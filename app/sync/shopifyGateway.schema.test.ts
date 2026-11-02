@@ -131,4 +131,25 @@ describe("forespørgsler mod Shopifys skema", () => {
       ),
     );
   });
+
+  it("ordrer: læsning, metafelter og tags", async () => {
+    const ORDER = "gid://shopify/Order/1";
+    expectValid(await capture((g) => g.readOrder(ORDER)));
+    expectValid(
+      await capture((g) =>
+        g.setOrderMetafields(ORDER, [
+          { key: "promised_date", type: "date", value: "2026-12-01" },
+          { key: "allocations", type: "json", value: "[]" },
+        ]),
+      ),
+    );
+    expectValid(
+      await capture((g) => g.addOrderTags(ORDER, ["Forudbestilling"])),
+    );
+    expectValid(
+      await capture((g) =>
+        g.removeOrderTags(ORDER, ["Forudbestilling uafklaret"]),
+      ),
+    );
+  });
 });

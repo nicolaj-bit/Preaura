@@ -46,8 +46,22 @@ model WebhookEvent {
   payload     String
   receivedAt  DateTime  @default(now())
   processedAt DateTime?
+  // "PENDING", "DONE", "FAILED" eller "SKIPPED" (emner, appen ikke behandler
+  // endnu). FAILED vises i admin med mulighed for at prøve igen.
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  lastError   String?
 
   @@index([processedAt, receivedAt])
+  @@index([shop, status])
+}
+
+// Sikrer, at kun én behandler arbejder på en butiks kø ad gangen, også hvis
+// appen kører på flere servere. Låsen udløber af sig selv.
+model QueueLock {
+  shop        String   @id
+  holder      String
+  lockedUntil DateTime
 }
 
 // ---------------------------------------------------------------------------
@@ -128,24 +142,53 @@ model Delivery {
 }
 
 // Tildeling: regnskabet over, hvem der har fået plads i hvilken leverance.
-// Rækker slettes ALDRIG. En annullering sætter status til "CANCELLED".
+//
+// Rækker slettes ALDRIG og ændres ikke i antal. Ændres en ordrelinjes antal,
+// annulleres den gamle række, og en ny oprettes — så historikken kan læses.
+//
+// En ordrelinje kan fordeles over flere leverancer, når der ikke er plads i
+// én. Derfor er den unikke nøgle: højst én AKTIV række pr. ordrelinje og
+// leverance, og højst én UAFKLARET række pr. ordrelinje. Det er partielle
+// unikke indekser, som Prisma ikke kan beskrive — de står i migrationen
+// 2026..._order_processing.
+//
 // onDelete: Restrict forhindrer også, at en leverance med tildelinger slettes.
 model Allocation {
-  id          String    @id @default(cuid())
-  shop        String
-  orderId     String
-  // Unik, så en gensendt webhook aldrig tæller den samme ordrelinje to gange.
-  orderLineId String
-  variantId   String
-  deliveryId  String
-  delivery    Delivery  @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
-  quantity    Int
-  // "ACTIVE" eller "CANCELLED".
-  status      String    @default("ACTIVE")
-  allocatedAt DateTime  @default(now())
-  cancelledAt DateTime?
-  updatedAt   DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  shop           String
+  orderId        String
+  // Ordrenummeret, som kunden og webshopejeren kender det, fx "#1042".
+  orderName      String    @default("")
+  // Hvornår kunden bestilte. Afgør rækkefølgen ved fordeling.
+  orderCreatedAt DateTime?
+  orderLineId    String
+  variantId      String
+  // Tom for en uafklaret tildeling (ingen plads i nogen leverance).
+  deliveryId     String?
+  delivery       Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  quantity       Int
+  // "ACTIVE", "UNRESOLVED" (ingen plads) eller "CANCELLED".
+  status         String    @default("ACTIVE")
+  // Datoen, kunden blev lovet, da tildelingen blev lavet. Den følger IKKE
+  // leverancen, hvis leverancens dato senere ændres.
+  promisedDate   String?
+  allocatedAt    DateTime  @default(now())
+  cancelledAt    DateTime?
+  updatedAt      DateTime  @updatedAt
 
-  @@unique([shop, orderLineId])
   @@index([shop, deliveryId])
+  @@index([shop, orderLineId])
+  @@index([shop, orderId])
+}
+
+// Hvilken leverance en selling plan hører til. Skrives af synkroniseringen,
+// hver gang en plan oprettes, og slettes aldrig — så en ordre på en plan, der
+// siden er taget ud af brug, stadig kan føres tilbage til sin leverance.
+model SellingPlanRef {
+  shop          String
+  sellingPlanId String
+  deliveryId    String
+  createdAt     DateTime @default(now())
+
+  @@id([shop, sellingPlanId])
 }

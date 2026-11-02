@@ -1,4 +1,8 @@
-import { ShopifyUserError, type ShopifyGateway } from "../sync/gateway";
+import {
+  ShopifyUserError,
+  type ShopifyGateway,
+  type ShopifyOrderState,
+} from "../sync/gateway";
 import {
   sellingPlanInput,
   type DesiredPlan,
@@ -74,7 +78,29 @@ export function createFakeShopify() {
     return created.map((plan) => ({ id: plan.id, option: plan.options[0] }));
   }
 
+  const orders = new Map<string, ShopifyOrderState>();
+
   const gateway: ShopifyGateway = {
+    async readOrder(orderId) {
+      const order = orders.get(orderId);
+      return order ? structuredClone(order) : null;
+    },
+    async setOrderMetafields(orderId, fields) {
+      write("setOrderMetafields", [orderId, fields]);
+      const order = orders.get(orderId)!;
+      for (const field of fields) order.metafields[field.key] = field.value;
+    },
+    async addOrderTags(orderId, tags) {
+      write("addOrderTags", [orderId, tags]);
+      const order = orders.get(orderId)!;
+      for (const tag of tags)
+        if (!order.tags.includes(tag)) order.tags.push(tag);
+    },
+    async removeOrderTags(orderId, tags) {
+      write("removeOrderTags", [orderId, tags]);
+      const order = orders.get(orderId)!;
+      order.tags = order.tags.filter((tag) => !tags.includes(tag));
+    },
     async read({ variantId, groupId, locationId }) {
       const variant = variants.get(variantId);
       const group = groupId ? groups.get(groupId) : undefined;
@@ -155,6 +181,16 @@ export function createFakeShopify() {
   return {
     gateway,
     writes,
+    orders,
+    /** Opretter eller erstatter en ordre i den simulerede Shopify. */
+    putOrder(snapshot: ShopifyOrderState["snapshot"]) {
+      const existing = orders.get(snapshot.id);
+      orders.set(snapshot.id, {
+        snapshot: structuredClone(snapshot),
+        tags: existing?.tags ?? [],
+        metafields: existing?.metafields ?? {},
+      });
+    },
     groups,
     variants,
     addVariant(variantId: string, state: Partial<Variant> = {}) {

@@ -427,6 +427,141 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       );
     },
 
+    async readOrder(orderId) {
+      const data = await run<{
+        order: {
+          id: string;
+          name: string;
+          createdAt: string;
+          cancelledAt: string | null;
+          tags: string[];
+          lineItems: {
+            nodes: {
+              id: string;
+              currentQuantity: number;
+              variant: { id: string } | null;
+              sellingPlan: { sellingPlanId: string | null } | null;
+            }[];
+          };
+          promisedDate: { value: string } | null;
+          allocations: { value: string } | null;
+        } | null;
+      }>(
+        graphql,
+        `#graphql
+          query PreauraOrder($id: ID!) {
+            order(id: $id) {
+              id
+              name
+              createdAt
+              cancelledAt
+              tags
+              lineItems(first: 250) {
+                nodes {
+                  id
+                  currentQuantity
+                  variant {
+                    id
+                  }
+                  sellingPlan {
+                    sellingPlanId
+                  }
+                }
+              }
+              promisedDate: metafield(namespace: "preaura", key: "promised_date") {
+                value
+              }
+              allocations: metafield(namespace: "preaura", key: "allocations") {
+                value
+              }
+            }
+          }`,
+        { id: orderId },
+      );
+      const order = data.order;
+      if (!order) return null;
+      return {
+        snapshot: {
+          id: order.id,
+          name: order.name,
+          createdAt: order.createdAt,
+          cancelled: order.cancelledAt != null,
+          lines: order.lineItems.nodes.map((line) => ({
+            id: line.id,
+            variantId: line.variant?.id ?? null,
+            sellingPlanId: line.sellingPlan?.sellingPlanId ?? null,
+            quantity: line.currentQuantity,
+          })),
+        },
+        tags: order.tags,
+        metafields: {
+          promised_date: order.promisedDate?.value ?? null,
+          allocations: order.allocations?.value ?? null,
+        },
+      };
+    },
+
+    async setOrderMetafields(orderId, fields) {
+      const data = await run<{
+        metafieldsSet: { userErrors: UserErrors };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraOrderMetafields($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        {
+          metafields: fields.map((field) => ({
+            ownerId: orderId,
+            namespace: "preaura",
+            key: field.key,
+            type: field.type,
+            value: field.value,
+          })),
+        },
+      );
+      check("Metafelter på ordren", data.metafieldsSet.userErrors);
+    },
+
+    async addOrderTags(orderId, tags) {
+      const data = await run<{ tagsAdd: { userErrors: UserErrors } }>(
+        graphql,
+        `#graphql
+          mutation PreauraAddOrderTags($id: ID!, $tags: [String!]!) {
+            tagsAdd(id: $id, tags: $tags) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        { id: orderId, tags },
+      );
+      check("Tag på ordren", data.tagsAdd.userErrors);
+    },
+
+    async removeOrderTags(orderId, tags) {
+      const data = await run<{ tagsRemove: { userErrors: UserErrors } }>(
+        graphql,
+        `#graphql
+          mutation PreauraRemoveOrderTags($id: ID!, $tags: [String!]!) {
+            tagsRemove(id: $id, tags: $tags) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        { id: orderId, tags },
+      );
+      check("Fjernelse af tag fra ordren", data.tagsRemove.userErrors);
+    },
+
     async setAvailable({ inventoryItemId, locationId, quantity, changeFrom }) {
       const data = await run<{
         inventorySetQuantities: { userErrors: UserErrors };

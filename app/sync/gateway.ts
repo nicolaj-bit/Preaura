@@ -1,9 +1,10 @@
+import type { OrderSnapshot } from "../models/preorder.server";
 import type { DesiredPlan, ShopifyPlan } from "./plans";
 
-// Alt, synkroniseringen må gøre i Shopify. Der er med vilje ingen metode til
-// at ÆNDRE en eksisterende selling plan: en plan kan oprettes eller tages ud
-// af brug, aldrig rettes. Så kan en solgt plans løfte til kunden ikke
-// overskrives.
+// Alt, synkroniseringen må gøre i Shopify — og dermed alt, appen må skrive.
+// Der er med vilje ingen metode til at ÆNDRE en eksisterende selling plan:
+// en plan kan oprettes eller tages ud af brug, aldrig rettes. Så kan en solgt
+// plans løfte til kunden ikke overskrives.
 
 export type ShopifyVariantState = {
   productId: string;
@@ -46,6 +47,14 @@ export interface ShopifyGateway {
   /** Slår lagersporing til og sætter inventory policy til DENY. */
   enforceInventoryTracking(productId: string, variantId: string): Promise<void>;
 
+  /** Læser en ordre. Null, hvis den ikke findes. */
+  readOrder(orderId: string): Promise<ShopifyOrderState | null>;
+
+  /** Sætter appens metafelter (namespace "preaura") på en ordre. */
+  setOrderMetafields(orderId: string, fields: OrderMetafield[]): Promise<void>;
+  addOrderTags(orderId: string, tags: string[]): Promise<void>;
+  removeOrderTags(orderId: string, tags: string[]): Promise<void>;
+
   /** Sætter tilgængeligt antal, kun hvis Shopify stadig står på `changeFrom`. */
   setAvailable(input: {
     inventoryItemId: string;
@@ -54,6 +63,19 @@ export interface ShopifyGateway {
     changeFrom: number;
   }): Promise<void>;
 }
+
+export type ShopifyOrderState = {
+  snapshot: OrderSnapshot;
+  tags: string[];
+  /** Nuværende værdier af appens metafelter på ordren. */
+  metafields: Record<string, string | null>;
+};
+
+export type OrderMetafield = {
+  key: string;
+  type: "date" | "json";
+  value: string;
+};
 
 /** Shopify svarede med userErrors. Beskeden vises på varianten i admin. */
 export class ShopifyUserError extends Error {

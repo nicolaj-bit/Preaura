@@ -37,7 +37,7 @@ api_version = "2026-10"
   # Ordrer. Håndteres af: /app/routes/webhooks.orders.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/orders"
-  topics = ["orders/create", "orders/updated", "orders/cancelled"]
+  topics = ["orders/create", "orders/updated", "orders/cancelled", "refunds/create"]
 
   # Håndteres af: /app/routes/webhooks.app.uninstalled.tsx
   [[webhooks.subscriptions]]

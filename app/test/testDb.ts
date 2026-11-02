@@ -34,6 +34,9 @@ export function createTestDb() {
       }
     },
     async reset() {
+      await client.webhookEvent.deleteMany();
+      await client.queueLock.deleteMany();
+      await client.sellingPlanRef.deleteMany();
       await client.allocation.deleteMany();
       await client.delivery.deleteMany();
       await client.variantPlan.deleteMany();

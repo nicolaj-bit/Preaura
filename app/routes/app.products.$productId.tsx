@@ -476,6 +476,12 @@ function DeliveryRow({
             <s-button-group>
               <s-button
                 slot="secondary-actions"
+                href={`/app/deliveries/${delivery.id}`}
+              >
+                Ordrer
+              </s-button>
+              <s-button
+                slot="secondary-actions"
                 onClick={() => onEdit(delivery.id)}
               >
                 Ret
@@ -503,7 +509,12 @@ function DeliveryRow({
           )}
 
           {cancelled && delivery.orders.length > 0 && (
-            <AffectedOrders orders={delivery.orders} />
+            <>
+              <AffectedOrders orders={delivery.orders} />
+              <s-link href={`/app/deliveries/${delivery.id}`}>
+                Se leverancens ordrer
+              </s-link>
+            </>
           )}
         </s-stack>
 
