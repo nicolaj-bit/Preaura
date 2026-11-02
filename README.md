@@ -19,7 +19,12 @@ Ordrer behandles endnu ikke (se «Før appen bruges til rigtigt salg»).
 - **Ordre-webhooks** (`orders/create`, `orders/updated`, `orders/cancelled`)
   → `app/routes/webhooks.orders.tsx`.
 - **`app/uninstalled`** → `app/routes/webhooks.app.uninstalled.tsx`.
-- **Admin-side** → `app/routes/app._index.tsx`. Viser butikkens navn.
+- **Admin-sider** (Polaris):
+  - `app/routes/app._index.tsx` — produkter i appen; nye vælges med
+    Shopifys produktvælger.
+  - `app/routes/app.products.$productId.tsx` — forudbestilling og
+    leverancer pr. variant, samt synkroniseringsstatus mod Shopify.
+  - `app/routes/app.settings.tsx` — butiksindstillinger.
 
 Alle webhooks verificerer HMAC-signaturen (forkert signatur giver 401),
 lægger hændelsen i tabellen `WebhookEvent` og svarer 200. Gentagne leveringer
@@ -129,7 +134,7 @@ database og sender konfigurationen (scopes og webhooks) til
 udviklingsbutikken. Første gang spørger den, hvilken butik der skal bruges.
 
 Tryk **P** i terminalen for at åbne appen. Shopify viser
-installationsdialogen med de seks scopes; godkend, og appen åbner inde i
+installationsdialogen med appens scopes; godkend, og appen åbner inde i
 Shopify Admin med butikkens navn. Så virker installation, OAuth og
 indlejring.
 
