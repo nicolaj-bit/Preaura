@@ -140,6 +140,8 @@ async function reconcile(
       const existing = group.plans.find((plan) => plan.id === storedId);
       if (existing && planMatches(existing, wanted)) {
         keep.add(existing.id);
+        // Planer fra før planreferencerne fandtes, får dem her.
+        await data.syncState.recordPlanRef(existing.id, wanted.deliveryId);
       } else {
         toCreate.push(wanted);
       }
@@ -225,6 +227,7 @@ async function saveCreatedPlans(
         `Shopify oprettede ikke planen "${wanted.option}". Synkronisér igen.`,
       );
     }
+    await data.syncState.recordPlanRef(match.id, wanted.deliveryId);
     await data.syncState.setDeliveryPlanId(wanted.deliveryId, match.id);
   }
 }

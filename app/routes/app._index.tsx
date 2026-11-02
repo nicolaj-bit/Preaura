@@ -10,6 +10,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { forShop } from "../models/preorder.server";
 import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
+import { queueFor } from "../models/queue.server";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
 // produktvælger. Et produkt står som slået til, hvis mindst én variant er.
@@ -25,7 +26,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const byId = new Map(products.map((product) => [product.id, product]));
 
+  const [counts, unresolved] = await Promise.all([
+    queueFor(session.shop).countByStatus(),
+    data.orders.unresolved(),
+  ]);
+
   return {
+    failedEvents: counts.FAILED ?? 0,
+    unresolvedOrders: new Set(unresolved.map((row) => row.orderId)).size,
     products: summaries.map((summary) => {
       const product = byId.get(summary.productId);
       return {
@@ -71,7 +79,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { products } = useLoaderData<typeof loader>();
+  const { products, failedEvents, unresolvedOrders } =
+    useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const busy = fetcher.state !== "idle";
@@ -106,6 +115,31 @@ export default function Index() {
       >
         Vælg produkter
       </s-button>
+
+      {unresolvedOrders > 0 && (
+        <s-banner tone="critical" heading="Ordrer uden plads i en leverance">
+          <s-paragraph>
+            {unresolvedOrders === 1
+              ? "1 ordre har"
+              : `${unresolvedOrders} ordrer har`}{" "}
+            forudbestilte varer, der ikke er plads til i nogen leverance.
+          </s-paragraph>
+          <s-link slot="secondary-actions" href="/app/queue">
+            Se ordrerne
+          </s-link>
+        </s-banner>
+      )}
+      {failedEvents > 0 && (
+        <s-banner tone="warning" heading="Ordrer kunne ikke behandles">
+          <s-paragraph>
+            {failedEvents === 1 ? "1 hændelse" : `${failedEvents} hændelser`}{" "}
+            fra Shopify fejlede og venter på, at du prøver igen.
+          </s-paragraph>
+          <s-link slot="secondary-actions" href="/app/queue">
+            Gå til ordrebehandling
+          </s-link>
+        </s-banner>
+      )}
 
       {products.length === 0 ? (
         <s-section>

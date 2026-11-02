@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import db from "../db.server";
 
 type QueuedWebhook = {
@@ -15,14 +15,12 @@ type QueuedWebhook = {
  * leverer nogle gange den samme webhook flere gange. Andre fejl kastes
  * videre, så handleren svarer 500, og Shopify prøver igen senere.
  */
-export async function enqueueWebhook({
-  webhookId,
-  shop,
-  topic,
-  payload,
-}: QueuedWebhook): Promise<void> {
+export async function enqueueWebhook(
+  { webhookId, shop, topic, payload }: QueuedWebhook,
+  client: PrismaClient = db,
+): Promise<void> {
   try {
-    await db.webhookEvent.create({
+    await client.webhookEvent.create({
       data: { webhookId, shop, topic, payload: JSON.stringify(payload ?? {}) },
     });
   } catch (error) {

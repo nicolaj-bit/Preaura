@@ -10,7 +10,10 @@ import { PrismaClient } from "@prisma/client";
 export function createTestDb() {
   const dir = mkdtempSync(join(tmpdir(), "preaura-test-"));
   const client = new PrismaClient({
-    datasourceUrl: `file:${join(dir, "test.sqlite")}`,
+    // Én forbindelse: migrationerne slår fremmednøgle-kontrollen fra og til
+    // med PRAGMA, som kun gælder den forbindelse, de kører på. Med en pulje
+    // af forbindelser kunne en forbindelse ende med kontrollen slået fra.
+    datasourceUrl: `file:${join(dir, "test.sqlite")}?connection_limit=1`,
   });
 
   return {
@@ -34,6 +37,9 @@ export function createTestDb() {
       }
     },
     async reset() {
+      await client.webhookEvent.deleteMany();
+      await client.queueLock.deleteMany();
+      await client.sellingPlanRef.deleteMany();
       await client.allocation.deleteMany();
       await client.delivery.deleteMany();
       await client.variantPlan.deleteMany();

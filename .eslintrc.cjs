@@ -115,7 +115,7 @@ module.exports = {
     },
     {
       files: ["app/**/*.{ts,tsx}"],
-      excludedFiles: ["app/sync/**", "app/test/**"],
+      excludedFiles: ["app/sync/**", "app/test/**", "**/*.test.ts"],
       rules: {
         "no-restricted-imports": [
           "error",
@@ -125,6 +125,7 @@ module.exports = {
                 group: [
                   "**/sync/shopifyGateway.server",
                   "**/sync/syncVariant.server",
+                  "**/sync/syncOrder.server",
                   "**/sync/gateway",
                 ],
                 message: "Brug shopifySync() fra app/sync/index.server.ts.",

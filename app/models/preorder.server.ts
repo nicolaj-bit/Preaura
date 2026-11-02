@@ -1,6 +1,11 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import {
+  planLineAllocation,
+  sameAllocation,
+  type Bucket,
+} from "../lib/allocation";
+import {
   allocatedQuantity,
   deliveryState,
   findActiveDelivery,
@@ -49,6 +54,21 @@ export type VariantPlanInput = {
   variantId: string;
   inventoryItemId: string;
   locationId: string | null;
+};
+
+/** En ordre, som Shopify ser den nu. Læses frisk ved hver behandling. */
+export type OrderSnapshot = {
+  id: string;
+  name: string;
+  createdAt: string;
+  cancelled: boolean;
+  lines: {
+    id: string;
+    variantId: string | null;
+    sellingPlanId: string | null;
+    /** Nuværende antal efter rettelser og refunderinger. */
+    quantity: number;
+  }[];
 };
 
 export type DeliveryView = {
@@ -311,6 +331,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      /** Husker, hvilken leverance en plan hører til. Slettes aldrig. */
+      async recordPlanRef(sellingPlanId: string, deliveryId: string) {
+        await client.sellingPlanRef.upsert({
+          where: { shop_sellingPlanId: { shop, sellingPlanId } },
+          create: { shop, sellingPlanId, deliveryId },
+          update: {},
+        });
+      },
+
       async setDeliveryPlanId(
         deliveryId: string,
         sellingPlanId: string | null,
@@ -341,7 +370,174 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
     },
+    orders: {
+      /**
+       * Bringer en ordres tildelinger i overensstemmelse med ordren, som den
+       * ser ud i Shopify nu. Idempotent: samme ordre to gange ændrer intet.
+       * Tildelinger slettes aldrig — en ændring annullerer den gamle række og
+       * opretter en ny.
+       *
+       * Returnerer de varianter, der er berørt, så deres lager kan
+       * synkroniseres.
+       */
+      async apply(order: OrderSnapshot) {
+        return client.$transaction(async (tx) => {
+          const variantIds = new Set<string>();
+          let changed = false;
+          const handledLines = new Set<string>();
+
+          for (const line of order.lines) {
+            if (!line.sellingPlanId) continue;
+            const start = await deliveryForPlan(tx, line.sellingPlanId);
+            if (!start) continue; // Ikke en af appens planer.
+            handledLines.add(line.id);
+            variantIds.add(start.variantId);
+
+            const lineChanged = await applyLine(tx, order, line.id, {
+              variantId: start.variantId,
+              startDeliveryId: start.id,
+              desired: order.cancelled ? 0 : line.quantity,
+            });
+            changed ||= lineChanged;
+          }
+
+          // Linjer, der ikke længere findes på ordren, frigives.
+          const orphans = await tx.allocation.findMany({
+            where: {
+              shop,
+              orderId: order.id,
+              status: { in: ["ACTIVE", "UNRESOLVED"] },
+              orderLineId: { notIn: [...handledLines] },
+            },
+          });
+          for (const row of orphans) {
+            await cancelRow(tx, row.id);
+            variantIds.add(row.variantId);
+            changed = true;
+          }
+
+          return { variantIds: [...variantIds], changed };
+        });
+      },
+
+      /** Alle ordrens tildelinger, til ordrens metafelt og tags. */
+      async allocationsForOrder(orderId: string) {
+        return client.allocation.findMany({
+          where: { shop, orderId },
+          include: { delivery: { select: { position: true } } },
+          orderBy: [{ orderLineId: "asc" }, { allocatedAt: "asc" }],
+        });
+      },
+
+      async forDelivery(deliveryId: string) {
+        const delivery = await client.delivery.findFirst({
+          where: { shop, id: deliveryId },
+        });
+        if (!delivery) return null;
+        const allocations = await client.allocation.findMany({
+          where: { shop, deliveryId },
+          orderBy: [{ orderCreatedAt: "asc" }, { allocatedAt: "asc" }],
+        });
+        return { delivery, allocations };
+      },
+
+      async unresolved() {
+        return client.allocation.findMany({
+          where: { shop, status: "UNRESOLVED" },
+          orderBy: { orderCreatedAt: "asc" },
+        });
+      },
+    },
   };
+
+  async function deliveryForPlan(tx: Tx, sellingPlanId: string) {
+    const ref = await tx.sellingPlanRef.findUnique({
+      where: { shop_sellingPlanId: { shop, sellingPlanId } },
+    });
+    const deliveryId =
+      ref?.deliveryId ??
+      (await tx.delivery.findFirst({ where: { shop, sellingPlanId } }))?.id;
+    if (!deliveryId) return null;
+    return tx.delivery.findFirst({ where: { shop, id: deliveryId } });
+  }
+
+  async function cancelRow(tx: Tx, id: string) {
+    await tx.allocation.updateMany({
+      where: { shop, id },
+      data: { status: "CANCELLED", cancelledAt: new Date() },
+    });
+  }
+
+  async function applyLine(
+    tx: Tx,
+    order: OrderSnapshot,
+    orderLineId: string,
+    {
+      variantId,
+      startDeliveryId,
+      desired,
+    }: { variantId: string; startDeliveryId: string; desired: number },
+  ) {
+    const rows = await tx.allocation.findMany({
+      where: { shop, orderLineId, status: { in: ["ACTIVE", "UNRESOLVED"] } },
+    });
+    const keyOf = (row: { status: string; deliveryId: string | null }) =>
+      row.status === "UNRESOLVED" ? null : row.deliveryId;
+    const current: Bucket[] = rows.map((row) => ({
+      deliveryId: keyOf(row),
+      quantity: row.quantity,
+      promisedDate: row.promisedDate,
+    }));
+
+    const deliveries = await tx.delivery.findMany({
+      where: { shop, variantId },
+      include: {
+        allocations: {
+          where: { shop, status: "ACTIVE" },
+          select: { quantity: true, status: true },
+        },
+      },
+    });
+    const target = planLineAllocation({
+      desired,
+      current,
+      startDeliveryId,
+      deliveries: deliveries.map((d) => ({
+        id: d.id,
+        position: d.position,
+        date: d.date,
+        status: d.status,
+        remaining: remainingQuantity(d.quantity, d.allocations),
+      })),
+    });
+    if (sameAllocation(target, current)) return false;
+
+    // Rækker, hvis antal ikke passer, annulleres; nye oprettes. Ingen rækker
+    // slettes, og ingen rækkers antal ændres.
+    for (const row of rows) {
+      const wanted = target.find((b) => b.deliveryId === keyOf(row));
+      if (wanted?.quantity !== row.quantity) await cancelRow(tx, row.id);
+    }
+    for (const bucket of target) {
+      const existing = rows.find((row) => keyOf(row) === bucket.deliveryId);
+      if (existing?.quantity === bucket.quantity) continue;
+      await tx.allocation.create({
+        data: {
+          shop,
+          orderId: order.id,
+          orderName: order.name,
+          orderCreatedAt: new Date(order.createdAt),
+          orderLineId,
+          variantId,
+          deliveryId: bucket.deliveryId,
+          quantity: bucket.quantity,
+          status: bucket.deliveryId ? "ACTIVE" : "UNRESOLVED",
+          promisedDate: bucket.promisedDate,
+        },
+      });
+    }
+    return true;
+  }
 }
 
 type Tx = Prisma.TransactionClient;

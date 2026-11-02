@@ -4,9 +4,9 @@ Offentlig Shopify-app (distribution gennem Shopify App Store), udviklet af
 LALATOTO of Denmark ApS. Bygget på Shopifys officielle app-skabelon
 (React Router — efterfølgeren til Remix-skabelonen) med Polaris og App Bridge.
 
-Status: leverancer, selling plans og lagerstyring. Appen skriver selling
-plans og lagerantal til Shopify for varianter med forudbestilling slået til.
-Ordrer behandles endnu ikke (se «Før appen bruges til rigtigt salg»).
+Status: leverancer, selling plans, lagerstyring og behandling af ordrer.
+Appen skriver selling plans og lagerantal til Shopify for varianter med
+forudbestilling slået til, og leveringsdato og tag på forudbestilte ordrer.
 
 ## Hvad er sat op
 
@@ -16,8 +16,8 @@ Ordrer behandles endnu ikke (se «Før appen bruges til rigtigt salg»).
   `shopify.app.toml`.
 - **Compliance-webhooks** (`customers/data_request`, `customers/redact`,
   `shop/redact`) → `app/routes/webhooks.compliance.tsx`.
-- **Ordre-webhooks** (`orders/create`, `orders/updated`, `orders/cancelled`)
-  → `app/routes/webhooks.orders.tsx`.
+- **Ordre-webhooks** (`orders/create`, `orders/updated`, `orders/cancelled`,
+  `refunds/create`) → `app/routes/webhooks.orders.tsx`.
 - **`app/uninstalled`** → `app/routes/webhooks.app.uninstalled.tsx`.
 - **Admin-sider** (Polaris):
   - `app/routes/app._index.tsx` — produkter i appen; nye vælges med
@@ -28,8 +28,9 @@ Ordrer behandles endnu ikke (se «Før appen bruges til rigtigt salg»).
 
 Alle webhooks verificerer HMAC-signaturen (forkert signatur giver 401),
 lægger hændelsen i tabellen `WebhookEvent` og svarer 200. Gentagne leveringer
-genkendes på `X-Shopify-Webhook-Id` og lægges ikke i køen to gange. Køen
-behandles ikke endnu — det kommer senere.
+genkendes på `X-Shopify-Webhook-Id` og lægges ikke i køen to gange.
+Ordre-hændelser behandles bagefter af køen (se «Behandling af ordrer»);
+compliance-hændelser markeres endnu som «ikke behandlet».
 
 ## Datamodel
 
@@ -40,7 +41,8 @@ Fire tabeller i `prisma/schema.prisma`, alle med en `shop`-kolonne:
 | `ShopSetting` | Én række pr. butik: dato som afsendelse eller levering, og tekster. |
 | `VariantPlan` | Én række pr. variant: produkt, lager-id'er, og om forudbestilling er slået til. Et produkt er slået til, hvis mindst én variant er. |
 | `Delivery` | Leverancer pr. variant: rækkefølgenummer, dato, antal, status (`OPEN`/`CANCELLED`) og et tomt `sellingPlanId`. |
-| `Allocation` | Hvilken ordrelinje har fået plads i hvilken leverance. Slettes aldrig — annullering sætter status. Unik pr. ordrelinje. |
+| `Allocation` | Hvilken ordrelinje har fået plads i hvilken leverance, med den dato kunden blev lovet. Status `ACTIVE`, `UNRESOLVED` (ingen plads) eller `CANCELLED`. Slettes aldrig, og antal ændres aldrig — en ændring annullerer rækken og opretter en ny. En linje kan fordeles over flere leverancer; den unikke nøgle er derfor *én aktiv række pr. linje og leverance* (partielt indeks i migrationen). |
+| `SellingPlanRef` | Hvilken leverance hver selling plan hører til — også planer, der er taget ud af brug. |
 
 Regler, alt andet hviler på (`app/lib/deliveries.ts`):
 
@@ -59,8 +61,10 @@ tabellerne andre steder.
 
 ## Synkronisering med Shopify
 
-Al skrivning til Shopify sker i `syncVariant()` i
-`app/sync/syncVariant.server.ts`. Den tager én variant og bringer Shopify i
+Al skrivning til Shopify sker i synkroniseringen i `app/sync/`:
+`syncVariant()` for en variants selling plans og lager, og `syncOrder()` for
+en ordres leveringsdato og tags. Begge læser Shopify først og skriver kun det,
+der afviger. `syncVariant()` tager én variant og bringer Shopify i
 overensstemmelse med appens data:
 
 - **Én selling plan group pr. variant**, knyttet til varianten.
@@ -90,6 +94,34 @@ Regler:
 To lint-regler håndhæver arkitekturen: GraphQL-mutationer må kun stå i
 `app/sync/shopifyGateway.server.ts`, og resten af appen må kun bruge
 synkroniseringen gennem `app/sync/index.server.ts`.
+
+## Behandling af ordrer
+
+`app/orders/processQueue.server.ts` omsætter ordre-hændelser i køen til
+tildelinger:
+
+- **Ordren læses frisk fra Shopify** ved hver behandling, og tildelingerne
+  bringes i overensstemmelse med den (`currentQuantity` efter rettelser og
+  refunderinger). Derfor tæller en gensendt webhook aldrig to gange, og
+  rækkefølgen af `create`/`updated`/`cancelled` er ligegyldig.
+- **Selling plan-id'et afgør leverancen.** Er der ikke plads, fyldes resten
+  i de følgende leverancer. Er der ingen plads nogen steder, bliver resten
+  *uafklaret*: ordren tagges «Forudbestilling uafklaret» og vises under
+  Ordrebehandling i admin. Behandles ordren igen, når der er plads, afklares
+  den.
+- **Først til mølle efter bestillingstidspunkt**: hændelser behandles i
+  ordrens oprettelsesrækkefølge. Behandlingen venter 5 sekunder efter en
+  webhook, så ordrer, der kommer næsten samtidig, sorteres korrekt.
+- **Én behandler ad gangen pr. butik** (lås i databasen, `QueueLock`), så
+  to ordrer aldrig læser det samme resterende antal.
+- **Ordren får sit løfte frosset:** metafeltet `preaura.promised_date` (dato)
+  og `preaura.allocations` (json), plus tagget «Forudbestilling». Datoen
+  kommer fra tildelingen, så en senere ændret leverance ikke ændrer den.
+- Bagefter synkroniseres variantens lager, så Shopify igen står på det
+  resterende antal.
+- **Fejl** lander på listen under Ordrebehandling med «Prøv igen». En
+  periodisk fejning (hvert minut) samler ventende hændelser op efter en
+  genstart.
 
 ## Krav
 
@@ -184,14 +216,17 @@ npm run lint
 De samme tjek kører automatisk på GitHub ved hvert push
 (`.github/workflows/checks.yml`).
 
-## Før appen bruges til rigtigt salg
+## Kendte begrænsninger
 
-**Ordrer bliver endnu ikke til tildelinger.** Ordre-webhooks lægges i kø, men
-behandles ikke. Shopify trækker selv fra lageret ved hvert salg, men appens
-«resterende» tæller ikke salget med. Kører en synkronisering efter et salg
-(fx fordi en leverance rettes), sætter den lageret tilbage til appens tal —
-og så kan varen sælges igen. Køen skal behandles til tildelinger, før appen
-bruges i en rigtig butik.
+- **Rækkefølgen er kun sikret inden for samme behandlingsrunde.** Kommer en
+  ordre frem mere end nogle sekunder efter en senere ordre, og er der netop
+  ikke plads til begge i leverancen, beholder den senere ordre sin plads —
+  et lovet leveringsløfte flyttes ikke. Shopifys lager (DENY) forhindrer
+  normalt situationen helt.
+- **Besked til webshopejeren** sker i admin (banner og Ordrebehandling) og
+  med et tag på ordren i Shopify — ikke på mail.
+- **Køen kører i appens egen proces.** Kører appen på flere servere, sikrer
+  låsen i databasen stadig, at kun én behandler arbejder ad gangen.
 
 ## Før indsendelse til App Store
 
@@ -207,6 +242,9 @@ godkendelse:
 - **Opbevaringsperioder:** køtabellen `WebhookEvent` gemmer ordredata uden
   udløb. Der skal laves sletning af behandlede hændelser efter en fast
   periode, og `customers/redact` og `shop/redact` skal faktisk slette data.
+  De lægges i kø i dag, men markeres som «ikke behandlet». Bemærk, at
+  tildelinger ellers aldrig slettes — `shop/redact` er den eneste bevidste
+  undtagelse.
 - **Kryptering ved lagring og overførsel:** overførsel er HTTPS. Lagring
   kræver en database, der krypterer data (fx en administreret PostgreSQL),
   i stedet for SQLite.
