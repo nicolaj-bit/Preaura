@@ -1,10 +1,14 @@
 # Konfiguration af PREAURA i Shopify.
-# client_id og application_url udfyldes af `npm run config:link`, når appen
-# er oprettet i Shopify Dev Dashboard. Distribution (offentlig / App Store)
-# vælges i Dev Dashboard og kan ikke ændres bagefter.
-client_id = ""
+# Distribution (offentlig / App Store) vælges i Dev Dashboard og kan ikke
+# ændres bagefter.
+#
+# OBS: `shopify app config link` overskriver denne fil med appens tomme
+# standardkonfiguration og sletter bl.a. scopes. Kør `git diff` bagefter.
+client_id = "5021b1e5a0b9cb456c79906ba0d09bd4"
 name = "PREAURA"
 embedded = true
+# Pladsholder. `npm run dev` sætter selv tunnel-adressen under udvikling.
+application_url = "https://shopify.dev/apps/default-app-home"
 
 [access_scopes]
 # Kun disse seks. Hvert ekstra scope forlænger Shopifys gennemgang.
