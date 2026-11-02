@@ -150,7 +150,10 @@ async function setup(deliveries: { date: string; quantity: number }[]) {
 }
 
 describe("jeres scenarier", () => {
-  it("ordre nummer 151 lander i leverance 2", async () => {
+  // Kører 151 ordrer hele vejen igennem og tager derfor nogle sekunder —
+  // mere end Vitests standardgrænse på 5 sek. på en langsom CI-maskine. En
+  // afbrudt test kører videre i baggrunden og ødelægger de næste tests.
+  it("ordre nummer 151 lander i leverance 2", { timeout: 60_000 }, async () => {
     const h = await setup([
       { date: "2026-12-01", quantity: 150 },
       { date: "2027-01-15", quantity: 50 },
