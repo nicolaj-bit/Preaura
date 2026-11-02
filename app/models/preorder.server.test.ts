@@ -1,7 +1,3 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   DeliveryValidationError,
@@ -9,46 +5,22 @@ import {
   forShop,
 } from "./preorder.server";
 import { MESSAGES } from "../lib/deliveries";
+import { createTestDb } from "../test/testDb";
 
 // Kører datalaget mod en rigtig SQLite-database i en midlertidig mappe, med
 // de samme migrationer som appen.
 
-const dir = mkdtempSync(join(tmpdir(), "preaura-test-"));
-const client = new PrismaClient({
-  datasourceUrl: `file:${join(dir, "test.sqlite")}`,
-});
+const testDb = createTestDb();
+const client = testDb.client;
 
 const TODAY = "2026-11-02";
 const A = "butik-a.myshopify.com";
 const B = "butik-b.myshopify.com";
 const VARIANT = "gid://shopify/ProductVariant/1";
 
-beforeAll(async () => {
-  const migrations = join(__dirname, "../../prisma/migrations");
-  for (const name of readdirSync(migrations)
-    .filter((n) => /^\d/.test(n))
-    .sort()) {
-    const sql = readFileSync(join(migrations, name, "migration.sql"), "utf8");
-    for (const statement of sql
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean)) {
-      await client.$executeRawUnsafe(statement);
-    }
-  }
-});
-
-afterAll(async () => {
-  await client.$disconnect();
-  rmSync(dir, { recursive: true, force: true });
-});
-
-beforeEach(async () => {
-  await client.allocation.deleteMany();
-  await client.delivery.deleteMany();
-  await client.variantPlan.deleteMany();
-  await client.shopSetting.deleteMany();
-});
+beforeAll(() => testDb.setup());
+afterAll(() => testDb.teardown());
+beforeEach(() => testDb.reset());
 
 async function addVariant(shop: string, variantId = VARIANT) {
   await forShop(shop, client).variantPlans.addVariants([

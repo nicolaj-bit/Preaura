@@ -20,8 +20,10 @@ include_config_on_deploy = true
 redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 
 [access_scopes]
-# Kun disse seks. Hvert ekstra scope forlænger Shopifys gennemgang.
-scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders"
+# Hold listen kort. Hvert ekstra scope forlænger Shopifys gennemgang.
+# write_purchase_options er påkrævet af sellingPlanGroupCreate (selling plans
+# til forudbestilling) — write_products alene er ikke nok.
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options"
 
 [webhooks]
 api_version = "2026-10"

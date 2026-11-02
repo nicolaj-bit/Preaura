@@ -62,6 +62,8 @@ export type DeliveryView = {
   remaining: number;
   state: DeliveryState;
   allocationCount: number;
+  /** Selling plan i Shopify. Tom, indtil leverancen er synkroniseret. */
+  sellingPlanId: string | null;
   /** Ordrer med tildelinger i leverancen (også annullerede tildelinger). */
   orders: { orderId: string; quantity: number; status: string }[];
 };
@@ -203,6 +205,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           remaining: row.remaining,
           state: deliveryState(row, activeByVariant.get(row.variantId) ?? null),
           allocationCount: row.allocations.length,
+          sellingPlanId: row.sellingPlanId,
           orders: row.allocations,
         }));
       },
@@ -255,13 +258,14 @@ export function forShop(shop: string, client: PrismaClient = db) {
             where: { id, shop },
             data: result.value,
           });
+          return { variantId: delivery.variantId };
         });
       },
 
       /** Sletter kun leverancer, der aldrig har haft tildelinger. */
       async remove(id: string) {
         return client.$transaction(async (tx) => {
-          await findDelivery(tx, id);
+          const delivery = await findDelivery(tx, id);
           const allocations = await tx.allocation.count({
             where: { shop, deliveryId: id },
           });
@@ -271,6 +275,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
             );
           }
           await tx.delivery.deleteMany({ where: { id, shop } });
+          return { variantId: delivery.variantId };
         });
       },
 
@@ -281,11 +286,58 @@ export function forShop(shop: string, client: PrismaClient = db) {
       async cancel(id: string) {
         return client.$transaction(async (tx) => {
           const delivery = await findDelivery(tx, id);
-          if (delivery.status === "CANCELLED") return;
-          await tx.delivery.updateMany({
-            where: { id, shop },
-            data: { status: "CANCELLED", cancelledAt: new Date() },
-          });
+          if (delivery.status !== "CANCELLED") {
+            await tx.delivery.updateMany({
+              where: { id, shop },
+              data: { status: "CANCELLED", cancelledAt: new Date() },
+            });
+          }
+          return { variantId: delivery.variantId };
+        });
+      },
+    },
+
+    // Kun til brug for app/sync/. Holder styr på, hvad der er sendt til
+    // Shopify, og hvordan seneste synkronisering gik.
+    syncState: {
+      async getVariant(variantId: string) {
+        return client.variantPlan.findFirst({ where: { shop, variantId } });
+      },
+
+      async setGroupId(variantId: string, sellingPlanGroupId: string | null) {
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { sellingPlanGroupId },
+        });
+      },
+
+      async setDeliveryPlanId(
+        deliveryId: string,
+        sellingPlanId: string | null,
+      ) {
+        await client.delivery.updateMany({
+          where: { shop, id: deliveryId },
+          data: { sellingPlanId },
+        });
+      },
+
+      async recordSuccess(variantId: string, available: number | null) {
+        const now = new Date();
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: {
+            lastSyncedAt: now,
+            lastSyncAttemptAt: now,
+            lastSyncError: null,
+            syncedAvailable: available,
+          },
+        });
+      },
+
+      async recordFailure(variantId: string, message: string) {
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { lastSyncAttemptAt: new Date(), lastSyncError: message },
         });
       },
     },

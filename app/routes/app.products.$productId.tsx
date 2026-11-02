@@ -19,6 +19,7 @@ import {
   fetchShopTimeZone,
 } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
+import { shopifySync } from "../sync/index.server";
 import {
   addDays,
   todayInTimeZone,
@@ -65,27 +66,56 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   );
   const timeZone = await fetchShopTimeZone(admin.graphql);
 
+  // Lagerantallet, som Shopify står med lige nu (kun læsning).
+  const sync = shopifySync(admin.graphql, session.shop);
+  const shopifyAvailable = await Promise.all(
+    plans.map((plan) =>
+      sync.readAvailable(plan.variantId, plan.locationId).catch(() => null),
+    ),
+  );
+
+  const syncTimeFormat = new Intl.DateTimeFormat("da-DK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  });
+  const formatSyncTime = (date: Date | null) =>
+    date ? syncTimeFormat.format(date) : null;
+
   return {
     today: todayInTimeZone(timeZone),
     product: {
       title: product?.title ?? "Produktet findes ikke længere i Shopify",
       imageUrl: product?.imageUrl ?? null,
     },
-    variants: plans.map((plan) => {
+    variants: plans.map((plan, index) => {
       const variant = product?.variants.find((v) => v.id === plan.variantId);
+      const variantDeliveries = deliveries.filter(
+        (d) => d.variantId === plan.variantId,
+      );
+      const active = variantDeliveries.find((d) => d.state === "ACTIVE");
       return {
         variantId: plan.variantId,
         title: variant?.title ?? "Varianten findes ikke længere i Shopify",
         sku: variant?.sku ?? null,
         enabled: plan.preorderEnabled,
-        deliveries: deliveries.filter((d) => d.variantId === plan.variantId),
+        deliveries: variantDeliveries,
+        sync: {
+          activeDelivery: active
+            ? { position: active.position, date: active.date }
+            : null,
+          shopifyAvailable: shopifyAvailable[index],
+          lastSyncedAt: formatSyncTime(plan.lastSyncedAt),
+          lastSyncError: plan.lastSyncError,
+          lastSyncAttemptAt: formatSyncTime(plan.lastSyncAttemptAt),
+        },
       };
     }),
   };
 };
 
 type ActionResult =
-  | { ok: true; message: string }
+  | { ok: true; message: string; syncFailed?: boolean }
   | { ok: false; message?: string; fieldErrors?: DeliveryErrors };
 
 export const action = async ({
@@ -97,42 +127,72 @@ export const action = async ({
   const intent = String(form.get("intent"));
   const today = () =>
     fetchShopTimeZone(admin.graphql).then((tz) => todayInTimeZone(tz));
+  const sync = shopifySync(admin.graphql, session.shop);
+
+  // Efter hver ændring bringes Shopify i trit med appen. Fejler det, gemmes
+  // fejlen på varianten og vises der; ændringen i appen står ved magt.
+  async function done(
+    variantId: string,
+    message: string,
+  ): Promise<ActionResult> {
+    const result = await sync.sync(variantId);
+    if (result.ok) return { ok: true, message };
+    // Ændringen er gemt i appen; kun Shopify mangler. Fejlen står fast ved
+    // varianten, indtil en synkronisering lykkes.
+    return {
+      ok: true,
+      syncFailed: true,
+      message: `${message}, men Shopify kunne ikke opdateres`,
+    };
+  }
 
   try {
     switch (intent) {
       case "toggle": {
+        const variantId = String(form.get("variantId"));
         const enabled = form.get("enabled") === "true";
-        await data.variantPlans.setEnabled(
-          String(form.get("variantId")),
-          enabled,
+        await data.variantPlans.setEnabled(variantId, enabled);
+        return done(
+          variantId,
+          enabled ? "Forudbestilling slået til" : "Forudbestilling slået fra",
         );
-        return {
-          ok: true,
-          message: enabled
-            ? "Forudbestilling slået til"
-            : "Forudbestilling slået fra",
-        };
       }
-      case "create":
+      case "create": {
+        const variantId = String(form.get("variantId"));
         await data.deliveries.create(
-          String(form.get("variantId")),
+          variantId,
           { date: form.get("date"), quantity: form.get("quantity") },
           await today(),
         );
-        return { ok: true, message: "Leverance oprettet" };
-      case "update":
-        await data.deliveries.update(
+        return done(variantId, "Leverance oprettet");
+      }
+      case "update": {
+        const { variantId } = await data.deliveries.update(
           String(form.get("deliveryId")),
           { date: form.get("date"), quantity: form.get("quantity") },
           await today(),
         );
-        return { ok: true, message: "Leverance gemt" };
-      case "delete":
-        await data.deliveries.remove(String(form.get("deliveryId")));
-        return { ok: true, message: "Leverance slettet" };
-      case "cancel":
-        await data.deliveries.cancel(String(form.get("deliveryId")));
-        return { ok: true, message: "Leverance annulleret" };
+        return done(variantId, "Leverance gemt");
+      }
+      case "delete": {
+        const { variantId } = await data.deliveries.remove(
+          String(form.get("deliveryId")),
+        );
+        return done(variantId, "Leverance slettet");
+      }
+      case "cancel": {
+        const { variantId } = await data.deliveries.cancel(
+          String(form.get("deliveryId")),
+        );
+        return done(variantId, "Leverance annulleret");
+      }
+      case "sync": {
+        const variantId = String(form.get("variantId"));
+        if (!(await data.syncState.getVariant(variantId))) {
+          return { ok: false, message: "Varianten findes ikke i appen." };
+        }
+        return done(variantId, "Synkroniseret med Shopify");
+      }
       default:
         return { ok: false, message: "Ukendt handling." };
     }
@@ -166,7 +226,9 @@ function formatDate(date: string) {
 function useSuccessToast(result: ActionResult | undefined) {
   const shopify = useAppBridge();
   useEffect(() => {
-    if (result?.ok) shopify.toast.show(result.message);
+    if (result?.ok) {
+      shopify.toast.show(result.message, { isError: result.syncFailed });
+    }
   }, [result, shopify]);
 }
 
@@ -236,6 +298,9 @@ function VariantSection({
         {toggle.data && !toggle.data.ok && toggle.data.message && (
           <s-banner tone="critical">{toggle.data.message}</s-banner>
         )}
+        {(enabled || variant.sync.lastSyncError) && (
+          <SyncStatus variantId={variant.variantId} sync={variant.sync} />
+        )}
         {enabled && !hasActive && (
           <s-banner tone="warning">
             Forudbestilling er slået til, men der er ingen leverance med ledige
@@ -275,6 +340,69 @@ function VariantSection({
         )}
       </s-stack>
     </s-section>
+  );
+}
+
+function SyncStatus({
+  variantId,
+  sync,
+}: {
+  variantId: string;
+  sync: VariantData["sync"];
+}) {
+  const fetcher = useFetcher<typeof action>();
+  useSuccessToast(fetcher.data);
+  const busy = fetcher.state !== "idle";
+  const syncNow = () =>
+    fetcher.submit({ intent: "sync", variantId }, { method: "POST" });
+
+  return (
+    <s-stack gap="base">
+      {sync.lastSyncError && (
+        <s-banner tone="critical" heading="Shopify er ikke opdateret">
+          <s-paragraph>{sync.lastSyncError}</s-paragraph>
+          {sync.lastSyncAttemptAt && (
+            <s-paragraph>Seneste forsøg: {sync.lastSyncAttemptAt}</s-paragraph>
+          )}
+          <s-button
+            slot="secondary-actions"
+            onClick={syncNow}
+            {...(busy ? { loading: true } : {})}
+          >
+            Prøv igen
+          </s-button>
+        </s-banner>
+      )}
+      <s-grid
+        gridTemplateColumns="1fr 1fr 1fr auto"
+        gap="base"
+        alignItems="center"
+      >
+        <s-stack gap="small-500">
+          <s-text color="subdued">Aktiv leverance</s-text>
+          <s-text>
+            {sync.activeDelivery
+              ? `Nr. ${sync.activeDelivery.position} · ${formatDate(sync.activeDelivery.date)}`
+              : "Ingen"}
+          </s-text>
+        </s-stack>
+        <s-stack gap="small-500">
+          <s-text color="subdued">Lager i Shopify nu</s-text>
+          <s-text>
+            {sync.shopifyAvailable == null
+              ? "Ukendt"
+              : `${sync.shopifyAvailable} stk.`}
+          </s-text>
+        </s-stack>
+        <s-stack gap="small-500">
+          <s-text color="subdued">Sidst synkroniseret</s-text>
+          <s-text>{sync.lastSyncedAt ?? "Aldrig"}</s-text>
+        </s-stack>
+        <s-button onClick={syncNow} {...(busy ? { loading: true } : {})}>
+          Synkronisér
+        </s-button>
+      </s-grid>
+    </s-stack>
   );
 }
 
