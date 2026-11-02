@@ -18,7 +18,8 @@ export default function App() {
   return (
     <AppProvider apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">PREAURA</s-link>
+        <s-link href="/app">Produkter</s-link>
+        <s-link href="/app/settings">Indstillinger</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

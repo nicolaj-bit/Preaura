@@ -4,8 +4,9 @@ Offentlig Shopify-app (distribution gennem Shopify App Store), udviklet af
 LALATOTO of Denmark ApS. Bygget på Shopifys officielle app-skabelon
 (React Router — efterfølgeren til Remix-skabelonen) med Polaris og App Bridge.
 
-Status: skelet. Installation, OAuth, indlejring i Shopify Admin og webhooks
-virker. Ingen forretningslogik endnu.
+Status: datamodel og administration af leverancer. Appen læser produkter fra
+Shopify, men skriver intet til Shopify endnu (selling plans og lager kommer
+senere).
 
 ## Hvad er sat op
 
@@ -23,6 +24,32 @@ Alle webhooks verificerer HMAC-signaturen (forkert signatur giver 401),
 lægger hændelsen i tabellen `WebhookEvent` og svarer 200. Gentagne leveringer
 genkendes på `X-Shopify-Webhook-Id` og lægges ikke i køen to gange. Køen
 behandles ikke endnu — det kommer senere.
+
+## Datamodel
+
+Fire tabeller i `prisma/schema.prisma`, alle med en `shop`-kolonne:
+
+| Tabel | Hvad |
+| --- | --- |
+| `ShopSetting` | Én række pr. butik: dato som afsendelse eller levering, og tekster. |
+| `VariantPlan` | Én række pr. variant: produkt, lager-id'er, og om forudbestilling er slået til. Et produkt er slået til, hvis mindst én variant er. |
+| `Delivery` | Leverancer pr. variant: rækkefølgenummer, dato, antal, status (`OPEN`/`CANCELLED`) og et tomt `sellingPlanId`. |
+| `Allocation` | Hvilken ordrelinje har fået plads i hvilken leverance. Slettes aldrig — annullering sætter status. Unik pr. ordrelinje. |
+
+Regler, alt andet hviler på (`app/lib/deliveries.ts`):
+
+- **Resterende antal gemmes ikke.** Det er altid leverancens antal minus
+  summen af aktive tildelinger.
+- **Aktiv leverance** er den første efter rækkefølgenummer, der hverken er
+  annulleret eller udsolgt.
+- **Validering:** datoen skal ligge efter i dag (i butikkens tidszone),
+  antal skal være større end nul, og antal må ikke sættes under det tildelte.
+- En leverance med tildelinger kan ikke slettes, kun annulleres.
+
+**Adskillelse mellem butikker:** al adgang til de fire tabeller går gennem
+`forShop(shop)` i `app/models/preorder.server.ts`, og `shop` kommer altid fra
+den godkendte Shopify-session. En lint-regel afviser direkte brug af
+tabellerne andre steder.
 
 ## Krav
 
@@ -108,9 +135,13 @@ Shopify med `npm run deploy`.
 ## Tjek før push
 
 ```bash
+npm test
 npm run typecheck
 npm run lint
 ```
+
+De samme tjek kører automatisk på GitHub ved hvert push
+(`.github/workflows/checks.yml`).
 
 ## Før indsendelse til App Store
 
