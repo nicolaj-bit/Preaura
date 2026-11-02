@@ -38,9 +38,14 @@ npm install
 npm run config:link
 ```
 
-`config:link` spørger, om du vil oprette en ny app eller bruge en
-eksisterende. Vælg **opret ny** og kald den **PREAURA**. CLI'en skriver
-`client_id` og app-URL ind i `shopify.app.toml` — commit den ændring.
+Appen er allerede oprettet (PREAURA under LALATOTO of Denmark ApS), og
+`client_id` står i `shopify.app.toml`. Vælg den eksisterende app, når
+`config:link` spørger.
+
+**Pas på:** `config:link` overskriver `shopify.app.toml` med Shopifys
+standardkonfiguration og tømmer bl.a. listen over scopes. Kør `git diff`
+bagefter, og fortryd med `git checkout -- shopify.app.toml`, hvis noget
+er forsvundet.
 
 Bagefter, i Shopify Dev Dashboard under appen:
 
