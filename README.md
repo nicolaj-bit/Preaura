@@ -111,3 +111,21 @@ Shopify med `npm run deploy`.
 npm run typecheck
 npm run lint
 ```
+
+## Før indsendelse til App Store
+
+Shopifys spørgsmål om databeskyttelse (Partner Dashboard → API access →
+Protected customer data access) er besvaret ærligt for udviklingsfasen.
+Disse svar står til «Nej» og skal være «Ja», før appen sendes til
+godkendelse:
+
+- **Fortæller shopejere, hvilke persondata vi behandler:** kræver en
+  privatlivspolitik for PREAURA, som der linkes til fra App Store-siden.
+- **Aftaler om databeskyttelse med shopejere:** kræver en
+  databehandleraftale (DPA) som del af appens vilkår.
+- **Opbevaringsperioder:** køtabellen `WebhookEvent` gemmer ordredata uden
+  udløb. Der skal laves sletning af behandlede hændelser efter en fast
+  periode, og `customers/redact` og `shop/redact` skal faktisk slette data.
+- **Kryptering ved lagring og overførsel:** overførsel er HTTPS. Lagring
+  kræver en database, der krypterer data (fx en administreret PostgreSQL),
+  i stedet for SQLite.
