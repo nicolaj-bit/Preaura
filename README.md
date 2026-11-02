@@ -4,21 +4,27 @@ Offentlig Shopify-app (distribution gennem Shopify App Store), udviklet af
 LALATOTO of Denmark ApS. Bygget på Shopifys officielle app-skabelon
 (React Router — efterfølgeren til Remix-skabelonen) med Polaris og App Bridge.
 
-Status: datamodel og administration af leverancer. Appen læser produkter fra
-Shopify, men skriver intet til Shopify endnu (selling plans og lager kommer
-senere).
+Status: leverancer, selling plans og lagerstyring. Appen skriver selling
+plans og lagerantal til Shopify for varianter med forudbestilling slået til.
+Ordrer behandles endnu ikke (se «Før appen bruges til rigtigt salg»).
 
 ## Hvad er sat op
 
 - **Scopes:** `read_products`, `write_products`, `read_inventory`,
-  `write_inventory`, `read_orders`, `write_orders` — ikke andre. Se
+  `write_inventory`, `read_orders`, `write_orders` og
+  `write_purchase_options` (krævet for at oprette selling plans). Se
   `shopify.app.toml`.
 - **Compliance-webhooks** (`customers/data_request`, `customers/redact`,
   `shop/redact`) → `app/routes/webhooks.compliance.tsx`.
 - **Ordre-webhooks** (`orders/create`, `orders/updated`, `orders/cancelled`)
   → `app/routes/webhooks.orders.tsx`.
 - **`app/uninstalled`** → `app/routes/webhooks.app.uninstalled.tsx`.
-- **Admin-side** → `app/routes/app._index.tsx`. Viser butikkens navn.
+- **Admin-sider** (Polaris):
+  - `app/routes/app._index.tsx` — produkter i appen; nye vælges med
+    Shopifys produktvælger.
+  - `app/routes/app.products.$productId.tsx` — forudbestilling og
+    leverancer pr. variant, samt synkroniseringsstatus mod Shopify.
+  - `app/routes/app.settings.tsx` — butiksindstillinger.
 
 Alle webhooks verificerer HMAC-signaturen (forkert signatur giver 401),
 lægger hændelsen i tabellen `WebhookEvent` og svarer 200. Gentagne leveringer
@@ -50,6 +56,40 @@ Regler, alt andet hviler på (`app/lib/deliveries.ts`):
 `forShop(shop)` i `app/models/preorder.server.ts`, og `shop` kommer altid fra
 den godkendte Shopify-session. En lint-regel afviser direkte brug af
 tabellerne andre steder.
+
+## Synkronisering med Shopify
+
+Al skrivning til Shopify sker i `syncVariant()` i
+`app/sync/syncVariant.server.ts`. Den tager én variant og bringer Shopify i
+overensstemmelse med appens data:
+
+- **Én selling plan group pr. variant**, knyttet til varianten.
+- **Én selling plan pr. åben leverance**: kategori `PRE_ORDER`, fuld betaling
+  ved bestilling (100 %, ingen restbetaling), afsendelse på leverancens dato
+  (`EXACT_TIME`, kl. 12:00 UTC), og lageret bindes ved salg (`ON_SALE`).
+  Planens id gemmes på leverancen.
+- **Lager:** lagersporing slået til, inventory policy `DENY`, og tilgængeligt
+  antal = det resterende i den aktive leverance. Shopify stopper selv salget
+  ved 0.
+
+Regler:
+
+- **En selling plan ændres aldrig.** Afviger den fra sin leverance (fx ny
+  dato), oprettes en ny, og den gamle tages ud af brug. Shopify-laget
+  (`app/sync/gateway.ts`) har slet ingen metode til at ændre en plan.
+  Eksisterende ordrer beholder deres løfte: ordren gemmer selv sin plan og
+  sin afsendelsesdato.
+- **Idempotent:** den læser Shopify først og skriver kun det, der afviger.
+  Den køres efter hver ændring i admin og kan køres igen («Synkronisér») for
+  at reparere.
+- **Ingen stille fejl:** userErrors fra Shopify stopper synkroniseringen, og
+  fejlen vises på varianten i admin, indtil en synkronisering lykkes.
+- Slås forudbestilling fra, tages varianten ud af sin gruppe. Lageret røres
+  ikke.
+
+To lint-regler håndhæver arkitekturen: GraphQL-mutationer må kun stå i
+`app/sync/shopifyGateway.server.ts`, og resten af appen må kun bruge
+synkroniseringen gennem `app/sync/index.server.ts`.
 
 ## Krav
 
@@ -94,7 +134,7 @@ database og sender konfigurationen (scopes og webhooks) til
 udviklingsbutikken. Første gang spørger den, hvilken butik der skal bruges.
 
 Tryk **P** i terminalen for at åbne appen. Shopify viser
-installationsdialogen med de seks scopes; godkend, og appen åbner inde i
+installationsdialogen med appens scopes; godkend, og appen åbner inde i
 Shopify Admin med butikkens navn. Så virker installation, OAuth og
 indlejring.
 
@@ -135,6 +175,7 @@ Shopify med `npm run deploy`.
 ## Tjek før push
 
 ```bash
+npm run graphql-codegen   # første gang: henter Shopifys skema til testene
 npm test
 npm run typecheck
 npm run lint
@@ -142,6 +183,15 @@ npm run lint
 
 De samme tjek kører automatisk på GitHub ved hvert push
 (`.github/workflows/checks.yml`).
+
+## Før appen bruges til rigtigt salg
+
+**Ordrer bliver endnu ikke til tildelinger.** Ordre-webhooks lægges i kø, men
+behandles ikke. Shopify trækker selv fra lageret ved hvert salg, men appens
+«resterende» tæller ikke salget med. Kører en synkronisering efter et salg
+(fx fordi en leverance rettes), sætter den lageret tilbage til appens tal —
+og så kan varen sælges igen. Køen skal behandles til tildelinger, før appen
+bruges i en rigtig butik.
 
 ## Før indsendelse til App Store
 

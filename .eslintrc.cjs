@@ -4,6 +4,19 @@
  * and should modify this configuration to best suit your team's needs.
  */
 
+const TABLE_RULE = {
+  selector:
+    "MemberExpression[object.name=/^(db|prisma|client|tx)$/][property.name=/^(shopSetting|variantPlan|delivery|allocation)$/]",
+  message:
+    "Brug forShop(shop) fra app/models/preorder.server.ts — så filtreres der altid på butik.",
+};
+
+const MUTATION_RULE = {
+  selector: "TemplateElement[value.raw=/\\bmutation\\b/]",
+  message:
+    "Al skrivning til Shopify skal ligge i app/sync/shopifyGateway.server.ts og køres via syncVariant().",
+};
+
 /** @type {import('eslint').Linter.Config} */
 module.exports = {
   root: true,
@@ -76,19 +89,47 @@ module.exports = {
       ],
     },
 
-    // Forudbestillingens tabeller må kun bruges gennem
-    // app/models/preorder.server.ts, som altid filtrerer på butik.
+    // To arkitekturregler. De står samlet, fordi ESLint lader en senere
+    // no-restricted-syntax overskrive en tidligere i stedet for at lægge dem
+    // sammen.
+    //
+    // 1. Forudbestillingens tabeller må kun bruges gennem
+    //    app/models/preorder.server.ts, som altid filtrerer på butik.
+    // 2. Kun synkroniseringen må skrive til Shopify: GraphQL-mutationer må
+    //    kun stå i app/sync/shopifyGateway.server.ts.
     {
       files: ["app/**/*.{ts,tsx}"],
-      excludedFiles: ["app/models/**", "**/*.test.ts"],
+      excludedFiles: ["**/*.test.ts", "app/test/**"],
       rules: {
-        "no-restricted-syntax": [
+        "no-restricted-syntax": ["error", TABLE_RULE, MUTATION_RULE],
+      },
+    },
+    {
+      files: ["app/models/**"],
+      excludedFiles: ["**/*.test.ts"],
+      rules: { "no-restricted-syntax": ["error", MUTATION_RULE] },
+    },
+    {
+      files: ["app/sync/shopifyGateway.server.ts"],
+      rules: { "no-restricted-syntax": ["error", TABLE_RULE] },
+    },
+    {
+      files: ["app/**/*.{ts,tsx}"],
+      excludedFiles: ["app/sync/**", "app/test/**"],
+      rules: {
+        "no-restricted-imports": [
           "error",
           {
-            selector:
-              "MemberExpression[property.name=/^(shopSetting|variantPlan|delivery|allocation)$/]",
-            message:
-              "Brug forShop(shop) fra app/models/preorder.server.ts — så filtreres der altid på butik.",
+            patterns: [
+              {
+                group: [
+                  "**/sync/shopifyGateway.server",
+                  "**/sync/syncVariant.server",
+                  "**/sync/gateway",
+                ],
+                message: "Brug shopifySync() fra app/sync/index.server.ts.",
+              },
+            ],
           },
         ],
       },
@@ -109,6 +150,6 @@ module.exports = {
     },
   ],
   globals: {
-    shopify: "readonly"
+    shopify: "readonly",
   },
 };

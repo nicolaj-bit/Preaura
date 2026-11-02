@@ -83,6 +83,17 @@ model VariantPlan {
   // Lageret, varianten styres fra. Tom, hvis varen ikke ligger på noget lager.
   locationId      String?
   preorderEnabled Boolean  @default(false)
+
+  // Synkronisering med Shopify. Udfyldes kun af app/sync/.
+  // Variantens egen selling plan group i Shopify.
+  sellingPlanGroupId String?
+  // Seneste vellykkede synkronisering, og det lagerantal den efterlod.
+  lastSyncedAt       DateTime?
+  syncedAvailable    Int?
+  // Seneste fejl. Tom, når seneste forsøg lykkedes. Vises i admin.
+  lastSyncError      String?
+  lastSyncAttemptAt  DateTime?
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
