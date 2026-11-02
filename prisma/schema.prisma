@@ -49,3 +49,92 @@ model WebhookEvent {
 
   @@index([processedAt, receivedAt])
 }
+
+// ---------------------------------------------------------------------------
+// Forudbestilling
+//
+// Alle fire tabeller har en shop-kolonne. Al adgang går gennem
+// app/models/preorder.server.ts, som altid filtrerer på shop. Læs og skriv
+// aldrig disse tabeller direkte med `db` andre steder.
+// ---------------------------------------------------------------------------
+
+// Butiksindstilling. Én række pr. butik.
+model ShopSetting {
+  id               String   @id @default(cuid())
+  shop             String   @unique
+  // "SHIPPING" = vis som forventet afsendelse, "DELIVERY" = forventet levering.
+  dateMode         String   @default("SHIPPING")
+  buttonLabel      String   @default("Forudbestil")
+  shippingDateText String   @default("Forventet afsendelse: {dato}")
+  deliveryDateText String   @default("Forventet levering: {dato}")
+  preorderNote     String   @default("Varen er på forudbestilling og sendes, når den er på lager.")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Variantplan. Én række pr. variant. Et produkt er slået til, hvis mindst én
+// af dets varianter er det — det gemmes ikke, det regnes ud.
+model VariantPlan {
+  id              String   @id @default(cuid())
+  shop            String
+  productId       String
+  variantId       String
+  inventoryItemId String
+  // Lageret, varianten styres fra. Tom, hvis varen ikke ligger på noget lager.
+  locationId      String?
+  preorderEnabled Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, variantId])
+  @@index([shop, productId])
+}
+
+// Leverance. Rækkefølgenummeret afgør, hvilken leverance der er aktiv: den
+// første, der hverken er annulleret eller udsolgt.
+//
+// Resterende antal gemmes IKKE. Det er altid `quantity` minus summen af
+// aktive tildelinger. Se app/lib/deliveries.ts.
+model Delivery {
+  id            String       @id @default(cuid())
+  shop          String
+  variantId     String
+  position      Int
+  // Kun dato, uden klokkeslæt og tidszone: "YYYY-MM-DD".
+  date          String
+  quantity      Int
+  // "OPEN" eller "CANCELLED". "Udsolgt" og "aktiv" regnes ud.
+  status        String       @default("OPEN")
+  // Tom indtil selling plans kommer i opgave 3.
+  sellingPlanId String?
+  cancelledAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  allocations   Allocation[]
+
+  @@unique([shop, variantId, position])
+  @@index([shop, variantId])
+}
+
+// Tildeling: regnskabet over, hvem der har fået plads i hvilken leverance.
+// Rækker slettes ALDRIG. En annullering sætter status til "CANCELLED".
+// onDelete: Restrict forhindrer også, at en leverance med tildelinger slettes.
+model Allocation {
+  id          String    @id @default(cuid())
+  shop        String
+  orderId     String
+  // Unik, så en gensendt webhook aldrig tæller den samme ordrelinje to gange.
+  orderLineId String
+  variantId   String
+  deliveryId  String
+  delivery    Delivery  @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  quantity    Int
+  // "ACTIVE" eller "CANCELLED".
+  status      String    @default("ACTIVE")
+  allocatedAt DateTime  @default(now())
+  cancelledAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([shop, orderLineId])
+  @@index([shop, deliveryId])
+}

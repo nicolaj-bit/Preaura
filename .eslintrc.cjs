@@ -76,6 +76,24 @@ module.exports = {
       ],
     },
 
+    // Forudbestillingens tabeller må kun bruges gennem
+    // app/models/preorder.server.ts, som altid filtrerer på butik.
+    {
+      files: ["app/**/*.{ts,tsx}"],
+      excludedFiles: ["app/models/**", "**/*.test.ts"],
+      rules: {
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector:
+              "MemberExpression[property.name=/^(shopSetting|variantPlan|delivery|allocation)$/]",
+            message:
+              "Brug forShop(shop) fra app/models/preorder.server.ts — så filtreres der altid på butik.",
+          },
+        ],
+      },
+    },
+
     // Node
     {
       files: [
