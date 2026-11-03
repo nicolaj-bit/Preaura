@@ -70,7 +70,15 @@ async function setup(deliveries: { date: string; quantity: number }[]) {
     /** Lægger (eller opdaterer) en ordre i Shopify og sender en webhook. */
     async order(
       n: number,
-      lines: { quantity: number; deliveryId: string; lineNo?: number }[],
+      lines: {
+        quantity: number;
+        /** Leverancen, hvis plan linjen er købt på. Udelades: købt uden plan. */
+        deliveryId?: string;
+        /** En anden apps plan (eller en ukendt plan). */
+        sellingPlanId?: string;
+        variantId?: string;
+        lineNo?: number;
+      }[],
       opts: {
         topic?: string;
         cancelled?: boolean;
@@ -88,8 +96,10 @@ async function setup(deliveries: { date: string; quantity: number }[]) {
         lines: await Promise.all(
           lines.map(async (line, i) => ({
             id: `gid://shopify/LineItem/${n}-${line.lineNo ?? i}`,
-            variantId: VARIANT,
-            sellingPlanId: await planOf(line.deliveryId),
+            variantId: line.variantId ?? VARIANT,
+            sellingPlanId: line.deliveryId
+              ? await planOf(line.deliveryId)
+              : (line.sellingPlanId ?? null),
             quantity: line.quantity,
           })),
         ),
@@ -324,31 +334,12 @@ describe("ordrens løfte og tag", () => {
     expect(h.shopify.writes).toEqual([]);
   });
 
-  it("ordrelinjer uden appens planer ignoreres, og ordren tagges ikke", async () => {
+  it("ordrelinjer på varianter uden forudbestilling ignoreres, og ordren tagges ikke", async () => {
     const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
-    const order: OrderSnapshot = {
-      id: "gid://shopify/Order/9",
-      name: "#1009",
-      createdAt: "2026-11-02T10:00:00Z",
-      cancelled: false,
-      lines: [
-        {
-          id: "gid://shopify/LineItem/9",
-          variantId: VARIANT,
-          sellingPlanId: null,
-          quantity: 1,
-        },
-      ],
-    };
-    h.shopify.putOrder(order);
-    await enqueueWebhook(
-      {
-        webhookId: "x",
-        shop: SHOP,
-        topic: "ORDERS_CREATE",
-        payload: { admin_graphql_api_id: order.id },
-      },
-      client,
+    const order = await h.order(
+      9,
+      [{ quantity: 1, variantId: "gid://shopify/ProductVariant/999" }],
+      { createdAt: new Date().toISOString() },
     );
     expect((await h.run()).ran).toBe(true);
     expect(await client.allocation.count()).toBe(0);
@@ -496,5 +487,141 @@ describe("fejl og samtidighed", () => {
     );
     expect(await h.run()).toMatchObject({ skipped: 1 });
     expect(await queueFor(SHOP, client).pending()).toHaveLength(0);
+  });
+});
+
+describe("sikkerhedsnettet: salg uden selling plan", () => {
+  // Ordrer oprettet efter, at forudbestilling blev slået til.
+  const now = () => new Date(Date.now() + 1000).toISOString();
+
+  it("en linje uden plan tælles i den aktive leverance og mærkes", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    const order = await h.order(1, [{ quantity: 2 }], { createdAt: now() });
+    await h.run();
+
+    const [row] = await h.active(1);
+    expect(row).toMatchObject({
+      deliveryId: h.ids[0],
+      status: "ACTIVE",
+      quantity: 2,
+      soldWithoutPlan: true,
+      promisedDate: "2026-12-01",
+    });
+    expect(await h.remaining()).toEqual([8]);
+    // Også disse ordrer får løfte og tag på ordren.
+    const state = h.shopify.orders.get(order.id)!;
+    expect(state.tags).toEqual(["Forudbestilling"]);
+    expect(state.metafields.promised_date).toBe("2026-12-01");
+  });
+
+  it("forhindrer oversalg: lageret skrives ikke op igen efter et salg uden plan", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    // Shopify har solgt 1 stk. og trukket lageret ned fra 10 til 9.
+    h.shopify.variants.get(VARIANT)!.available = 9;
+    await h.order(1, [{ quantity: 1 }], { createdAt: now() });
+    await h.run();
+
+    // Uden sikkerhedsnettet ville synkroniseringen sætte lageret tilbage til 10.
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(9);
+    expect(await h.remaining()).toEqual([9]);
+  });
+
+  it("en linje med en anden apps plan tælles også", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    await h.order(
+      1,
+      [{ quantity: 1, sellingPlanId: "gid://shopify/SellingPlan/fremmed" }],
+      {
+        createdAt: now(),
+      },
+    );
+    await h.run();
+    expect((await h.active(1))[0]).toMatchObject({
+      soldWithoutPlan: true,
+      quantity: 1,
+    });
+  });
+
+  it("fylder videre i næste leverance og bliver ellers uafklaret", async () => {
+    const h = await setup([
+      { date: "2026-12-01", quantity: 1 },
+      { date: "2027-01-15", quantity: 1 },
+    ]);
+    await h.order(1, [{ quantity: 3 }], { createdAt: now() });
+    await h.run();
+    expect(
+      (await h.active(1)).map((r) => [r.status, r.quantity, r.soldWithoutPlan]),
+    ).toEqual([
+      ["ACTIVE", 1, true],
+      ["ACTIVE", 1, true],
+      ["UNRESOLVED", 1, true],
+    ]);
+  });
+
+  it("uden nogen åben leverance bliver hele linjen uafklaret — den forsvinder ikke", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 5 }]);
+    await data().deliveries.cancel(h.ids[0]);
+    await h.order(1, [{ quantity: 2 }], { createdAt: now() });
+    await h.run();
+    expect(await h.active(1)).toMatchObject([
+      { status: "UNRESOLVED", quantity: 2 },
+    ]);
+  });
+
+  it("ordrer fra før forudbestilling blev slået til, tælles ikke", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    await h.order(1, [{ quantity: 1 }], { createdAt: "2020-01-01T00:00:00Z" });
+    await h.run();
+    expect(await client.allocation.count()).toBe(0);
+  });
+
+  it("samme ordre med plan og uden plan: begge linjer tælles", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    await h.order(
+      1,
+      [
+        { quantity: 2, deliveryId: h.ids[0], lineNo: 0 },
+        { quantity: 3, lineNo: 1 },
+      ],
+      {
+        createdAt: now(),
+      },
+    );
+    await h.run();
+    expect(await h.remaining()).toEqual([5]);
+    const rows = await h.active(1);
+    expect(rows.map((r) => [r.quantity, r.soldWithoutPlan])).toEqual([
+      [2, false],
+      [3, true],
+    ]);
+  });
+
+  it("er idempotent og frigiver ved annullering, også efter forudbestilling er slået fra", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    const createdAt = now();
+    await h.order(1, [{ quantity: 4 }], { createdAt });
+    await h.order(1, [{ quantity: 4 }], { createdAt, topic: "ORDERS_UPDATED" });
+    await h.run();
+    expect(await h.remaining()).toEqual([6]);
+
+    await data().variantPlans.setEnabled(VARIANT, false);
+    await h.order(1, [{ quantity: 4 }], {
+      createdAt,
+      topic: "ORDERS_CANCELLED",
+      cancelled: true,
+    });
+    await h.run();
+    expect(await h.remaining()).toEqual([10]);
+    expect(await client.allocation.count()).toBe(1);
+  });
+
+  it("vises samlet: liste og antal ordrer købt uden plan", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    await h.order(1, [{ quantity: 1 }], { createdAt: now() });
+    await h.order(2, [{ quantity: 1 }], { createdAt: now() });
+    await h.order(3, [{ quantity: 1, deliveryId: h.ids[0] }]);
+    await h.run();
+    expect(await data().orders.withoutPlan()).toHaveLength(2);
+    expect(await data().orders.countWithoutPlanSince(new Date(0))).toBe(2);
   });
 });

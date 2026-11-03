@@ -8,6 +8,10 @@ import type { DesiredPlan, ShopifyPlan } from "./plans";
 
 export type ShopifyVariantState = {
   productId: string;
+  /** Kan produktet kun købes med en selling plan? Gælder hele produktet. */
+  productRequiresSellingPlan: boolean;
+  /** Alle produktets varianter i Shopify. */
+  productVariantIds: string[];
   inventoryPolicy: string;
   tracked: boolean;
   /** Tilgængeligt antal på lageret. Null, hvis varen ikke ligger der. */
@@ -46,6 +50,15 @@ export interface ShopifyGateway {
 
   /** Slår lagersporing til og sætter inventory policy til DENY. */
   enforceInventoryTracking(productId: string, variantId: string): Promise<void>;
+
+  /**
+   * Sætter produktets requiresSellingPlan. Gælder hele produktet: sand
+   * betyder, at ingen variant kan købes uden selling plan.
+   */
+  setProductRequiresSellingPlan(
+    productId: string,
+    requiresSellingPlan: boolean,
+  ): Promise<void>;
 
   /** Læser en ordre. Null, hvis den ikke findes. */
   readOrder(orderId: string): Promise<ShopifyOrderState | null>;

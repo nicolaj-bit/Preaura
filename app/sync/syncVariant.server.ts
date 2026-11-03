@@ -47,7 +47,8 @@ export async function syncVariant({
 }): Promise<SyncResult> {
   const data = forShop(shop, client);
   try {
-    const available = await reconcile(data, variantId, gateway);
+    const { available, product } = await reconcile(data, variantId, gateway);
+    await reconcileProduct(data, product, gateway);
     await data.syncState.recordSuccess(variantId, available);
     return { ok: true, available };
   } catch (error) {
@@ -67,7 +68,7 @@ async function reconcile(
   data: Data,
   variantId: string,
   gateway: ShopifyGateway,
-): Promise<number | null> {
+): Promise<{ available: number | null; product: ProductState }> {
   const plan = await data.syncState.getVariant(variantId);
   if (!plan) throw new SyncError("Varianten findes ikke i appen.");
 
@@ -79,6 +80,11 @@ async function reconcile(
   if (!state.variant) {
     throw new SyncError("Varianten findes ikke længere i Shopify.");
   }
+  const product: ProductState = {
+    id: state.variant.productId,
+    requiresSellingPlan: state.variant.productRequiresSellingPlan,
+    variantIds: state.variant.productVariantIds,
+  };
   // Er gruppen slettet i Shopify, glemmes den, og der oprettes en ny.
   let group = state.group;
   if (plan.sellingPlanGroupId && !group) {
@@ -93,7 +99,7 @@ async function reconcile(
     if (group?.appliesToVariant) {
       await gateway.removeVariant(group.id, variantId);
     }
-    return null;
+    return { available: null, product };
   }
 
   const settings = await data.settings.get();
@@ -212,7 +218,51 @@ async function reconcile(
       changeFrom: variant.available,
     });
   }
-  return wantedAvailable;
+  return { available: wantedAvailable, product };
+}
+
+type ProductState = {
+  id: string;
+  requiresSellingPlan: boolean;
+  variantIds: string[];
+};
+
+/**
+ * Produktets requiresSellingPlan. Den gælder HELE produktet, så den sættes
+ * kun, når alle produktets varianter er på forudbestilling (og har deres
+ * selling plans). Så forsvinder «Engangskøb», og kunden kan kun forudbestille.
+ *
+ * Er kun nogle varianter på forudbestilling, må den ikke sættes — den ville
+ * spærre de almindelige varianter. Så er det app-blokken på produktsiden og
+ * sikkerhedsnettet i ordrebehandlingen, der beskytter.
+ *
+ * Appen slår den kun fra igen, hvis det var appen, der satte den.
+ */
+async function reconcileProduct(
+  data: Data,
+  product: ProductState,
+  gateway: ShopifyGateway,
+) {
+  const plans = await data.variantPlans.listForProduct(product.id);
+  const allPreorder =
+    product.variantIds.length > 0 &&
+    product.variantIds.every((id) =>
+      plans.some(
+        (p) => p.variantId === id && p.preorderEnabled && p.sellingPlanGroupId,
+      ),
+    );
+  const setByApp = plans.some((p) => p.setRequiresSellingPlan);
+
+  if (allPreorder && !product.requiresSellingPlan) {
+    await gateway.setProductRequiresSellingPlan(product.id, true);
+    await data.syncState.markRequiresSellingPlan(product.id, true);
+  } else if (!allPreorder && product.requiresSellingPlan && setByApp) {
+    await gateway.setProductRequiresSellingPlan(product.id, false);
+    await data.syncState.markRequiresSellingPlan(product.id, false);
+  } else if (allPreorder && product.requiresSellingPlan && !setByApp) {
+    // Allerede sat (fx af webshopejeren). Appen overtager den nu.
+    await data.syncState.markRequiresSellingPlan(product.id, true);
+  }
 }
 
 async function saveCreatedPlans(

@@ -42,7 +42,8 @@ export function planLineAllocation({
 }: {
   desired: number;
   current: Bucket[];
-  startDeliveryId: string;
+  /** Null: ingen åben leverance — alt bliver uafklaret. */
+  startDeliveryId: string | null;
   deliveries: DeliverySlot[];
 }): Bucket[] {
   const byPosition = [...deliveries].sort((a, b) => a.position - b.position);

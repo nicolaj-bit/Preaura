@@ -29,6 +29,8 @@ export function createFakeShopify() {
   const variants = new Map<string, Variant>();
   const groups = new Map<string, Group>();
   const writes: Write[] = [];
+  /** requiresSellingPlan pr. produkt. */
+  const products = new Map<string, { requiresSellingPlan: boolean }>();
   const failures = new Map<string, string>();
 
   const id = (type: string) => `gid://shopify/${type}/${nextId++}`;
@@ -108,6 +110,11 @@ export function createFakeShopify() {
         variant: variant
           ? {
               productId: variant.productId,
+              productRequiresSellingPlan:
+                products.get(variant.productId)?.requiresSellingPlan ?? false,
+              productVariantIds: [...variants.entries()]
+                .filter(([, v]) => v.productId === variant.productId)
+                .map(([vid]) => vid),
               inventoryPolicy: variant.inventoryPolicy,
               tracked: variant.tracked,
               available: locationId ? variant.available : null,
@@ -159,6 +166,10 @@ export function createFakeShopify() {
       variant.tracked = true;
       variant.inventoryPolicy = "DENY";
     },
+    async setProductRequiresSellingPlan(productId, requiresSellingPlan) {
+      write("setProductRequiresSellingPlan", [productId, requiresSellingPlan]);
+      products.set(productId, { requiresSellingPlan });
+    },
     async setAvailable({ inventoryItemId, locationId, quantity, changeFrom }) {
       write("setAvailable", [
         inventoryItemId,
@@ -182,6 +193,7 @@ export function createFakeShopify() {
     gateway,
     writes,
     orders,
+    products,
     /** Opretter eller erstatter en ordre i den simulerede Shopify. */
     putOrder(snapshot: ShopifyOrderState["snapshot"]) {
       const existing = orders.get(snapshot.id);

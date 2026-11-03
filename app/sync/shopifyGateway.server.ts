@@ -131,6 +131,12 @@ const READ_QUERY = `#graphql
       inventoryPolicy
       product {
         id
+        requiresSellingPlan
+        variants(first: 250) {
+          nodes {
+            id
+          }
+        }
       }
       inventoryItem {
         tracked
@@ -167,7 +173,11 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       const data = await run<{
         productVariant: {
           inventoryPolicy: string;
-          product: { id: string };
+          product: {
+            id: string;
+            requiresSellingPlan: boolean;
+            variants: { nodes: { id: string }[] };
+          };
           inventoryItem: {
             tracked: boolean;
             inventoryLevel?: {
@@ -195,6 +205,8 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         variant: variant
           ? {
               productId: variant.product.id,
+              productRequiresSellingPlan: variant.product.requiresSellingPlan,
+              productVariantIds: variant.product.variants.nodes.map((v) => v.id),
               inventoryPolicy: variant.inventoryPolicy,
               tracked: variant.inventoryItem.tracked,
               available:
@@ -560,6 +572,26 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         { id: orderId, tags },
       );
       check("Fjernelse af tag fra ordren", data.tagsRemove.userErrors);
+    },
+
+    async setProductRequiresSellingPlan(productId, requiresSellingPlan) {
+      const data = await run<{
+        productUpdate: { userErrors: UserErrors };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraRequireSellingPlan($product: ProductUpdateInput!) {
+            productUpdate(product: $product) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        // Kun requiresSellingPlan. Intet andet på produktet.
+        { product: { id: productId, requiresSellingPlan } },
+      );
+      check("Krav om forudbestilling på produktet", data.productUpdate.userErrors);
     },
 
     async setAvailable({ inventoryItemId, locationId, quantity, changeFrom }) {

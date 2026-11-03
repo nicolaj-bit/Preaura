@@ -396,7 +396,11 @@ describe("forudbestilling slået fra", () => {
 
     await data().variantPlans.setEnabled(VARIANT, false);
     await sync();
-    expect(shopify.writes.map((w) => w.method)).toEqual(["removeVariant"]);
+    // Produktet har kun denne variant, så kravet om plan fjernes også.
+    expect(shopify.writes.map((w) => w.method)).toEqual([
+      "removeVariant",
+      "setProductRequiresSellingPlan",
+    ]);
     expect(onlyGroup(shopify).variantIds.size).toBe(0);
   });
 
@@ -411,6 +415,120 @@ describe("forudbestilling slået fra", () => {
 
     await data().variantPlans.setEnabled(VARIANT, true);
     await sync();
-    expect(shopify.writes.map((w) => w.method)).toEqual(["addVariant"]);
+    expect(shopify.writes.map((w) => w.method)).toEqual([
+      "addVariant",
+      "setProductRequiresSellingPlan",
+    ]);
+  });
+});
+
+describe("kun forudbestilling eller blandet produkt", () => {
+  const OTHER = "gid://shopify/ProductVariant/2";
+
+  async function addOther(enabled: boolean) {
+    await data().variantPlans.addVariants([
+      {
+        productId: "gid://shopify/Product/1",
+        variantId: OTHER,
+        inventoryItemId: "gid://shopify/InventoryItem/2",
+        locationId: "gid://shopify/Location/1",
+      },
+    ]);
+    if (enabled) await data().variantPlans.setEnabled(OTHER, true);
+    await data().deliveries.create(
+      OTHER,
+      { date: "2026-12-01", quantity: "5" },
+      TODAY,
+    );
+  }
+
+  it("alle varianter på forudbestilling: produktet kræver selling plan", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBe(true);
+  });
+
+  it("kun nogle varianter på forudbestilling: kravet sættes ikke", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    await addOther(false);
+    const { shopify, sync } = setup();
+    shopify.addVariant(OTHER, {
+      inventoryItemId: "gid://shopify/InventoryItem/2",
+    });
+    await sync();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBeUndefined();
+    expect(shopify.writes.map((w) => w.method)).not.toContain(
+      "setProductRequiresSellingPlan",
+    );
+  });
+
+  it("sættes, når den sidste variant slås til, og fjernes, når én slås fra", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    await addOther(false);
+    const { shopify, sync } = setup();
+    shopify.addVariant(OTHER, {
+      inventoryItemId: "gid://shopify/InventoryItem/2",
+    });
+    const syncOther = () =>
+      syncVariant({
+        shop: SHOP,
+        variantId: OTHER,
+        gateway: shopify.gateway,
+        client,
+      });
+    await sync();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBeUndefined();
+
+    await data().variantPlans.setEnabled(OTHER, true);
+    await syncOther();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBe(true);
+
+    await data().variantPlans.setEnabled(VARIANT, false);
+    await sync();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBe(false);
+  });
+
+  it("et krav, webshopejeren selv har sat på et blandet produkt, røres ikke", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    await addOther(false);
+    const { shopify, sync } = setup();
+    shopify.addVariant(OTHER, {
+      inventoryItemId: "gid://shopify/InventoryItem/2",
+    });
+    shopify.products.set("gid://shopify/Product/1", {
+      requiresSellingPlan: true,
+    });
+    await sync();
+    expect(
+      shopify.products.get("gid://shopify/Product/1")?.requiresSellingPlan,
+    ).toBe(true);
+    expect(shopify.writes.map((w) => w.method)).not.toContain(
+      "setProductRequiresSellingPlan",
+    );
+  });
+
+  it("anden kørsel ændrer intet, heller ikke på produktet", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    shopify.clearWrites();
+    await sync();
+    expect(shopify.writes).toEqual([]);
   });
 });

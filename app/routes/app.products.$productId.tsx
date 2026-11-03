@@ -87,6 +87,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     product: {
       title: product?.title ?? "Produktet findes ikke længere i Shopify",
       imageUrl: product?.imageUrl ?? null,
+      mode: productMode(plans, product?.variants.length ?? plans.length),
+      requiresSellingPlan: product?.requiresSellingPlan ?? false,
     },
     variants: plans.map((plan, index) => {
       const variant = product?.variants.find((v) => v.id === plan.variantId);
@@ -113,6 +115,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   };
 };
+
+/**
+ * Produktets tilstand:
+ * - ALL: alle varianter er på forudbestilling → Shopify kræver en plan, og
+ *   «Engangskøb» vises ikke.
+ * - MIXED: kun nogle → Shopify kan ikke kræve plan for hele produktet.
+ * - NONE: ingen er slået til.
+ */
+function productMode(
+  plans: { preorderEnabled: boolean }[],
+  shopifyVariantCount: number,
+): "ALL" | "MIXED" | "NONE" {
+  const enabled = plans.filter((p) => p.preorderEnabled).length;
+  if (enabled === 0) return "NONE";
+  return enabled >= shopifyVariantCount ? "ALL" : "MIXED";
+}
 
 type ActionResult =
   | { ok: true; message: string; syncFailed?: boolean }
@@ -240,6 +258,10 @@ export default function ProductPage() {
       <s-link slot="breadcrumb-actions" href="/app">
         Produkter
       </s-link>
+      <ProductModeBanner
+        mode={product.mode}
+        requiresSellingPlan={product.requiresSellingPlan}
+      />
       {variants.map((variant) => (
         <VariantSection
           key={variant.variantId}
@@ -249,6 +271,50 @@ export default function ProductPage() {
         />
       ))}
     </s-page>
+  );
+}
+
+function ProductModeBanner({
+  mode,
+  requiresSellingPlan,
+}: {
+  mode: "ALL" | "MIXED" | "NONE";
+  requiresSellingPlan: boolean;
+}) {
+  if (mode === "NONE") return null;
+  if (mode === "ALL") {
+    return (
+      <s-banner
+        tone={requiresSellingPlan ? "success" : "warning"}
+        heading="Kun forudbestilling"
+      >
+        <s-paragraph>
+          Alle varianter er på forudbestilling. Shopify tillader derfor kun køb
+          som forudbestilling: valget «Engangskøb» vises ikke på produktsiden.
+        </s-paragraph>
+        {!requiresSellingPlan && (
+          <s-paragraph>
+            Shopify er ikke opdateret endnu. Tryk «Synkronisér» på en af
+            varianterne.
+          </s-paragraph>
+        )}
+      </s-banner>
+    );
+  }
+  return (
+    <s-banner tone="info" heading="Blandet: nogle varianter sælges almindeligt">
+      <s-paragraph>
+        Kun nogle varianter er på forudbestilling. Shopify kan kun kræve
+        forudbestilling for hele produktet, og det ville spærre de almindelige
+        varianter — så det bliver ikke slået til.
+      </s-paragraph>
+      <s-paragraph>
+        I stedet sørger PREAURA-blokken på produktsiden for, at varianterne på
+        forudbestilling købes som forudbestilling. Køber nogen alligevel uden
+        (fx via en kladdeordre eller POS), tæller appen salget med i den aktive
+        leverance og viser det under Ordrebehandling.
+      </s-paragraph>
+    </s-banner>
   );
 }
 

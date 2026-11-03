@@ -176,6 +176,14 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
 
       async setEnabled(variantId: string, enabled: boolean) {
+        // Tidspunktet sættes kun, når forudbestilling går fra slået fra til
+        // slået til — ikke hvis den allerede var slået til.
+        if (enabled) {
+          await client.variantPlan.updateMany({
+            where: { shop, variantId, preorderEnabled: false },
+            data: { preorderEnabledAt: new Date() },
+          });
+        }
         const result = await client.variantPlan.updateMany({
           where: { shop, variantId },
           data: { preorderEnabled: enabled },
@@ -331,6 +339,13 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      async markRequiresSellingPlan(productId: string, value: boolean) {
+        await client.variantPlan.updateMany({
+          where: { shop, productId },
+          data: { setRequiresSellingPlan: value },
+        });
+      },
+
       /** Husker, hvilken leverance en plan hører til. Slettes aldrig. */
       async recordPlanRef(sellingPlanId: string, deliveryId: string) {
         await client.sellingPlanRef.upsert({
@@ -387,15 +402,13 @@ export function forShop(shop: string, client: PrismaClient = db) {
           const handledLines = new Set<string>();
 
           for (const line of order.lines) {
-            if (!line.sellingPlanId) continue;
-            const start = await deliveryForPlan(tx, line.sellingPlanId);
-            if (!start) continue; // Ikke en af appens planer.
+            const target = await lineTarget(tx, order, line);
+            if (!target) continue; // Ikke en forudbestilling.
             handledLines.add(line.id);
-            variantIds.add(start.variantId);
+            variantIds.add(target.variantId);
 
             const lineChanged = await applyLine(tx, order, line.id, {
-              variantId: start.variantId,
-              startDeliveryId: start.id,
+              ...target,
               desired: order.cancelled ? 0 : line.quantity,
             });
             changed ||= lineChanged;
@@ -441,6 +454,25 @@ export function forShop(shop: string, client: PrismaClient = db) {
         return { delivery, allocations };
       },
 
+      /** Ordrelinjer talt med af sikkerhedsnettet (købt uden plan). */
+      async withoutPlan(limit = 100) {
+        return client.allocation.findMany({
+          where: { shop, soldWithoutPlan: true },
+          orderBy: [{ orderCreatedAt: "desc" }, { allocatedAt: "desc" }],
+          take: limit,
+        });
+      },
+
+      /** Antal ordrer købt uden plan siden et tidspunkt. */
+      async countWithoutPlanSince(since: Date) {
+        const rows = await client.allocation.findMany({
+          where: { shop, soldWithoutPlan: true, orderCreatedAt: { gte: since } },
+          distinct: ["orderId"],
+          select: { orderId: true },
+        });
+        return rows.length;
+      },
+
       async unresolved() {
         return client.allocation.findMany({
           where: { shop, status: "UNRESOLVED" },
@@ -468,6 +500,68 @@ export function forShop(shop: string, client: PrismaClient = db) {
     });
   }
 
+  /**
+   * Hvilken variant og leverance en ordrelinje hører til — eller null, hvis
+   * linjen ikke er en forudbestilling.
+   *
+   * 1. Linjen har en af appens selling plans: planens leverance.
+   * 2. SIKKERHEDSNETTET: linjen har ingen af appens planer, men varianten har
+   *    forudbestilling slået til (og havde det, da ordren blev oprettet). Så
+   *    er enheden alligevel trukket fra Shopifys lager og skal tælles — ellers
+   *    skriver næste synkronisering lageret op igen, og varen sælges én gang
+   *    for meget. Linjen lægges i den aktive leverance og mærkes "uden plan".
+   *    Det gælder uanset hvordan ordren er opstået: webshop, kladdeordre, POS
+   *    eller API.
+   * 3. Har linjen allerede tildelinger uden plan, behandles den videre som
+   *    sådan, også hvis forudbestilling siden er slået fra.
+   */
+  async function lineTarget(
+    tx: Tx,
+    order: OrderSnapshot,
+    line: OrderSnapshot["lines"][number],
+  ): Promise<{
+    variantId: string;
+    startDeliveryId: string | null;
+    soldWithoutPlan: boolean;
+  } | null> {
+    if (line.sellingPlanId) {
+      const start = await deliveryForPlan(tx, line.sellingPlanId);
+      if (start) {
+        return {
+          variantId: start.variantId,
+          startDeliveryId: start.id,
+          soldWithoutPlan: false,
+        };
+      }
+    }
+    if (!line.variantId) return null;
+
+    const plan = await tx.variantPlan.findFirst({
+      where: { shop, variantId: line.variantId },
+    });
+    const enabledWhenOrdered =
+      plan?.preorderEnabled === true &&
+      plan.preorderEnabledAt != null &&
+      plan.preorderEnabledAt <= new Date(order.createdAt);
+    const alreadyCounted =
+      (await tx.allocation.count({
+        where: { shop, orderLineId: line.id, soldWithoutPlan: true },
+      })) > 0;
+    if (!enabledWhenOrdered && !alreadyCounted) return null;
+
+    // Den aktive leverance: den første åbne. Er den udsolgt, fylder
+    // fordelingen videre i de næste — præcis som for en linje med plan.
+    const first = await tx.delivery.findFirst({
+      where: { shop, variantId: line.variantId, status: "OPEN" },
+      orderBy: { position: "asc" },
+    });
+    return {
+      variantId: line.variantId,
+      startDeliveryId: first?.id ?? null,
+      soldWithoutPlan: true,
+    };
+  }
+
   async function applyLine(
     tx: Tx,
     order: OrderSnapshot,
@@ -475,8 +569,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
     {
       variantId,
       startDeliveryId,
+      soldWithoutPlan,
       desired,
-    }: { variantId: string; startDeliveryId: string; desired: number },
+    }: {
+      variantId: string;
+      /** Null: ingen åben leverance — alt bliver uafklaret. */
+      startDeliveryId: string | null;
+      soldWithoutPlan: boolean;
+      desired: number;
+    },
   ) {
     const rows = await tx.allocation.findMany({
       where: { shop, orderLineId, status: { in: ["ACTIVE", "UNRESOLVED"] } },
@@ -533,6 +634,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           quantity: bucket.quantity,
           status: bucket.deliveryId ? "ACTIVE" : "UNRESOLVED",
           promisedDate: bucket.promisedDate,
+          soldWithoutPlan,
         },
       });
     }
