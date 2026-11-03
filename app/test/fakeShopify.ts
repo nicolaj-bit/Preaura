@@ -14,6 +14,7 @@ import {
 
 type Variant = {
   productId: string;
+  preorderMetafield?: string | null;
   inventoryItemId: string;
   inventoryPolicy: string;
   tracked: boolean;
@@ -115,6 +116,7 @@ export function createFakeShopify() {
               productVariantIds: [...variants.entries()]
                 .filter(([, v]) => v.productId === variant.productId)
                 .map(([vid]) => vid),
+              preorderMetafield: variant.preorderMetafield ?? null,
               inventoryPolicy: variant.inventoryPolicy,
               tracked: variant.tracked,
               available: locationId ? variant.available : null,
@@ -165,6 +167,10 @@ export function createFakeShopify() {
       const variant = variants.get(variantId)!;
       variant.tracked = true;
       variant.inventoryPolicy = "DENY";
+    },
+    async setVariantPreorderMetafield(variantId, value) {
+      write("setVariantPreorderMetafield", [variantId, value]);
+      variants.get(variantId)!.preorderMetafield = value;
     },
     async setProductRequiresSellingPlan(productId, requiresSellingPlan) {
       write("setProductRequiresSellingPlan", [productId, requiresSellingPlan]);

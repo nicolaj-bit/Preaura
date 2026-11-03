@@ -181,6 +181,7 @@ describe("selling plans", () => {
     expect(shopify.writes.map((w) => w.method)).toEqual([
       "deletePlans",
       "createPlans",
+      "setVariantPreorderMetafield",
     ]);
   });
 
@@ -227,7 +228,11 @@ describe("selling plans", () => {
       TODAY,
     );
     await sync();
-    expect(shopify.writes.map((w) => w.method)).toEqual(["setAvailable"]);
+    // Planen røres ikke — kun lageret og produktsidens resterende antal.
+    expect(shopify.writes.map((w) => w.method)).toEqual([
+      "setAvailable",
+      "setVariantPreorderMetafield",
+    ]);
   });
 
   it("en annulleret leverance tages ud af brug", async () => {
@@ -399,6 +404,7 @@ describe("forudbestilling slået fra", () => {
     // Produktet har kun denne variant, så kravet om plan fjernes også.
     expect(shopify.writes.map((w) => w.method)).toEqual([
       "removeVariant",
+      "setVariantPreorderMetafield",
       "setProductRequiresSellingPlan",
     ]);
     expect(onlyGroup(shopify).variantIds.size).toBe(0);
@@ -417,6 +423,7 @@ describe("forudbestilling slået fra", () => {
     await sync();
     expect(shopify.writes.map((w) => w.method)).toEqual([
       "addVariant",
+      "setVariantPreorderMetafield",
       "setProductRequiresSellingPlan",
     ]);
   });
@@ -530,5 +537,90 @@ describe("kun forudbestilling eller blandet produkt", () => {
     shopify.clearWrites();
     await sync();
     expect(shopify.writes).toEqual([]);
+  });
+});
+
+describe("metafelt til produktsiden", () => {
+  const metafield = (shopify: ReturnType<typeof createFakeShopify>) =>
+    JSON.parse(shopify.variants.get(VARIANT)!.preorderMetafield ?? "null");
+
+  it("indeholder aktiv leverances dato, plan, resterende og visning", async () => {
+    await setupVariant();
+    const first = await addDelivery("2026-12-01", 10);
+    await addDelivery("2027-01-15", 20);
+    await allocate(first.id, 4, "1");
+    const { shopify, sync } = setup();
+    await sync();
+
+    const row = await client.delivery.findUniqueOrThrow({
+      where: { id: first.id },
+    });
+    expect(metafield(shopify)).toEqual({
+      active: true,
+      mode: "SHIPPING",
+      date: "2026-12-01",
+      sellingPlanId: row.sellingPlanId,
+      remaining: 6,
+      soldOut: false,
+    });
+  });
+
+  it("følger butikkens valg af forventet levering", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    await data().settings.update({
+      dateMode: "DELIVERY",
+      buttonLabel: "x",
+      shippingDateText: "{dato}",
+      deliveryDateText: "{dato}",
+      preorderNote: "x",
+    });
+    const { shopify, sync } = setup();
+    await sync();
+    expect(metafield(shopify).mode).toBe("DELIVERY");
+  });
+
+  it("går videre til næste leverance, når den første er udsolgt", async () => {
+    await setupVariant();
+    const first = await addDelivery("2026-12-01", 2);
+    const second = await addDelivery("2027-01-15", 20);
+    await allocate(first.id, 2, "1");
+    const { shopify, sync } = setup();
+    await sync();
+    const row = await client.delivery.findUniqueOrThrow({
+      where: { id: second.id },
+    });
+    expect(metafield(shopify)).toMatchObject({
+      date: "2027-01-15",
+      sellingPlanId: row.sellingPlanId,
+      remaining: 20,
+      soldOut: false,
+    });
+  });
+
+  it("alt udsolgt: ingen dato og ingen plan", async () => {
+    await setupVariant();
+    const only = await addDelivery("2026-12-01", 2);
+    await allocate(only.id, 2, "1");
+    const { shopify, sync } = setup();
+    await sync();
+    expect(metafield(shopify)).toEqual({
+      active: true,
+      mode: "SHIPPING",
+      date: null,
+      sellingPlanId: null,
+      remaining: 0,
+      soldOut: true,
+    });
+  });
+
+  it("slås forudbestilling fra, får produktsiden besked", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    await data().variantPlans.setEnabled(VARIANT, false);
+    await sync();
+    expect(metafield(shopify)).toEqual({ active: false });
   });
 });

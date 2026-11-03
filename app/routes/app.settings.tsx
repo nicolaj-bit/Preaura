@@ -9,6 +9,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { DATE_MODES, forShop, type DateMode } from "../models/preorder.server";
+import { shopifySync } from "../sync/index.server";
 
 // Butiksindstillinger: om datoen vises som afsendelse eller levering, og de
 // tekster, webshopejeren selv kan ændre.
@@ -36,7 +37,7 @@ const TEXT_FIELDS = [
 type TextField = (typeof TEXT_FIELDS)[number];
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const form = await request.formData();
 
   const dateMode = String(form.get("dateMode")) as DateMode;
@@ -53,7 +54,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   if (Object.keys(errors).length > 0) return { ok: false as const, errors };
 
-  await forShop(session.shop).settings.update({ dateMode, ...texts });
+  const data = forShop(session.shop);
+  const before = await data.settings.get();
+  await data.settings.update({ dateMode, ...texts });
+
+  // Visningen (afsendelse/levering) står i variantens metafelt, som
+  // produktsiden læser. Er den ændret, synkroniseres varianterne.
+  if (before.dateMode !== dateMode) {
+    const sync = shopifySync(admin.graphql, session.shop);
+    const products = await data.variantPlans.listProducts();
+    for (const { productId } of products) {
+      for (const plan of await data.variantPlans.listForProduct(productId)) {
+        if (plan.preorderEnabled) await sync.sync(plan.variantId);
+      }
+    }
+  }
   return { ok: true as const };
 };
 

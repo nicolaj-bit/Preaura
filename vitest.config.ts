@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 // vite.config.ts.
 export default defineConfig({
   test: {
-    include: ["app/**/*.test.ts"],
+    include: ["app/**/*.test.ts", "extensions/**/*.test.ts"],
     environment: "node",
   },
 });

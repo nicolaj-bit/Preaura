@@ -136,6 +136,33 @@ tildelinger:
   periodisk fejning (hvert minut) samler ventende hændelser op efter en
   genstart.
 
+## Produktsiden (Theme App Extension)
+
+`extensions/preaura-preorder/` er en app block, som webshopejeren selv
+placerer i produktsektionen i temaeditoren (Tilpas → Produktside → Tilføj
+blok → Apps → Forudbestilling). Ingen app embed og ingen kode i temaet.
+
+- **Data uden netværkskald:** synkroniseringen skriver metafeltet
+  `preaura.preorder` (json) på hver variant — om forudbestilling er aktiv,
+  visning (afsendelse/levering), den aktive leverances dato og selling
+  plan-id, resterende antal, og om alt er udsolgt. Blokken læser det i Liquid
+  for alle varianter ved sideindlæsning.
+- **To skjulte felter i produktformularen**, holdt opdateret ved
+  variantskifte: `selling_plan` og en synlig linjeegenskab, fx
+  `properties[Forventet afsendelse]`. Linjeegenskaben vises af Shopify i
+  kurv, checkout, ordrebekræftelse og på ordren — uden at tema eller
+  mailskabelon skal rettes — og fryser datoen fast i købsøjeblikket.
+- **Variantskifte** opdages via temaernes hændelser og en reserve, der hvert
+  250 ms læser formularens skjulte felt `id` (gamle temaer).
+- **Rører ikke temaet:** ingen skrifttyper, størrelser eller farver;
+  variantvælger og købsknap røres ikke. Knappens tekst ændres kun, hvis
+  indstillingen er slået til (standard: fra).
+- **Udsolgt:** tydelig besked, og hverken plan eller linjeegenskab.
+- Alle kundevendte tekster er indstillinger på blokken. Datoen formateres
+  på butikkens sprog.
+
+Tjek blokken med `shopify theme check --path extensions/preaura-preorder`.
+
 ## Krav
 
 - Node.js 22.12 eller nyere

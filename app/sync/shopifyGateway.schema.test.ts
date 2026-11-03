@@ -160,4 +160,15 @@ describe("forespørgsler mod Shopifys skema", () => {
       ),
     );
   });
+
+  it("variant: metafelt til produktsiden", async () => {
+    expectValid(
+      await capture((g) =>
+        g.setVariantPreorderMetafield(
+          "gid://shopify/ProductVariant/1",
+          '{"active":false}',
+        ),
+      ),
+    );
+  });
 });

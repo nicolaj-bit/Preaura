@@ -1,0 +1,108 @@
+{%- comment -%}
+  PREAURA – forudbestilling på produktsiden.
+
+  Læser variantens metafelt preaura.preorder (skrevet af appens
+  synkronisering) for ALLE varianter ved sideindlæsning. Intet netværkskald
+  fra produktsiden: siden bliver ikke langsommere og afhænger ikke af, at
+  appens server svarer.
+
+  JavaScript (assets/preaura-preorder.js) lægger to skjulte felter i temaets
+  produktformular — selling_plan og en synlig linjeegenskab med datoen — og
+  holder dem opdateret ved variantskifte. Ellers røres temaet ikke.
+
+  Ingen skrifttyper, størrelser eller farver: alt arver temaets udseende.
+{%- endcomment -%}
+{%- liquid
+  assign preaura_product = closest.product | default: product
+-%}
+{%- if preaura_product -%}
+  <div data-preaura-root hidden {{ block.shopify_attributes }}>
+    <p data-preaura-message></p>
+    {%- if block.settings.note != blank -%}
+      <p data-preaura-note>{{ block.settings.note | escape }}</p>
+    {%- endif -%}
+    <script type="application/json" data-preaura-data>
+      {
+        "selected": {{ preaura_product.selected_or_first_available_variant.id | json }},
+        "locale": {{ request.locale.iso_code | json }},
+        "settings": {
+          "shippingLabel": {{ block.settings.shipping_label | json }},
+          "deliveryLabel": {{ block.settings.delivery_label | json }},
+          "message": {{ block.settings.message | json }},
+          "soldOutMessage": {{ block.settings.sold_out_message | json }},
+          "changeButtonText": {{ block.settings.change_button_text | json }},
+          "buttonText": {{ block.settings.button_text | json }}
+        },
+        "variants": {
+          {%- for variant in preaura_product.variants -%}
+            "{{ variant.id }}": {{ variant.metafields.preaura.preorder.value | json }}{% unless forloop.last %},{% endunless %}
+          {%- endfor -%}
+        }
+      }
+    </script>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Forudbestilling",
+  "target": "content",
+  "javascript": "preaura-preorder.js",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Placér blokken i produktsektionen, gerne lige over købsknappen. Datoen og teksterne vises kun for varianter på forudbestilling."
+    },
+    {
+      "type": "text",
+      "id": "shipping_label",
+      "label": "Navn for forventet afsendelse",
+      "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren.",
+      "default": "Forventet afsendelse"
+    },
+    {
+      "type": "text",
+      "id": "delivery_label",
+      "label": "Navn for forventet levering",
+      "info": "Bruges, når appens indstilling står til forventet levering.",
+      "default": "Forventet levering"
+    },
+    {
+      "type": "text",
+      "id": "message",
+      "label": "Besked",
+      "info": "{label} bliver til navnet ovenfor, {dato} til leverancens dato.",
+      "default": "{label}: {dato}"
+    },
+    {
+      "type": "textarea",
+      "id": "note",
+      "label": "Forklaring",
+      "info": "Gør vilkårene tydelige før køb. Lad feltet stå tomt for at skjule det.",
+      "default": "Varen er på forudbestilling. Du betaler hele beløbet nu, og varen sendes, når den er på lager."
+    },
+    {
+      "type": "text",
+      "id": "sold_out_message",
+      "label": "Besked, når alt er udsolgt",
+      "default": "Udsolgt – alle leverancer er udsolgt."
+    },
+    {
+      "type": "checkbox",
+      "id": "change_button_text",
+      "label": "Skift teksten på købsknappen",
+      "info": "Slået fra: blokken viser sin egen besked over knappen, og temaets knap røres ikke.",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Tekst på købsknappen",
+      "default": "Forudbestil"
+    }
+  ]
+}
+{% endschema %}
