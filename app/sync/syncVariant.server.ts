@@ -111,7 +111,10 @@ async function reconcile(
       state.variant.preorderMetafield != null &&
       !preorderDataMatches(state.variant.preorderMetafield, off)
     ) {
-      await gateway.setVariantPreorderMetafield(variantId, serializePreorderData(off));
+      await gateway.setVariantPreorderMetafield(
+        variantId,
+        serializePreorderData(off),
+      );
     }
     return { available: null, product };
   }

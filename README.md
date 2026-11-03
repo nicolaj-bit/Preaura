@@ -68,8 +68,8 @@ der afviger. `syncVariant()` tager én variant og bringer Shopify i
 overensstemmelse med appens data:
 
 - **Én selling plan group pr. variant**, knyttet til varianten.
-- **Én selling plan pr. åben leverance**: kategori `PRE_ORDER`, fuld betaling
-  ved bestilling (100 %, ingen restbetaling), afsendelse på leverancens dato
+- **Én selling plan pr. åben leverance**: kategori `PRE_ORDER`, betaling
+  ved afsendelse (0 % ved bestilling, resten `ON_FULFILLMENT`), afsendelse på leverancens dato
   (`EXACT_TIME`, kl. 12:00 UTC), og lageret bindes ved salg (`ON_SALE`).
   Planens id gemmes på leverancen.
 - **Lager:** lagersporing slået til, inventory policy `DENY`, og tilgængeligt
@@ -269,6 +269,12 @@ De samme tjek kører automatisk på GitHub ved hvert push
 (`.github/workflows/checks.yml`).
 
 ## Kendte begrænsninger
+
+- **Betaling ved afsendelse:** kunden betaler intet ved bestilling. Shopify
+  gemmer betalingsmidlet og trækker beløbet, når ordren sendes. Er kortet
+  udløbet eller uden dækning, står ordren som ikke betalt — tjek
+  betalingsstatus, før en forudbestilling sendes. Kræver Shopify Payments
+  eller en betalingsudbyder, der understøtter udskudt betaling.
 
 - **Rækkefølgen er kun sikret inden for samme behandlingsrunde.** Kommer en
   ordre frem mere end nogle sekunder efter en senere ordre, og er der netop

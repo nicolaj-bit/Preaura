@@ -86,8 +86,8 @@ describe("selling plans", () => {
         reserve: "ON_SALE",
         billing: {
           checkoutChargeType: "PERCENTAGE",
-          checkoutChargePercentage: 100,
-          remainingBalanceChargeTrigger: "NO_REMAINING_BALANCE",
+          checkoutChargePercentage: 0,
+          remainingBalanceChargeTrigger: "ON_FULFILLMENT",
         },
         delivery: { fulfillmentTrigger: "EXACT_TIME" },
         pricingPolicyCount: 0,
@@ -125,6 +125,39 @@ describe("selling plans", () => {
     expect(onlyGroup(shopify).plans[0].options).toEqual([
       "Leveres 1. december 2026",
     ]);
+  });
+
+  it("en plan med de gamle betalingsvilkår (100 % ved bestilling) erstattes — den ændres ikke", async () => {
+    await setupVariant();
+    const delivery = await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    // Som en plan, der blev oprettet, før betaling ved afsendelse.
+    const [old] = onlyGroup(shopify).plans;
+    old.billing = {
+      remainingBalanceChargeTrigger: "NO_REMAINING_BALANCE",
+      checkoutChargeType: "PERCENTAGE",
+      checkoutChargePercentage: 100,
+    };
+    shopify.clearWrites();
+
+    await sync();
+    expect(shopify.writes.map((w) => w.method)).toEqual([
+      "deletePlans",
+      "createPlans",
+      "setVariantPreorderMetafield",
+    ]);
+    const [plan] = onlyGroup(shopify).plans;
+    expect(plan.id).not.toBe(old.id);
+    expect(plan.billing).toEqual({
+      remainingBalanceChargeTrigger: "ON_FULFILLMENT",
+      checkoutChargeType: "PERCENTAGE",
+      checkoutChargePercentage: 0,
+    });
+    const row = await client.delivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    });
+    expect(row.sellingPlanId).toBe(plan.id);
   });
 
   it("anden kørsel ændrer intet", async () => {
