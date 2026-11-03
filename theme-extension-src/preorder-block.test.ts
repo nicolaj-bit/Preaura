@@ -299,6 +299,24 @@ describe("temaets egne anmodninger til kurven", () => {
     );
   });
 
+  it("erstatter et tomt selling_plan, som temaet tilføjer EFTER formularens", async () => {
+    // Præcis det, testbutikkens tema gjorde: FormData fra formularen (med
+    // blokkens plan) og derefter et ekstra, tomt selling_plan til sidst.
+    const calls = withFetch({ "1": active("2026-12-01") });
+    const body = new FormData();
+    body.append("id", "1");
+    body.append("selling_plan", "111");
+    body.append("properties[Forventet afsendelse]", "1. december 2026");
+    body.append("sections", "cart-drawer");
+    body.append("selling_plan", "");
+    await fetch("/cart/add", { method: "POST", body });
+    const sent = calls[0].body as FormData;
+    expect(sent.getAll("selling_plan")).toEqual(["111"]);
+    expect(sent.getAll("properties[Forventet afsendelse]")).toEqual([
+      "1. december 2026",
+    ]);
+  });
+
   it("lægger plan og dato på en JSON-anmodning med items", async () => {
     const calls = withFetch({ "1": active("2026-12-01") });
     await fetch("/cart/add.js", {

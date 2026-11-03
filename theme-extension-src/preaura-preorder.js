@@ -300,18 +300,40 @@
   }
 
   /** Sætter plan og dato på én vare, hvis de mangler. */
+  /**
+   * Sætter plan og dato på én vare, hvis de mangler. get(k) returnerer ALLE
+   * værdier for k: nogle temaer tilføjer et tomt selling_plan EFTER
+   * formularens (fundet i testbutikken), og Shopify bruger den sidste værdi.
+   * Er der et tomt selling_plan blandt værdierne, erstattes de alle med
+   * planen. En enkelt plan, temaet selv har sat, bevares.
+   */
   function completeItem(get, set) {
-    var plan = PLANS[numericId(get("id"))];
+    var ids = get("id");
+    var plan = PLANS[numericId(ids[ids.length - 1])];
     if (!plan) return;
-    if (!get("selling_plan")) set("selling_plan", plan.sellingPlan);
+    var plans = get("selling_plan");
+    var hasEmpty =
+      plans.length === 0 ||
+      plans.some(function (v) {
+        return !v;
+      });
+    if (hasEmpty) set("selling_plan", plan.sellingPlan);
     var key = "properties[" + plan.label + "]";
-    if (!get(key)) set(key, plan.date);
+    var dates = get(key);
+    if (
+      dates.length === 0 ||
+      dates.some(function (v) {
+        return !v;
+      })
+    ) {
+      set(key, plan.date);
+    }
   }
 
   function completeParams(params) {
     completeItem(
       function (k) {
-        return params.get(k);
+        return params.getAll(k);
       },
       function (k, v) {
         params.set(k, v);
@@ -326,7 +348,7 @@
               k.indexOf("properties[") === 0
                 ? prefix + "[properties]" + k.slice("properties".length)
                 : prefix + "[" + k + "]";
-            return params.get(name);
+            return params.getAll(name);
           },
           function (k, v) {
             var name =
