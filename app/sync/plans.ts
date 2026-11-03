@@ -100,9 +100,12 @@ export function sellingPlanInput(plan: DesiredPlan) {
     category: "PRE_ORDER",
     billingPolicy: {
       fixed: {
-        // Hele beløbet ved bestilling. Ingen restbetaling i denne version.
-        checkoutCharge: { type: "PERCENTAGE", value: { percentage: 100 } },
-        remainingBalanceChargeTrigger: "NO_REMAINING_BALANCE",
+        // Intet ved bestilling. Hele beløbet trækkes, når ordren sendes
+        // (fulfillment). Shopify gemmer kundens betalingsmiddel ved checkout.
+        // Danske regler for kortbetaling: der må som udgangspunkt først
+        // trækkes, når varen sendes.
+        checkoutCharge: { type: "PERCENTAGE", value: { percentage: 0 } },
+        remainingBalanceChargeTrigger: "ON_FULFILLMENT",
       },
     },
     deliveryPolicy: {
@@ -125,9 +128,9 @@ export function planMatches(plan: ShopifyPlan, desired: DesiredPlan) {
   return (
     plan.category === "PRE_ORDER" &&
     plan.reserve === "ON_SALE" &&
-    plan.billing?.remainingBalanceChargeTrigger === "NO_REMAINING_BALANCE" &&
+    plan.billing?.remainingBalanceChargeTrigger === "ON_FULFILLMENT" &&
     plan.billing.checkoutChargeType === "PERCENTAGE" &&
-    plan.billing.checkoutChargePercentage === 100 &&
+    plan.billing.checkoutChargePercentage === 0 &&
     plan.delivery?.fulfillmentTrigger === "EXACT_TIME" &&
     plan.delivery.fulfillmentExactTime != null &&
     Date.parse(plan.delivery.fulfillmentExactTime) ===

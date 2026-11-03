@@ -14,7 +14,7 @@ import { desiredPlans } from "./plans";
 
 // Validerer hver forespørgsel og mutation, appen sender til Shopify, mod
 // Shopifys rigtige Admin-skema — inklusive variablerne (feltnavne og
-// enum-værdier som PRE_ORDER og NO_REMAINING_BALANCE). Skemaet hentes med
+// enum-værdier som PRE_ORDER og ON_FULFILLMENT). Skemaet hentes med
 // `npm run graphql-codegen`.
 
 const SCHEMA_PATH = join(__dirname, "../types/admin-2026-10.schema.json");

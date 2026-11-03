@@ -210,7 +210,9 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           ? {
               productId: variant.product.id,
               productRequiresSellingPlan: variant.product.requiresSellingPlan,
-              productVariantIds: variant.product.variants.nodes.map((v) => v.id),
+              productVariantIds: variant.product.variants.nodes.map(
+                (v) => v.id,
+              ),
               preorderMetafield: variant.preorderMetafield?.value ?? null,
               inventoryPolicy: variant.inventoryPolicy,
               tracked: variant.inventoryItem.tracked,
@@ -625,7 +627,10 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         // Kun requiresSellingPlan. Intet andet på produktet.
         { product: { id: productId, requiresSellingPlan } },
       );
-      check("Krav om forudbestilling på produktet", data.productUpdate.userErrors);
+      check(
+        "Krav om forudbestilling på produktet",
+        data.productUpdate.userErrors,
+      );
     },
 
     async setAvailable({ inventoryItemId, locationId, quantity, changeFrom }) {
