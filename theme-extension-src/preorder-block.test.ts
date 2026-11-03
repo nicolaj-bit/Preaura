@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readdirSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Tester app-blokkens JavaScript i en rigtig DOM med den samme fil, som
@@ -8,7 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // den, temaer som Dawn og Horizon har.
 
 const SCRIPT = readFileSync(
-  join(__dirname, "assets/preaura-preorder.js") /* den komprimerede fil, Shopify serverer */,
+  join(
+    __dirname,
+    "../extensions/preaura-preorder/assets/preaura-preorder.js",
+  ) /* den komprimerede fil, Shopify serverer */,
   "utf8",
 );
 
@@ -377,5 +381,25 @@ describe("temaets egne anmodninger til kurven", () => {
     } finally {
       XMLHttpRequest.prototype.send = originalSend;
     }
+  });
+});
+
+describe("extensionens filstruktur", () => {
+  it("indeholder kun det, Shopify tillader i en theme app extension", () => {
+    // Shopify afviser extensionen ved alt andet end disse (fundet i testbutikken).
+    const dir = join(__dirname, "../extensions/preaura-preorder");
+    const allowed = [
+      "assets",
+      "blocks",
+      "locales",
+      "shopify.extension.toml",
+      "snippets",
+      "package.json",
+    ];
+    expect(readdirSync(dir).filter((name) => !allowed.includes(name))).toEqual(
+      [],
+    );
+    // Git gemmer ikke tomme mapper: locales skal indeholde en fil.
+    expect(readdirSync(join(dir, "locales")).length).toBeGreaterThan(0);
   });
 });
