@@ -138,6 +138,9 @@ const READ_QUERY = `#graphql
           }
         }
       }
+      preorderMetafield: metafield(namespace: "preaura", key: "preorder") {
+        value
+      }
       inventoryItem {
         tracked
         inventoryLevel(locationId: $locationId) @include(if: $hasLocation) {
@@ -173,6 +176,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       const data = await run<{
         productVariant: {
           inventoryPolicy: string;
+          preorderMetafield: { value: string } | null;
           product: {
             id: string;
             requiresSellingPlan: boolean;
@@ -207,6 +211,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
               productId: variant.product.id,
               productRequiresSellingPlan: variant.product.requiresSellingPlan,
               productVariantIds: variant.product.variants.nodes.map((v) => v.id),
+              preorderMetafield: variant.preorderMetafield?.value ?? null,
               inventoryPolicy: variant.inventoryPolicy,
               tracked: variant.inventoryItem.tracked,
               available:
@@ -538,6 +543,35 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         },
       );
       check("Metafelter på ordren", data.metafieldsSet.userErrors);
+    },
+
+    async setVariantPreorderMetafield(variantId, value) {
+      const data = await run<{
+        metafieldsSet: { userErrors: UserErrors };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraVariantMetafield($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        {
+          metafields: [
+            {
+              ownerId: variantId,
+              namespace: "preaura",
+              key: "preorder",
+              type: "json",
+              value,
+            },
+          ],
+        },
+      );
+      check("Metafelt på varianten", data.metafieldsSet.userErrors);
     },
 
     async addOrderTags(orderId, tags) {

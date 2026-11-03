@@ -12,6 +12,8 @@ export type ShopifyVariantState = {
   productRequiresSellingPlan: boolean;
   /** Alle produktets varianter i Shopify. */
   productVariantIds: string[];
+  /** Nuværende værdi af variantens metafelt preaura.preorder (json). */
+  preorderMetafield: string | null;
   inventoryPolicy: string;
   tracked: boolean;
   /** Tilgængeligt antal på lageret. Null, hvis varen ikke ligger der. */
@@ -59,6 +61,12 @@ export interface ShopifyGateway {
     productId: string,
     requiresSellingPlan: boolean,
   ): Promise<void>;
+
+  /**
+   * Skriver variantens metafelt preaura.preorder (json), som app-blokken på
+   * produktsiden læser i Liquid.
+   */
+  setVariantPreorderMetafield(variantId: string, value: string): Promise<void>;
 
   /** Læser en ordre. Null, hvis den ikke findes. */
   readOrder(orderId: string): Promise<ShopifyOrderState | null>;

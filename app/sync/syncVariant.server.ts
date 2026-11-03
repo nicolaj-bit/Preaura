@@ -4,6 +4,11 @@ import { forShop } from "../models/preorder.server";
 import { findActiveDelivery } from "../lib/deliveries";
 import type { ShopifyGateway } from "./gateway";
 import {
+  preorderDataMatches,
+  serializePreorderData,
+  type VariantPreorderData,
+} from "./variantMetafield";
+import {
   desiredPlans,
   groupMerchantCode,
   planMatches,
@@ -98,6 +103,15 @@ async function reconcile(
   if (!plan.preorderEnabled) {
     if (group?.appliesToVariant) {
       await gateway.removeVariant(group.id, variantId);
+    }
+    // Har varianten tidligere haft forudbestilling, får produktsiden besked
+    // om, at den ikke er aktiv længere. Ellers skrives intet.
+    const off: VariantPreorderData = { active: false };
+    if (
+      state.variant.preorderMetafield != null &&
+      !preorderDataMatches(state.variant.preorderMetafield, off)
+    ) {
+      await gateway.setVariantPreorderMetafield(variantId, serializePreorderData(off));
     }
     return { available: null, product };
   }
@@ -218,6 +232,26 @@ async function reconcile(
       changeFrom: variant.available,
     });
   }
+  // --- Metafelt til produktsiden ---------------------------------------------
+
+  // Læses igen: planerne kan være oprettet ovenfor.
+  const fresh = await data.deliveries.listForVariants([variantId]);
+  const activeNow = findActiveDelivery(fresh);
+  const wantedData: VariantPreorderData = {
+    active: true,
+    mode: settings.dateMode,
+    date: activeNow?.date ?? null,
+    sellingPlanId: activeNow?.sellingPlanId ?? null,
+    remaining: wantedAvailable,
+    soldOut: activeNow == null,
+  };
+  if (!preorderDataMatches(state.variant.preorderMetafield, wantedData)) {
+    await gateway.setVariantPreorderMetafield(
+      variantId,
+      serializePreorderData(wantedData),
+    );
+  }
+
   return { available: wantedAvailable, product };
 }
 
