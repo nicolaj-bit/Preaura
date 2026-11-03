@@ -20,5 +20,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      # Den komprimerede fil til butikken skal svare til kildefilen.
+      - run: npm run build:block && git diff --exit-code extensions/preaura-preorder/assets
       # Shopifys eget tjek af app-blokken (Liquid, schema, assets, størrelse).
       - run: npx -y @shopify/cli@latest theme check --path extensions/preaura-preorder
