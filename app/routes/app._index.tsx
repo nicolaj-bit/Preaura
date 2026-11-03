@@ -26,13 +26,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const byId = new Map(products.map((product) => [product.id, product]));
 
-  const [counts, unresolved] = await Promise.all([
+  const [counts, unresolved, withoutPlan7] = await Promise.all([
     queueFor(session.shop).countByStatus(),
     data.orders.unresolved(),
+    data.orders.countWithoutPlanSince(
+      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    ),
   ]);
 
   return {
     failedEvents: counts.FAILED ?? 0,
+    withoutPlan7,
     unresolvedOrders: new Set(unresolved.map((row) => row.orderId)).size,
     products: summaries.map((summary) => {
       const product = byId.get(summary.productId);
@@ -44,6 +48,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         imageAlt: product?.imageAlt ?? "",
         variants: summary.variants,
         enabled: summary.enabled,
+        // Alle produktets varianter i Shopify på forudbestilling?
+        allPreorder:
+          summary.enabled > 0 &&
+          summary.enabled >= (product?.variants.length ?? summary.variants),
       };
     }),
   };
@@ -79,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { products, failedEvents, unresolvedOrders } =
+  const { products, failedEvents, unresolvedOrders, withoutPlan7 } =
     useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
@@ -141,6 +149,20 @@ export default function Index() {
         </s-banner>
       )}
 
+      {withoutPlan7 > 0 && (
+        <s-banner tone="info" heading="Forudbestillinger købt uden plan">
+          <s-paragraph>
+            {withoutPlan7 === 1 ? "1 ordre" : `${withoutPlan7} ordrer`} de
+            seneste 7 dage købte en vare på forudbestilling uden at vælge
+            forudbestilling. Appen har talt dem med, men det kan betyde, at
+            noget i opsætningen er galt.
+          </s-paragraph>
+          <s-link slot="secondary-actions" href="/app/queue">
+            Se ordrerne
+          </s-link>
+        </s-banner>
+      )}
+
       {products.length === 0 ? (
         <s-section>
           <s-stack gap="base" alignItems="center">
@@ -179,10 +201,12 @@ export default function Index() {
                     {product.enabled} af {product.variants}
                   </s-table-cell>
                   <s-table-cell>
-                    {product.enabled > 0 ? (
-                      <s-badge tone="success">Slået til</s-badge>
-                    ) : (
+                    {product.enabled === 0 ? (
                       <s-badge>Slået fra</s-badge>
+                    ) : product.allPreorder ? (
+                      <s-badge tone="success">Kun forudbestilling</s-badge>
+                    ) : (
+                      <s-badge tone="info">Blandet</s-badge>
                     )}
                   </s-table-cell>
                 </s-table-row>

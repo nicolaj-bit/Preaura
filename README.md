@@ -76,6 +76,12 @@ overensstemmelse med appens data:
   antal = det resterende i den aktive leverance. Shopify stopper selv salget
   ved 0.
 
+- **Kun forudbestilling eller blandet:** er alle produktets varianter på
+  forudbestilling, sætter appen produktets `requiresSellingPlan`, så
+  «Engangskøb» forsvinder. Er kun nogle, sættes den ikke (den gælder hele
+  produktet) — så beskytter app-blokken og sikkerhedsnettet. Appen slår den
+  kun fra igen, hvis det var appen, der satte den.
+
 Regler:
 
 - **En selling plan ændres aldrig.** Afviger den fra sin leverance (fx ny
@@ -109,6 +115,13 @@ tildelinger:
   *uafklaret*: ordren tagges «Forudbestilling uafklaret» og vises under
   Ordrebehandling i admin. Behandles ordren igen, når der er plads, afklares
   den.
+- **Sikkerhedsnettet: hver solgt enhed tælles.** Har en ordrelinje ingen af
+  appens selling plans (almindeligt køb, kladdeordre, POS, API eller en anden
+  apps plan), men er varianten på forudbestilling, lægges linjen alligevel i
+  den aktive leverance og mærkes «købt uden plan». Ellers ville Shopify have
+  trukket lageret ned, og næste synkronisering skrive det op igen. Kun ordrer
+  oprettet efter, at forudbestilling blev slået til, tælles. Salg uden plan
+  vises samlet under Ordrebehandling.
 - **Først til mølle efter bestillingstidspunkt**: hændelser behandles i
   ordrens oprettelsesrækkefølge. Behandlingen venter 5 sekunder efter en
   webhook, så ordrer, der kommer næsten samtidig, sorteres korrekt.

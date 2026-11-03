@@ -97,6 +97,13 @@ model VariantPlan {
   // Lageret, varianten styres fra. Tom, hvis varen ikke ligger på noget lager.
   locationId      String?
   preorderEnabled Boolean  @default(false)
+  // Hvornår forudbestilling sidst blev slået til. Sikkerhedsnettet tæller
+  // kun ordrer uden plan, der er oprettet efter dette tidspunkt — ellers ville
+  // en gammel, almindelig ordre, der bliver rettet, pludselig tælle med.
+  preorderEnabledAt DateTime?
+  // Sand, når appen har sat produktets requiresSellingPlan. Kun da må appen
+  // slå det fra igen. Sættes på alle produktets rækker.
+  setRequiresSellingPlan Boolean @default(false)
 
   // Synkronisering med Shopify. Udfyldes kun af app/sync/.
   // Variantens egen selling plan group i Shopify.
@@ -169,6 +176,10 @@ model Allocation {
   quantity       Int
   // "ACTIVE", "UNRESOLVED" (ingen plads) eller "CANCELLED".
   status         String    @default("ACTIVE")
+  // Sand, når ordrelinjen ikke havde en af appens selling plans (almindeligt
+  // køb, kladdeordre, POS, API). Tælles alligevel — sikkerhedsnettet — men
+  // vises samlet i admin, fordi det tit betyder, at opsætningen er forkert.
+  soldWithoutPlan Boolean   @default(false)
   // Datoen, kunden blev lovet, da tildelingen blev lavet. Den følger IKKE
   // leverancen, hvis leverancens dato senere ændres.
   promisedDate   String?

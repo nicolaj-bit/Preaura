@@ -18,6 +18,8 @@ export type ShopifyVariant = {
 export type ShopifyProduct = {
   id: string;
   title: string;
+  /** Kan produktet kun købes med en selling plan? */
+  requiresSellingPlan: boolean;
   imageUrl: string | null;
   imageAlt: string | null;
   variants: ShopifyVariant[];
@@ -29,6 +31,7 @@ const PRODUCTS_QUERY = `#graphql
       ... on Product {
         id
         title
+        requiresSellingPlan
         featuredMedia {
           preview {
             image {
@@ -61,6 +64,7 @@ const PRODUCTS_QUERY = `#graphql
 type ProductNode = {
   id: string;
   title: string;
+  requiresSellingPlan: boolean;
   featuredMedia: {
     preview: { image: { url: string; altText: string | null } | null } | null;
   } | null;
@@ -99,6 +103,7 @@ export async function fetchProducts(
       products.push({
         id: node.id,
         title: node.title,
+        requiresSellingPlan: node.requiresSellingPlan,
         imageUrl: image?.url ?? null,
         imageAlt: image?.altText ?? null,
         variants: node.variants.nodes.map((variant) => ({

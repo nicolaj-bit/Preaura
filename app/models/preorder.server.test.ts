@@ -265,4 +265,15 @@ describe("tildelinger", () => {
       client.delivery.delete({ where: { id: delivery.id } }),
     ).rejects.toThrow();
   });
+
+  it("databasens værn mod dobbelttælling findes efter alle migrationer", async () => {
+    // De partielle unikke indekser kan Prisma ikke beskrive. Genskaber en
+    // migration tabellen Allocation, forsvinder de stille — det fanger denne test.
+    const rows = await client.$queryRawUnsafe<{ name: string }[]>(
+      `SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'Allocation'`,
+    );
+    const names = rows.map((r) => r.name);
+    expect(names).toContain("Allocation_active_line_delivery_key");
+    expect(names).toContain("Allocation_unresolved_line_key");
+  });
 });

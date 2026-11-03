@@ -152,4 +152,12 @@ describe("forespørgsler mod Shopifys skema", () => {
       ),
     );
   });
+
+  it("produkt: krav om selling plan", async () => {
+    expectValid(
+      await capture((g) =>
+        g.setProductRequiresSellingPlan("gid://shopify/Product/1", true),
+      ),
+    );
+  });
 });
