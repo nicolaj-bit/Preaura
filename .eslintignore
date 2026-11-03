@@ -4,3 +4,4 @@ public/build
 */*.yml
 .shopify
 /app/types
+/extensions/preaura-preorder/assets

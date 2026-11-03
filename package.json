@@ -18,7 +18,9 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:block": "esbuild extensions/preaura-preorder/src/preaura-preorder.js --minify --target=es2018 \"--banner:js=/* PREAURA. Genereret fra src/preaura-preorder.js med npm run build:block - ret ikke her. */\" --outfile=extensions/preaura-preorder/assets/preaura-preorder.js",
+    "pretest": "npm run build:block"
   },
   "type": "module",
   "engines": {

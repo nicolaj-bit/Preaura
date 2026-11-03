@@ -161,6 +161,16 @@ blok → Apps → Forudbestilling). Ingen app embed og ingen kode i temaet.
 - Alle kundevendte tekster er indstillinger på blokken. Datoen formateres
   på butikkens sprog.
 
+- **Temaets egne anmodninger:** mange temaer sender ikke formularen, som den
+  står, men bygger deres egen anmodning til `/cart/add`. Blokken lægger plan
+  og dato på temaets anmodning (fetch og XMLHttpRequest), hvis varen er en
+  variant på forudbestilling, og de mangler. Andre varianter og andre
+  anmodninger røres ikke.
+
+**Ret i `src/preaura-preorder.js`**, ikke i `assets/`. Filen i `assets/` er en
+komprimeret udgave (Shopify tillader højst 10 KB JavaScript pr. app block) og
+bygges med `npm run build:block` (sker også automatisk før `npm test`).
+
 Tjek blokken med `shopify theme check --path extensions/preaura-preorder`.
 
 ## Krav

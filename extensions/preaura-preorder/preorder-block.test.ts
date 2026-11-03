@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // den, temaer som Dawn og Horizon har.
 
 const SCRIPT = readFileSync(
-  join(__dirname, "assets/preaura-preorder.js"),
+  join(__dirname, "assets/preaura-preorder.js") /* den komprimerede fil, Shopify serverer */,
   "utf8",
 );
 
@@ -96,9 +96,12 @@ const active = (date: string, plan = PLAN_1, mode = "SHIPPING") => ({
 beforeEach(() => {
   vi.useFakeTimers();
 });
+const realFetch = window.fetch;
 afterEach(() => {
   vi.useRealTimers();
   delete (window as { PreauraPreorder?: unknown }).PreauraPreorder;
+  delete (window as { __preauraCartPatched?: unknown }).__preauraCartPatched;
+  window.fetch = realFetch;
 });
 
 describe("app-blokken på produktsiden", () => {
@@ -262,5 +265,117 @@ describe("app-blokken på produktsiden", () => {
     expect(installment.querySelectorAll("[data-preaura-field]")).toHaveLength(
       0,
     );
+  });
+});
+
+describe("temaets egne anmodninger til kurven", () => {
+  // Temaer, der bygger deres egen anmodning i stedet for at sende formularen.
+  // Testen installerer en falsk fetch FØR scriptet, ligesom browserens.
+  function withFetch(variants: Variants) {
+    const calls: { url: string; body: unknown }[] = [];
+    window.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body });
+      return new Response("{}");
+    }) as typeof fetch;
+    page(variants);
+    return calls;
+  }
+
+  it("lægger plan og dato på temaets FormData, når temaet sender tom plan", async () => {
+    const calls = withFetch({ "1": active("2026-12-01") });
+    const body = new FormData();
+    body.set("id", "1");
+    body.set("quantity", "1");
+    body.set("selling_plan", ""); // temaets «Engangskøb»
+    await fetch("/cart/add.js", { method: "POST", body });
+    const sent = calls[0].body as FormData;
+    expect(sent.get("selling_plan")).toBe("111");
+    expect(sent.get("properties[Forventet afsendelse]")).toBe(
+      "1. december 2026",
+    );
+  });
+
+  it("lægger plan og dato på en JSON-anmodning med items", async () => {
+    const calls = withFetch({ "1": active("2026-12-01") });
+    await fetch("/cart/add.js", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ id: 1, quantity: 2 }] }),
+    });
+    expect(JSON.parse(calls[0].body as string)).toEqual({
+      items: [
+        {
+          id: 1,
+          quantity: 2,
+          selling_plan: "111",
+          properties: { "Forventet afsendelse": "1. december 2026" },
+        },
+      ],
+    });
+  });
+
+  it("virker også på en urlencoded anmodning", async () => {
+    const calls = withFetch({ "1": active("2026-12-01") });
+    await fetch("/cart/add", { method: "POST", body: "id=1&quantity=1" });
+    const sent = new URLSearchParams(calls[0].body as string);
+    expect(sent.get("selling_plan")).toBe("111");
+  });
+
+  it("rører ikke varianter uden forudbestilling eller udsolgte varianter", async () => {
+    const calls = withFetch({
+      "1": active("2026-12-01"),
+      "2": { active: false },
+      "3": {
+        active: true,
+        mode: "SHIPPING",
+        date: null,
+        sellingPlanId: null,
+        remaining: 0,
+        soldOut: true,
+      },
+    });
+    const body = JSON.stringify({
+      items: [
+        { id: 2, quantity: 1 },
+        { id: 3, quantity: 1 },
+      ],
+    });
+    await fetch("/cart/add.js", { method: "POST", body });
+    expect(calls[0].body).toBe(body);
+  });
+
+  it("rører ikke andre anmodninger end /cart/add", async () => {
+    const calls = withFetch({ "1": active("2026-12-01") });
+    const body = JSON.stringify({ id: 1, quantity: 3 });
+    await fetch("/cart/change.js", { method: "POST", body });
+    expect(calls[0].body).toBe(body);
+  });
+
+  it("beholder en plan, temaet allerede har sat", async () => {
+    const calls = withFetch({ "1": active("2026-12-01") });
+    await fetch("/cart/add.js", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, quantity: 1, selling_plan: 999 }),
+    });
+    expect(JSON.parse(calls[0].body as string).selling_plan).toBe(999);
+  });
+
+  it("virker på ældre temaer, der bruger XMLHttpRequest", () => {
+    const sent: unknown[] = [];
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function (body) {
+      sent.push(body);
+    };
+    try {
+      page({ "1": active("2026-12-01") });
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/cart/add.js");
+      xhr.send("id=1&quantity=1");
+      expect(new URLSearchParams(sent[0] as string).get("selling_plan")).toBe(
+        "111",
+      );
+    } finally {
+      XMLHttpRequest.prototype.send = originalSend;
+    }
   });
 });
