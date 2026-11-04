@@ -207,6 +207,27 @@ describe("forespørgsler mod Shopifys skema", () => {
       lines: [],
     });
 
+    // Shopifys bibliotek kaster selv fejlen i stedet for at returnere den.
+    let thrown = 0;
+    const throwing = createShopifyGateway(async () => {
+      thrown += 1;
+      if (thrown === 1) {
+        throw new Error(
+          "This app is not approved to use the email field. See https://shopify.dev/docs/apps/launch/protected-customer-data for more details.",
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: { order: { name: "#1004", lineItems: { nodes: [] } } },
+        }),
+      );
+    });
+    expect(await throwing.readOrderDetails(ORDER)).toEqual({
+      name: "#1004",
+      customer: null,
+      lines: [],
+    });
+
     // Andre fejl giver stadig en fejl, så hændelsen prøves igen.
     const broken = createShopifyGateway(
       async () =>

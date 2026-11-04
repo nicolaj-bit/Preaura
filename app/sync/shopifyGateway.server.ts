@@ -553,39 +553,45 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
               }`;
       // Kundens navn og e-mail er beskyttede kundedata. Har appen ikke fået
       // adgang til dem, afviser Shopify hele forespørgslen — så hentes ordren
-      // igen uden, og hændelsen sendes uden kunde.
-      const response = await graphql(
-        `#graphql
-          query PreauraOrderDetails($id: ID!) {
-            order(id: $id) {
-              name
-              email
-              customer {
-                firstName
-                lastName
-              }
-              ${lineFields}
-            }
-          }`,
-        { variables: { id: orderId } },
-      );
-      const json = (await response.json()) as {
+      // igen uden, og hændelsen sendes uden kunde. Afvisningen kan komme som
+      // «errors» i svaret eller som en fejl, Shopifys bibliotek kaster.
+      const denied = (message: string, code?: string) =>
+        code === "ACCESS_DENIED" ||
+        // Fx «This app is not approved to use the email field. See
+        // …/protected-customer-data».
+        /access denied|not approved|protected[- ]customer[- ]data/i.test(
+          message,
+        );
+      let json: {
         data?: Data;
         errors?: { message: string; extensions?: { code?: string } }[];
       };
+      try {
+        const response = await graphql(
+          `#graphql
+            query PreauraOrderDetails($id: ID!) {
+              order(id: $id) {
+                name
+                email
+                customer {
+                  firstName
+                  lastName
+                }
+                ${lineFields}
+              }
+            }`,
+          { variables: { id: orderId } },
+        );
+        json = (await response.json()) as typeof json;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!denied(message)) throw error;
+        json = { errors: [{ message }] };
+      }
       let data = json.data;
       let withCustomer = true;
       if (json.errors?.length) {
-        const denied = json.errors.every(
-          (e) =>
-            e.extensions?.code === "ACCESS_DENIED" ||
-            // Fx «This app is not approved to use the email field. See
-            // …/protected-customer-data».
-            /access|not approved|protected[- ]customer[- ]data/i.test(
-              e.message,
-            ),
-        );
-        if (!denied) {
+        if (!json.errors.every((e) => denied(e.message, e.extensions?.code))) {
           throw new Error(
             `Shopify afviste forespørgslen: ${json.errors.map((e) => e.message).join("; ")}`,
           );
