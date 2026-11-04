@@ -579,7 +579,11 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         const denied = json.errors.every(
           (e) =>
             e.extensions?.code === "ACCESS_DENIED" ||
-            /access|protected customer data/i.test(e.message),
+            // Fx «This app is not approved to use the email field. See
+            // …/protected-customer-data».
+            /access|not approved|protected[- ]customer[- ]data/i.test(
+              e.message,
+            ),
         );
         if (!denied) {
           throw new Error(
