@@ -7,17 +7,19 @@
 client_id = "5021b1e5a0b9cb456c79906ba0d09bd4"
 name = "PREAURA"
 embedded = true
-# Pladsholder. `npm run dev` sætter selv tunnel-adressen under udvikling.
-application_url = "https://shopify.dev/apps/default-app-home"
+# Appens server på Render (se render.yaml). Sendes til Shopify med
+# `npm run deploy`.
+application_url = "https://preaura.onrender.com"
 
 [build]
-# `npm run dev` skriver selv tunnel-adressen ind i appens URL'er.
-automatically_update_urls_on_dev = true
+# Slået fra: ellers ville `npm run dev` skrive en midlertidig tunnel-adresse
+# ind i den rigtige app, og butikkerne ville miste forbindelsen. Lokal
+# udvikling kræver sin egen udviklings-app, se README.
+automatically_update_urls_on_dev = false
 include_config_on_deploy = true
 
 [auth]
-# Pladsholder. Sættes til den rigtige server-adresse ved udrulning.
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [ "https://preaura.onrender.com/auth/callback" ]
 
 [access_scopes]
 # Hold listen kort. Hvert ekstra scope forlænger Shopifys gennemgang.

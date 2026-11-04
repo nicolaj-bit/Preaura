@@ -239,54 +239,58 @@ Bagefter, i Shopify Dev Dashboard under appen:
    På udviklingsbutikker virker det med det samme; til App Store-godkendelsen
    skal begrundelsen udfyldes.
 
-## Kør lokalt og installer på en udviklingsbutik
+## Drift på Render
 
-```bash
-npm run dev
-```
+Appen kører på [Render](https://render.com) i Frankfurt (EU). Opsætningen står
+i `render.yaml`: en webserver (`preaura`) og en PostgreSQL-database
+(`preaura-db`), som kun appen kan nå. Render krypterer databasen og tager
+selv backup.
 
-Shopify CLI starter appen, laver en offentlig tunnel, opretter den lokale
-database og sender konfigurationen (scopes og webhooks) til
-udviklingsbutikken. Første gang spørger den, hvilken butik der skal bruges.
+- **Udrulning:** hver merge til `main` udrulles automatisk. Render bygger
+  appen, kører databasens migrationer og skifter først til den nye version,
+  når `/healthz` svarer.
+- **Konfigurationen i Shopify** (URL'er, scopes, webhooks) og app-blokken
+  til temaet sendes med `npm run deploy` fra en computer. Det skal kun gøres,
+  når `shopify.app.toml` eller `extensions/` er ændret.
+- **Logs:** Render → preaura → Logs.
 
-Tryk **P** i terminalen for at åbne appen. Shopify viser
-installationsdialogen med appens scopes; godkend, og appen åbner inde i
-Shopify Admin med butikkens navn. Så virker installation, OAuth og
-indlejring.
+### Første opsætning
 
-Prøv en webhook af uden at lave en rigtig ordre med
-`shopify app webhook trigger`, som spørger efter emne og adresse
-(fx `orders/create` og `/webhooks/orders`).
+1. Render → **New → Blueprint** → vælg repoet `nicolaj-bit/preaura`.
+2. Indsæt `SHOPIFY_API_SECRET` (Dev Dashboard → PREAURA → Settings →
+   Client secret), når Render spørger. Godkend.
+3. Tjek, at adressen er `https://preaura.onrender.com`. Er den en anden,
+   skal `application_url` og `redirect_urls` i `shopify.app.toml` rettes.
+4. Kør `npm run deploy` fra en computer, så Shopify sender butikkerne og
+   webhooks til Render.
 
-## Miljøvariabler
+### Miljøvariabler
 
-Under `npm run dev` sætter Shopify CLI dem selv. I produktion skal de sættes
-på serveren:
+Sættes af `render.yaml`. Kun `SHOPIFY_API_SECRET` skal indtastes.
 
 | Variabel | Hvad |
 | --- | --- |
-| `SHOPIFY_API_KEY` | Appens client ID fra Dev Dashboard |
+| `DATABASE_URL` | Adressen på databasen. Sættes af Render |
+| `SHOPIFY_API_KEY` | Appens client ID |
 | `SHOPIFY_API_SECRET` | Appens client secret. Bruges også til at verificere webhooks |
-| `SHOPIFY_APP_URL` | Den offentlige adresse, appen kører på, fx `https://preaura.example.com` |
-| `SCOPES` | `read_products,write_products,read_inventory,write_inventory,read_orders,write_orders` |
-| `PORT` | Port, serveren lytter på (valgfri, standard 3000) |
+| `SHOPIFY_APP_URL` | Appens adresse. Udelades på Render, der selv sætter `RENDER_EXTERNAL_URL` |
+| `SCOPES` | Samme liste som i `shopify.app.toml` |
 | `SHOP_CUSTOM_DOMAIN` | Kun hvis butikker bruger et eget admin-domæne (valgfri) |
 
-Databasen er SQLite (`prisma/dev.sqlite`) til lokal udvikling. I produktion
-skal den skiftes til en rigtig database (fx PostgreSQL) i
-`prisma/schema.prisma`, fordi SQLite-filen forsvinder ved hver udrulning på
-de fleste hosting-platforme.
+## Lokal udvikling
 
-## Udrulning
+`automatically_update_urls_on_dev` står til `false`, så `npm run dev` aldrig
+skriver en midlertidig tunnel-adresse ind i den rigtige app. Lokal
+udvikling kræver derfor:
 
-```bash
-npm run build
-npm run setup   # prisma generate + migrate deploy
-npm run start
-```
+- **En egen udviklings-app:** `npm run config:link` → opret en ny app
+  (fx «PREAURA Dev»), så der laves en `shopify.app.<navn>.toml`. Slå
+  `automatically_update_urls_on_dev` til i den fil.
+- **En PostgreSQL-database:** sæt `DATABASE_URL` i `.env`.
 
-Konfigurationen i `shopify.app.toml` (scopes, webhooks, URL'er) sendes til
-Shopify med `npm run deploy`.
+Testene bruger `TEST_DATABASE_URL` (standard
+`postgresql://postgres:postgres@localhost:5432/preaura_test`). Hver testfil
+får sit eget skema og rydder op efter sig.
 
 ## Tjek før push
 
@@ -357,6 +361,6 @@ godkendelse:
   databehandleraftale (DPA) som del af appens vilkår.
 - **Opbevaringsperioder:** på plads (se «Databeskyttelse (GDPR)»). Svaret
   kan sættes til «Ja».
-- **Kryptering ved lagring og overførsel:** overførsel er HTTPS. Lagring
-  kræver en database, der krypterer data (fx en administreret PostgreSQL),
-  i stedet for SQLite.
+- **Kryptering ved lagring og overførsel:** overførsel er HTTPS, og
+  databasen på Render er krypteret (se «Drift på Render»). Svaret kan sættes
+  til «Ja».

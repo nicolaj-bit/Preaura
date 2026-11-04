@@ -1,28 +1,32 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
+// PostgreSQL-serveren, testene kører mod. På GitHub starter workflowet en;
+// lokalt kan TEST_DATABASE_URL pege på en hvilken som helst tom database.
+const BASE_URL =
+  process.env.TEST_DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:5432/preaura_test";
+
 /**
- * En rigtig SQLite-database i en midlertidig mappe med appens migrationer.
+ * En rigtig PostgreSQL-database med appens migrationer — i sit eget skema,
+ * så testfiler, der kører samtidig, ikke ser hinandens data.
  * Kald setup() i beforeAll, reset() i beforeEach og teardown() i afterAll.
  */
 export function createTestDb() {
-  const dir = mkdtempSync(join(tmpdir(), "preaura-test-"));
-  const client = new PrismaClient({
-    // Én forbindelse: migrationerne slår fremmednøgle-kontrollen fra og til
-    // med PRAGMA, som kun gælder den forbindelse, de kører på. Med en pulje
-    // af forbindelser kunne en forbindelse ende med kontrollen slået fra.
-    datasourceUrl: `file:${join(dir, "test.sqlite")}?connection_limit=1`,
-  });
+  const schema = `test_${randomUUID().replace(/-/g, "")}`;
+  const url = new URL(BASE_URL);
+  url.searchParams.set("schema", schema);
+  const client = new PrismaClient({ datasourceUrl: url.toString() });
 
   return {
     client,
-    /** Kører migrationerne. Med `only` kun dem, filteret siger ja til. */
-    async setup(only: (name: string) => boolean = () => true) {
+    async setup() {
+      await client.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
       const migrations = join(__dirname, "../../prisma/migrations");
       const names = readdirSync(migrations)
-        .filter((n) => /^\d/.test(n) && only(n))
+        .filter((n) => /^\d/.test(n))
         .sort();
       for (const name of names) {
         const sql = readFileSync(
@@ -38,20 +42,13 @@ export function createTestDb() {
       }
     },
     async reset() {
-      await client.webhookEvent.deleteMany();
-      await client.dataRequest.deleteMany();
-      await client.session.deleteMany();
-      await client.modeChange.deleteMany();
-      await client.queueLock.deleteMany();
-      await client.sellingPlanRef.deleteMany();
-      await client.allocation.deleteMany();
-      await client.delivery.deleteMany();
-      await client.variantPlan.deleteMany();
-      await client.shopSetting.deleteMany();
+      await client.$executeRawUnsafe(
+        `TRUNCATE "WebhookEvent", "DataRequest", "Session", "ModeChange", "QueueLock", "SellingPlanRef", "Allocation", "Delivery", "VariantPlan", "ShopSetting"`,
+      );
     },
     async teardown() {
+      await client.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
       await client.$disconnect();
-      rmSync(dir, { recursive: true, force: true });
     },
   };
 }
