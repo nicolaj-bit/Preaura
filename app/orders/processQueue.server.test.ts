@@ -9,7 +9,7 @@ import { syncOrder } from "../sync/syncOrder.server";
 import { processShopQueue } from "./processQueue.server";
 
 // Hele vejen: webhook i kø → behandling → tildelinger → lager og ordrefelter
-// i (en simuleret) Shopify. Databasen er en rigtig SQLite med appens
+// i (en simuleret) Shopify. Databasen er en rigtig PostgreSQL med appens
 // migrationer.
 
 const testDb = createTestDb();

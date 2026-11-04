@@ -7,8 +7,8 @@ import {
 import { MESSAGES } from "../lib/deliveries";
 import { createTestDb } from "../test/testDb";
 
-// Kører datalaget mod en rigtig SQLite-database i en midlertidig mappe, med
-// de samme migrationer som appen.
+// Kører datalaget mod en rigtig PostgreSQL-database (eget skema), med de
+// samme migrationer som appen.
 
 const testDb = createTestDb();
 const client = testDb.client;
@@ -270,7 +270,7 @@ describe("tildelinger", () => {
     // De partielle unikke indekser kan Prisma ikke beskrive. Genskaber en
     // migration tabellen Allocation, forsvinder de stille — det fanger denne test.
     const rows = await client.$queryRawUnsafe<{ name: string }[]>(
-      `SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'Allocation'`,
+      `SELECT indexname AS name FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'Allocation'`,
     );
     const names = rows.map((r) => r.name);
     expect(names).toContain("Allocation_active_line_delivery_key");

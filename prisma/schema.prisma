@@ -5,12 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+// PostgreSQL. Adressen står i miljøvariablen DATABASE_URL (på Render sættes
+// den selv ud fra databasen, se render.yaml).
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -172,7 +171,7 @@ model Delivery {
 // én. Derfor er den unikke nøgle: højst én AKTIV række pr. ordrelinje og
 // leverance, og højst én UAFKLARET række pr. ordrelinje. Det er partielle
 // unikke indekser, som Prisma ikke kan beskrive — de står i migrationen
-// 2026..._order_processing.
+// 20261104130000_init.
 //
 // onDelete: Restrict forhindrer også, at en leverance med tildelinger slettes.
 model Allocation {
