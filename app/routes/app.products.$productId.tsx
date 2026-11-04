@@ -101,6 +101,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         title: variant?.title ?? "Varianten findes ikke længere i Shopify",
         sku: variant?.sku ?? null,
         enabled: plan.preorderEnabled,
+        mode: {
+          mode: plan.mode as "STOCK" | "PREORDER",
+          forced: plan.modeForced,
+          changedAt: formatSyncTime(plan.modeChangedAt),
+          reason: plan.modeChangeReason,
+        },
         deliveries: variantDeliveries,
         sync: {
           activeDelivery: active
@@ -124,10 +130,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
  * - NONE: ingen er slået til.
  */
 function productMode(
-  plans: { preorderEnabled: boolean }[],
+  plans: { preorderEnabled: boolean; mode: string }[],
   shopifyVariantCount: number,
 ): "ALL" | "MIXED" | "NONE" {
-  const enabled = plans.filter((p) => p.preorderEnabled).length;
+  // Kun varianter, der er i forudbestillingsmode nu, tæller.
+  const enabled = plans.filter(
+    (p) => p.preorderEnabled && p.mode === "PREORDER",
+  ).length;
   if (enabled === 0) return "NONE";
   return enabled >= shopifyVariantCount ? "ALL" : "MIXED";
 }
@@ -203,6 +212,15 @@ export const action = async ({
           String(form.get("deliveryId")),
         );
         return done(variantId, "Leverance annulleret");
+      }
+      case "force": {
+        const variantId = String(form.get("variantId"));
+        const forced = form.get("forced") === "true";
+        await data.variantPlans.setForced(variantId, forced);
+        return done(
+          variantId,
+          forced ? "Forudbestilling tvunget" : "Tvang slået fra",
+        );
       }
       case "sync": {
         const variantId = String(form.get("variantId"));
@@ -347,8 +365,8 @@ function VariantSection({
     <s-section heading={heading}>
       <s-stack gap="base">
         <s-switch
-          label="Forudbestilling"
-          details="Kunder kan bestille varianten, før den er på lager."
+          label="Forudbestilling, når lageret er tomt"
+          details="Appen skifter selv: lagermode, når der er varer på hylden, og forudbestilling, når lageret rammer 0, og der er plads i en leverance."
           checked={enabled}
           onChange={() =>
             toggle.submit(
@@ -367,7 +385,10 @@ function VariantSection({
         {(enabled || variant.sync.lastSyncError) && (
           <SyncStatus variantId={variant.variantId} sync={variant.sync} />
         )}
-        {enabled && !hasActive && (
+        {enabled && (
+          <ModeStatus variantId={variant.variantId} mode={variant.mode} />
+        )}
+        {enabled && !hasActive && variant.mode.mode === "PREORDER" && (
           <s-banner tone="warning">
             Forudbestilling er slået til, men der er ingen leverance med ledige
             pladser. Opret en leverance nedenfor.
@@ -406,6 +427,61 @@ function VariantSection({
         )}
       </s-stack>
     </s-section>
+  );
+}
+
+function ModeStatus({
+  variantId,
+  mode,
+}: {
+  variantId: string;
+  mode: VariantData["mode"];
+}) {
+  const fetcher = useFetcher<typeof action>();
+  useSuccessToast(fetcher.data);
+  const forced =
+    fetcher.formData != null
+      ? fetcher.formData.get("forced") === "true"
+      : mode.forced;
+
+  return (
+    <s-box padding="base" border="base" borderRadius="base">
+      <s-stack gap="base">
+        <s-stack direction="inline" gap="small" alignItems="center">
+          <s-text type="strong">Tilstand nu:</s-text>
+          {mode.mode === "STOCK" ? (
+            <s-badge>Lagermode</s-badge>
+          ) : mode.forced ? (
+            <s-badge tone="warning">Forudbestilling (tvunget)</s-badge>
+          ) : (
+            <s-badge tone="success">Forudbestilling (automatisk)</s-badge>
+          )}
+        </s-stack>
+        <s-paragraph>
+          {mode.mode === "STOCK"
+            ? "Der er varer på lager. Varianten sælges som enhver anden vare, og appen rører hverken lageret eller produktsiden."
+            : mode.forced
+              ? "Varianten er tvunget i forudbestilling af dig, selvom der kan være varer på lager. Appen styrer lageret, indtil du slår tvangen fra."
+              : "Lageret er tomt. Kunderne kan forudbestille, og appen styrer lageret ud fra leverancerne. Lægger du varer på lager (som en tilføjelse, fx +20), skifter varianten selv tilbage — efter at forudbestillingerne er dækket."}
+        </s-paragraph>
+        <s-text color="subdued">
+          {mode.changedAt
+            ? `Sidst skiftet ${mode.changedAt}: ${mode.reason ?? ""}`
+            : "Har ikke skiftet tilstand endnu."}
+        </s-text>
+        <s-checkbox
+          label="Tving forudbestilling"
+          details="Bruges, når de sidste stk. på lager er beskadigede eller reserverede. Slås tvangen fra, sættes lageret tilbage til det, det var."
+          checked={forced}
+          onChange={() =>
+            fetcher.submit(
+              { intent: "force", variantId, forced: String(!forced) },
+              { method: "POST" },
+            )
+          }
+        />
+      </s-stack>
+    </s-box>
   );
 }
 

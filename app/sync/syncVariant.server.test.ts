@@ -375,7 +375,10 @@ describe("lager", () => {
     await setupVariant();
     await addDelivery("2026-12-01", 10);
     const { shopify, sync } = setup();
+    await sync();
+    // Salg har trukket Shopify ned fra 10 til 3, før ordrerne er behandlet.
     shopify.variants.get(VARIANT)!.available = 3;
+    shopify.clearWrites();
 
     await sync();
     const write = shopify.writes.find((w) => w.method === "setAvailable");
@@ -658,9 +661,10 @@ describe("metafelt til produktsiden", () => {
   it("alt udsolgt: ingen dato og ingen plan", async () => {
     await setupVariant();
     const only = await addDelivery("2026-12-01", 2);
-    await allocate(only.id, 2, "1");
     const { shopify, sync } = setup();
-    await sync();
+    await sync(); // forudbestilling, mens der er plads
+    await allocate(only.id, 2, "1");
+    await sync(); // nu udsolgt
     expect(metafield(shopify)).toEqual({
       active: true,
       mode: "SHIPPING",
@@ -679,5 +683,171 @@ describe("metafelt til produktsiden", () => {
     await data().variantPlans.setEnabled(VARIANT, false);
     await sync();
     expect(metafield(shopify)).toEqual({ active: false });
+  });
+});
+
+describe("lagermode og forudbestillingsmode", () => {
+  const modeOf = async () => (await data().syncState.getVariant(VARIANT))!;
+  const product = (shopify: ReturnType<typeof createFakeShopify>) =>
+    shopify.products.get("gid://shopify/Product/1");
+
+  it("lagermode: med varer på lager rører appen hverken lager eller selling plans", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.variants.get(VARIANT)!.available = 5;
+
+    expect((await sync()).ok).toBe(true);
+    expect((await modeOf()).mode).toBe("STOCK");
+    expect(shopify.writes).toEqual([]);
+    expect(shopify.groups.size).toBe(0);
+    expect(shopify.variants.get(VARIANT)?.available).toBe(5);
+
+    // Webshopejeren ændrer selv lageret: appen holder sig ude.
+    shopify.variants.get(VARIANT)!.available = 2;
+    await sync();
+    expect(shopify.writes).toEqual([]);
+  });
+
+  it("lagermode → forudbestilling, når lageret rammer 0, og der er plads", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.variants.get(VARIANT)!.available = 1;
+    await sync();
+    expect((await modeOf()).mode).toBe("STOCK");
+
+    shopify.variants.get(VARIANT)!.available = 0; // sidste stk. solgt
+    await sync();
+
+    const plan = await modeOf();
+    expect(plan).toMatchObject({ mode: "PREORDER", modeForced: false });
+    expect(plan.modeChangeReason).toContain("ramte 0");
+    expect(onlyGroup(shopify).variantIds.has(VARIANT)).toBe(true);
+    expect(shopify.variants.get(VARIANT)).toMatchObject({
+      available: 10,
+      inventoryPolicy: "DENY",
+    });
+    expect(product(shopify)?.requiresSellingPlan).toBe(true);
+    const history = await data().variantPlans.modeHistory(VARIANT);
+    expect(history.map((h) => h.mode)).toEqual(["PREORDER"]);
+  });
+
+  it("bliver i lagermode ved 0, når ingen leverance har plads", async () => {
+    await setupVariant();
+    const { shopify, sync } = setup();
+    shopify.variants.get(VARIANT)!.available = 0;
+    await sync();
+    expect((await modeOf()).mode).toBe("STOCK");
+    expect(shopify.groups.size).toBe(0);
+  });
+
+  it("forudbestilling → lagermode, når rigtige varer kommer ind — efter forudbestillingerne", async () => {
+    await setupVariant();
+    const delivery = await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync(); // forudbestilling, Shopify står på 10
+    await allocate(delivery.id, 4, "1");
+    await sync(); // Shopify står på 6
+    const groupId = onlyGroup(shopify).id;
+    const planIds = onlyGroup(shopify).plans.map((p) => p.id);
+
+    // Webshopejeren lægger 20 stk. på lager (+20).
+    shopify.variants.get(VARIANT)!.available = 26;
+    shopify.clearWrites();
+    await sync();
+
+    const plan = await modeOf();
+    expect(plan.mode).toBe("STOCK");
+    expect(plan.modeChangeReason).toContain("4 går til forudbestillinger");
+    // 20 modtaget − 4 lovet = 16 til almindeligt salg.
+    expect(shopify.variants.get(VARIANT)?.available).toBe(16);
+    // Gruppen tages ud af brug — men hverken gruppen eller planerne slettes.
+    expect(onlyGroup(shopify).id).toBe(groupId);
+    expect(onlyGroup(shopify).plans.map((p) => p.id)).toEqual(planIds);
+    expect(onlyGroup(shopify).variantIds.has(VARIANT)).toBe(false);
+    const methods = shopify.writes.map((w) => w.method);
+    expect(methods).not.toContain("deleteGroup");
+    expect(methods).not.toContain("deletePlans");
+    expect(product(shopify)?.requiresSellingPlan).toBe(false);
+    expect(
+      JSON.parse(shopify.variants.get(VARIANT)!.preorderMetafield!),
+    ).toEqual({
+      active: false,
+    });
+  });
+
+  it("dækker varerne ikke forudbestillingerne, bliver varianten i forudbestilling", async () => {
+    await setupVariant();
+    const delivery = await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    await allocate(delivery.id, 8, "1");
+    await sync(); // Shopify står på 2
+    shopify.variants.get(VARIANT)!.available = 7; // +5, men 8 er lovet
+    await sync();
+    expect((await modeOf()).mode).toBe("PREORDER");
+  });
+
+  it("et skift rører aldrig eksisterende tildelinger", async () => {
+    await setupVariant();
+    const delivery = await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    await sync();
+    await allocate(delivery.id, 3, "1");
+    await allocate(delivery.id, 2, "2");
+    await sync();
+    const before = await client.allocation.findMany({ orderBy: { id: "asc" } });
+
+    shopify.variants.get(VARIANT)!.available = 105; // → lagermode
+    await sync();
+    expect((await modeOf()).mode).toBe("STOCK");
+    shopify.variants.get(VARIANT)!.available = 0; // → forudbestilling igen
+    await sync();
+    expect((await modeOf()).mode).toBe("PREORDER");
+
+    const after = await client.allocation.findMany({ orderBy: { id: "asc" } });
+    expect(after).toEqual(before);
+  });
+
+  it("tvungen forudbestilling: med lager — og lageret gives tilbage, når tvangen slås fra", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.variants.get(VARIANT)!.available = 3;
+    await sync();
+    expect((await modeOf()).mode).toBe("STOCK");
+
+    await data().variantPlans.setForced(VARIANT, true);
+    await sync();
+    let plan = await modeOf();
+    expect(plan).toMatchObject({
+      mode: "PREORDER",
+      modeForced: true,
+      stockBeforeForce: 3,
+    });
+    expect(plan.modeChangeReason).toContain("Tvunget");
+    expect(shopify.variants.get(VARIANT)?.available).toBe(10);
+    const history = await data().variantPlans.modeHistory(VARIANT);
+    expect(history[0]).toMatchObject({ mode: "PREORDER", forced: true });
+
+    // Selv med nye varer bliver en tvunget variant i forudbestilling. De 40
+    // stk., der lægges på lager imens, gemmes til side.
+    shopify.variants.get(VARIANT)!.available = 50;
+    await sync();
+    expect((await modeOf()).mode).toBe("PREORDER");
+    expect((await modeOf()).receivedWhileForced).toBe(40);
+
+    await data().variantPlans.setForced(VARIANT, false);
+    await sync();
+    plan = await modeOf();
+    expect(plan).toMatchObject({
+      mode: "STOCK",
+      modeForced: false,
+      stockBeforeForce: null,
+      receivedWhileForced: 0,
+    });
+    // De 3 fra før tvangen plus de 40, der kom ind imens.
+    expect(shopify.variants.get(VARIANT)?.available).toBe(43);
   });
 });

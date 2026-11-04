@@ -129,21 +129,30 @@ export function forShop(shop: string, client: PrismaClient = db) {
       async listProducts() {
         const plans = await client.variantPlan.findMany({
           where: { shop },
-          select: { productId: true, preorderEnabled: true },
+          select: { productId: true, preorderEnabled: true, mode: true },
           orderBy: { createdAt: "asc" },
         });
         const products = new Map<
           string,
-          { productId: string; variants: number; enabled: number }
+          {
+            productId: string;
+            variants: number;
+            enabled: number;
+            inPreorder: number;
+          }
         >();
         for (const plan of plans) {
           const entry = products.get(plan.productId) ?? {
             productId: plan.productId,
             variants: 0,
             enabled: 0,
+            inPreorder: 0,
           };
           entry.variants += 1;
           if (plan.preorderEnabled) entry.enabled += 1;
+          if (plan.preorderEnabled && plan.mode === "PREORDER") {
+            entry.inPreorder += 1;
+          }
           products.set(plan.productId, entry);
         }
         return [...products.values()];
@@ -173,6 +182,32 @@ export function forShop(shop: string, client: PrismaClient = db) {
             }),
           ),
         );
+      },
+
+      /** Tving (eller slip) forudbestilling, selvom der er lager. */
+      async setForced(variantId: string, forced: boolean) {
+        const result = await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { modeForced: forced },
+        });
+        if (result.count === 0) {
+          throw new PreorderActionError("Varianten findes ikke i appen.");
+        }
+      },
+
+      async findByInventoryItem(inventoryItemId: string) {
+        return client.variantPlan.findFirst({
+          where: { shop, inventoryItemId },
+        });
+      },
+
+      /** Seneste tilstandsskift for en variant, nyeste først. */
+      async modeHistory(variantId: string, take = 10) {
+        return client.modeChange.findMany({
+          where: { shop, variantId },
+          orderBy: { at: "desc" },
+          take,
+        });
       },
 
       async setEnabled(variantId: string, enabled: boolean) {
@@ -339,6 +374,38 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      /** Gemmer et tilstandsskift på varianten og i historikken. */
+      async recordModeChange(
+        variantId: string,
+        mode: "STOCK" | "PREORDER",
+        reason: string,
+        forced: boolean,
+      ) {
+        const at = new Date();
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { mode, modeChangedAt: at, modeChangeReason: reason },
+        });
+        await client.modeChange.create({
+          data: { shop, variantId, mode, reason, forced, at },
+        });
+      },
+
+      /** Sætter (eller rydder) lageret fra før tvangen og varer modtaget imens. */
+      async setStockBeforeForce(variantId: string, value: number | null) {
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { stockBeforeForce: value, receivedWhileForced: 0 },
+        });
+      },
+
+      async addReceivedWhileForced(variantId: string, quantity: number) {
+        await client.variantPlan.updateMany({
+          where: { shop, variantId },
+          data: { receivedWhileForced: { increment: quantity } },
+        });
+      },
+
       async markRequiresSellingPlan(productId: string, value: boolean) {
         await client.variantPlan.updateMany({
           where: { shop, productId },
@@ -466,7 +533,11 @@ export function forShop(shop: string, client: PrismaClient = db) {
       /** Antal ordrer købt uden plan siden et tidspunkt. */
       async countWithoutPlanSince(since: Date) {
         const rows = await client.allocation.findMany({
-          where: { shop, soldWithoutPlan: true, orderCreatedAt: { gte: since } },
+          where: {
+            shop,
+            soldWithoutPlan: true,
+            orderCreatedAt: { gte: since },
+          },
           distinct: ["orderId"],
           select: { orderId: true },
         });
@@ -539,10 +610,18 @@ export function forShop(shop: string, client: PrismaClient = db) {
     const plan = await tx.variantPlan.findFirst({
       where: { shop, variantId: line.variantId },
     });
+    const orderedAt = new Date(order.createdAt);
+    // Kun salg i forudbestillingsmode tælles. Et almindeligt salg i
+    // lagermode er webshopejerens eget lager og skal ikke tildeles.
+    const modeWhenOrdered = await tx.modeChange.findFirst({
+      where: { shop, variantId: line.variantId, at: { lte: orderedAt } },
+      orderBy: { at: "desc" },
+    });
     const enabledWhenOrdered =
       plan?.preorderEnabled === true &&
       plan.preorderEnabledAt != null &&
-      plan.preorderEnabledAt <= new Date(order.createdAt);
+      plan.preorderEnabledAt <= orderedAt &&
+      modeWhenOrdered?.mode === "PREORDER";
     const alreadyCounted =
       (await tx.allocation.count({
         where: { shop, orderLineId: line.id, soldWithoutPlan: true },

@@ -49,9 +49,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variants: summary.variants,
         enabled: summary.enabled,
         // Alle produktets varianter i Shopify på forudbestilling?
+        inPreorder: summary.inPreorder,
         allPreorder:
-          summary.enabled > 0 &&
-          summary.enabled >= (product?.variants.length ?? summary.variants),
+          summary.inPreorder > 0 &&
+          summary.inPreorder >= (product?.variants.length ?? summary.variants),
       };
     }),
   };
@@ -205,8 +206,10 @@ export default function Index() {
                       <s-badge>Slået fra</s-badge>
                     ) : product.allPreorder ? (
                       <s-badge tone="success">Kun forudbestilling</s-badge>
-                    ) : (
+                    ) : product.inPreorder > 0 ? (
                       <s-badge tone="info">Blandet</s-badge>
+                    ) : (
+                      <s-badge>Lagermode</s-badge>
                     )}
                   </s-table-cell>
                 </s-table-row>

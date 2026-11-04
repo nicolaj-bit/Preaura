@@ -18,6 +18,8 @@ forudbestilling slået til, og leveringsdato og tag på forudbestilte ordrer.
   `shop/redact`) → `app/routes/webhooks.compliance.tsx`.
 - **Ordre-webhooks** (`orders/create`, `orders/updated`, `orders/cancelled`,
   `refunds/create`) → `app/routes/webhooks.orders.tsx`.
+- **Lager-webhook** (`inventory_levels/update`) →
+  `app/routes/webhooks.inventory.tsx`.
 - **`app/uninstalled`** → `app/routes/webhooks.app.uninstalled.tsx`.
 - **Admin-sider** (Polaris):
   - `app/routes/app._index.tsx` — produkter i appen; nye vælges med
@@ -100,6 +102,36 @@ Regler:
 To lint-regler håndhæver arkitekturen: GraphQL-mutationer må kun stå i
 `app/sync/shopifyGateway.server.ts`, og resten af appen må kun bruge
 synkroniseringen gennem `app/sync/index.server.ts`.
+
+## Lagermode og forudbestillingsmode
+
+Hver variant med forudbestilling slået til er i én af to tilstande, og appen
+skifter selv (`app/lib/variantMode.ts`, afgjort i `syncVariant()`):
+
+- **Lagermode:** der er rigtige varer. Appen rører hverken lagertal eller
+  selling plans, og produktsiden ser ud som enhver anden vare.
+- **Forudbestillingsmode:** appen ejer lagertallet (= resterende i den aktive
+  leverance) og tilbyder selling plan.
+
+Skift:
+
+- **Lager → forudbestilling:** når Shopifys tilgængelige antal rammer 0, og
+  der er plads i en leverance.
+- **Forudbestilling → lager:** når der kommer rigtige varer ind, dvs. Shopify
+  står højere, end appen selv satte det. Varerne går først til de
+  forudbestillinger, der allerede er solgt; kun resten bliver almindeligt
+  lager. **Registrér varemodtagelsen som en tilføjelse** (fx +150), ikke ved
+  at skrive et nyt optalt tal.
+- **Tvunget forudbestilling:** webshopejeren kan tvinge en variant i
+  forudbestilling, selvom der er lager. Lageret fra før og varer, der kommer
+  ind imens, gives tilbage, når tvangen slås fra.
+- Et skift rører aldrig eksisterende tildelinger eller ordrer. Går en
+  variant i lagermode, tages gruppen af varianten, men gruppen og planerne
+  slettes ikke.
+- `inventory_levels/update` opdager lagerændringer uden for appen og går
+  gennem samme kø som ordrerne — efter ordrerne i samme omgang. Sikkerheds-
+  nettet tæller kun salg uden plan, hvis varianten var i forudbestilling, da
+  ordren blev lagt (`ModeChange`-historikken).
 
 ## Behandling af ordrer
 

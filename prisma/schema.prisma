@@ -105,6 +105,21 @@ model VariantPlan {
   // slå det fra igen. Sættes på alle produktets rækker.
   setRequiresSellingPlan Boolean @default(false)
 
+  // Tilstand: "STOCK" (lagermode: appen rører hverken lager eller selling
+  // plans) eller "PREORDER" (forudbestillingsmode: appen ejer lagertallet).
+  // Appen skifter selv, se app/lib/variantMode.ts. Kun relevant, når
+  // preorderEnabled er sand.
+  mode             String    @default("STOCK")
+  // Sand: webshopejeren har tvunget varianten i forudbestilling.
+  modeForced       Boolean   @default(false)
+  // Lageret, da tvangen blev slået til. Gives tilbage, når den slås fra.
+  stockBeforeForce Int?
+  // Varer lagt på lager, mens varianten var tvunget. Gives tilbage (efter
+  // forudbestillingerne), når tvangen slås fra.
+  receivedWhileForced Int @default(0)
+  modeChangedAt    DateTime?
+  modeChangeReason String?
+
   // Synkronisering med Shopify. Udfyldes kun af app/sync/.
   // Variantens egen selling plan group i Shopify.
   sellingPlanGroupId String?
@@ -202,4 +217,20 @@ model SellingPlanRef {
   createdAt     DateTime @default(now())
 
   @@id([shop, sellingPlanId])
+}
+
+// Historik over tilstandsskift pr. variant. Slettes aldrig. Bruges til at
+// vise, hvad der skete, og til at afgøre, hvilken tilstand en variant var i,
+// da en ordre blev lagt (sikkerhedsnettet tæller kun salg i forudbestilling).
+model ModeChange {
+  id        String   @id @default(cuid())
+  shop      String
+  variantId String
+  // "STOCK" eller "PREORDER".
+  mode      String
+  forced    Boolean  @default(false)
+  reason    String
+  at        DateTime @default(now())
+
+  @@index([shop, variantId, at])
 }
