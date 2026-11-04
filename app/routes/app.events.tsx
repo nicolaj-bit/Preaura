@@ -29,10 +29,11 @@ import {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const outbox = outboxFor(session.shop);
-  const [settings, failed, log, timeZone] = await Promise.all([
+  const [settings, failed, log, waiting, timeZone] = await Promise.all([
     outbox.integrations.view(),
     outbox.deliveries.failed(),
     outbox.deliveries.log(50),
+    outbox.events.unbuilt(50),
     fetchShopTimeZone(admin.graphql),
   ]);
   const format = new Intl.DateTimeFormat("da-DK", {
@@ -65,6 +66,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       canRetry: d.event.payloadEnc != null,
     })),
     log: log.map(row),
+    // Hændelser, der endnu ikke er bygget og sendt — med årsagen, hvis det
+    // er gået galt. Uden dem ville en hændelse, der sidder fast, være usynlig.
+    waiting: waiting.map((e) => ({
+      id: e.id,
+      type: label(e.type),
+      orderName: e.orderName || numericId(e.orderId),
+      orderNumber: numericId(e.orderId),
+      at: format.format(e.createdAt),
+      error: e.lastError,
+    })),
+    encryptionMissing: !process.env.PREAURA_ENCRYPTION_KEY,
   };
 };
 
@@ -136,7 +148,8 @@ const STATUS: Record<
 };
 
 export default function EventsPage() {
-  const { settings, failed, log } = useLoaderData<typeof loader>();
+  const { settings, failed, log, waiting, encryptionMissing } =
+    useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const [url, setUrl] = useState("");
@@ -330,6 +343,57 @@ export default function EventsPage() {
           />
         </s-stack>
       </s-section>
+
+      {encryptionMissing && (
+        <s-banner tone="critical" heading="Krypteringsnøglen mangler">
+          <s-paragraph>
+            Serveren mangler miljøvariablen PREAURA_ENCRYPTION_KEY. Uden den kan
+            hændelser ikke bygges, og nøgler og adresser kan ikke gemmes. På
+            Render: preaura → Environment, eller Manual sync på blueprintet.
+          </s-paragraph>
+        </s-banner>
+      )}
+
+      {waiting.length > 0 && (
+        <s-section heading="Venter på at blive sendt">
+          <s-stack gap="base">
+            <s-paragraph>
+              Disse hændelser er ikke sendt endnu. Normalt sker det inden for et
+              minut. Står der en fejl, prøver appen igen hvert minut.
+            </s-paragraph>
+            <s-table>
+              <s-table-header-row>
+                <s-table-header listSlot="primary">Hændelse</s-table-header>
+                <s-table-header>Ordre</s-table-header>
+                <s-table-header>Oprettet</s-table-header>
+                <s-table-header listSlot="secondary">Fejl</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {waiting.map((row) => (
+                  <s-table-row key={row.id}>
+                    <s-table-cell>{row.type}</s-table-cell>
+                    <s-table-cell>
+                      <s-link
+                        href={`shopify://admin/orders/${row.orderNumber}`}
+                      >
+                        {row.orderName}
+                      </s-link>
+                    </s-table-cell>
+                    <s-table-cell>{row.at}</s-table-cell>
+                    <s-table-cell>
+                      {row.error ? (
+                        <s-text tone="critical">{row.error}</s-text>
+                      ) : (
+                        "–"
+                      )}
+                    </s-table-cell>
+                  </s-table-row>
+                ))}
+              </s-table-body>
+            </s-table>
+          </s-stack>
+        </s-section>
+      )}
 
       <s-section heading="Fejlede leveringer">
         {failed.length === 0 ? (
