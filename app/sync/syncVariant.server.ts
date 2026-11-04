@@ -127,6 +127,31 @@ async function reconcile(
 
   // --- Selling plans -------------------------------------------------------
 
+  // Shopify tillader ikke, at en gruppe står uden planer — heller ikke et
+  // øjeblik (fundet i testbutikken). Skal ALLE gruppens planer udskiftes (fx
+  // når den eneste leverances dato eller vilkår ændres), slettes hele
+  // gruppen, og en ny oprettes med de nye planer. Eksisterende ordrer
+  // påvirkes ikke; de har selv deres plan og dato.
+  if (group && group.plans.length > 0 && desired.length > 0) {
+    const current = group;
+    const anyKept = desired.some((wanted) => {
+      const existing = current.plans.find(
+        (plan) => plan.id === storedPlanIds.get(wanted.deliveryId),
+      );
+      return existing != null && planMatches(existing, wanted);
+    });
+    if (!anyKept) {
+      await gateway.deleteGroup(current.id);
+      await data.syncState.setGroupId(variantId, null);
+      for (const delivery of deliveries) {
+        if (delivery.sellingPlanId) {
+          await data.syncState.setDeliveryPlanId(delivery.id, null);
+        }
+      }
+      group = null;
+    }
+  }
+
   if (desired.length === 0) {
     // Ingen åbne leverancer: intet at forudbestille. Gruppen fjernes helt.
     if (group) {

@@ -143,8 +143,8 @@ describe("selling plans", () => {
 
     await sync();
     expect(shopify.writes.map((w) => w.method)).toEqual([
-      "deletePlans",
-      "createPlans",
+      "deleteGroup",
+      "createGroup",
       "setVariantPreorderMetafield",
     ]);
     const [plan] = onlyGroup(shopify).plans;
@@ -212,10 +212,34 @@ describe("selling plans", () => {
     });
     expect(row.sellingPlanId).toBe(plan.id);
     expect(shopify.writes.map((w) => w.method)).toEqual([
+      "deleteGroup",
+      "createGroup",
+      "setVariantPreorderMetafield",
+    ]);
+  });
+
+  it("udskiftes kun én af flere planer, beholdes gruppen", async () => {
+    await setupVariant();
+    const first = await addDelivery("2026-12-01", 10);
+    await addDelivery("2027-01-15", 20);
+    const { shopify, sync } = setup();
+    await sync();
+    const groupBefore = onlyGroup(shopify).id;
+    shopify.clearWrites();
+
+    await data().deliveries.update(
+      first.id,
+      { date: "2026-12-20", quantity: "10" },
+      TODAY,
+    );
+    expect((await sync()).ok).toBe(true);
+    expect(shopify.writes.map((w) => w.method)).toEqual([
       "deletePlans",
       "createPlans",
       "setVariantPreorderMetafield",
     ]);
+    expect(onlyGroup(shopify).id).toBe(groupBefore);
+    expect(onlyGroup(shopify).plans).toHaveLength(2);
   });
 
   it("nægter at ændre en plan med ordrer: der oprettes en ny i stedet", async () => {
