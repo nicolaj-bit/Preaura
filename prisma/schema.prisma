@@ -14,21 +14,21 @@ datasource db {
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
@@ -89,36 +89,36 @@ model ShopSetting {
 // Variantplan. Én række pr. variant. Et produkt er slået til, hvis mindst én
 // af dets varianter er det — det gemmes ikke, det regnes ud.
 model VariantPlan {
-  id              String   @id @default(cuid())
-  shop            String
-  productId       String
-  variantId       String
-  inventoryItemId String
+  id                     String    @id @default(cuid())
+  shop                   String
+  productId              String
+  variantId              String
+  inventoryItemId        String
   // Lageret, varianten styres fra. Tom, hvis varen ikke ligger på noget lager.
-  locationId      String?
-  preorderEnabled Boolean  @default(false)
+  locationId             String?
+  preorderEnabled        Boolean   @default(false)
   // Hvornår forudbestilling sidst blev slået til. Sikkerhedsnettet tæller
   // kun ordrer uden plan, der er oprettet efter dette tidspunkt — ellers ville
   // en gammel, almindelig ordre, der bliver rettet, pludselig tælle med.
-  preorderEnabledAt DateTime?
+  preorderEnabledAt      DateTime?
   // Sand, når appen har sat produktets requiresSellingPlan. Kun da må appen
   // slå det fra igen. Sættes på alle produktets rækker.
-  setRequiresSellingPlan Boolean @default(false)
+  setRequiresSellingPlan Boolean   @default(false)
 
   // Tilstand: "STOCK" (lagermode: appen rører hverken lager eller selling
   // plans) eller "PREORDER" (forudbestillingsmode: appen ejer lagertallet).
   // Appen skifter selv, se app/lib/variantMode.ts. Kun relevant, når
   // preorderEnabled er sand.
-  mode             String    @default("STOCK")
+  mode                String    @default("STOCK")
   // Sand: webshopejeren har tvunget varianten i forudbestilling.
-  modeForced       Boolean   @default(false)
+  modeForced          Boolean   @default(false)
   // Lageret, da tvangen blev slået til. Gives tilbage, når den slås fra.
-  stockBeforeForce Int?
+  stockBeforeForce    Int?
   // Varer lagt på lager, mens varianten var tvunget. Gives tilbage (efter
   // forudbestillingerne), når tvangen slås fra.
-  receivedWhileForced Int @default(0)
-  modeChangedAt    DateTime?
-  modeChangeReason String?
+  receivedWhileForced Int       @default(0)
+  modeChangedAt       DateTime?
+  modeChangeReason    String?
 
   // Synkronisering med Shopify. Udfyldes kun af app/sync/.
   // Variantens egen selling plan group i Shopify.
@@ -130,8 +130,8 @@ model VariantPlan {
   lastSyncError      String?
   lastSyncAttemptAt  DateTime?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([shop, variantId])
   @@index([shop, productId])
@@ -176,31 +176,31 @@ model Delivery {
 //
 // onDelete: Restrict forhindrer også, at en leverance med tildelinger slettes.
 model Allocation {
-  id             String    @id @default(cuid())
-  shop           String
-  orderId        String
+  id              String    @id @default(cuid())
+  shop            String
+  orderId         String
   // Ordrenummeret, som kunden og webshopejeren kender det, fx "#1042".
-  orderName      String    @default("")
+  orderName       String    @default("")
   // Hvornår kunden bestilte. Afgør rækkefølgen ved fordeling.
-  orderCreatedAt DateTime?
-  orderLineId    String
-  variantId      String
+  orderCreatedAt  DateTime?
+  orderLineId     String
+  variantId       String
   // Tom for en uafklaret tildeling (ingen plads i nogen leverance).
-  deliveryId     String?
-  delivery       Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
-  quantity       Int
+  deliveryId      String?
+  delivery        Delivery? @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  quantity        Int
   // "ACTIVE", "UNRESOLVED" (ingen plads) eller "CANCELLED".
-  status         String    @default("ACTIVE")
+  status          String    @default("ACTIVE")
   // Sand, når ordrelinjen ikke havde en af appens selling plans (almindeligt
   // køb, kladdeordre, POS, API). Tælles alligevel — sikkerhedsnettet — men
   // vises samlet i admin, fordi det tit betyder, at opsætningen er forkert.
   soldWithoutPlan Boolean   @default(false)
   // Datoen, kunden blev lovet, da tildelingen blev lavet. Den følger IKKE
   // leverancen, hvis leverancens dato senere ændres.
-  promisedDate   String?
-  allocatedAt    DateTime  @default(now())
-  cancelledAt    DateTime?
-  updatedAt      DateTime  @updatedAt
+  promisedDate    String?
+  allocatedAt     DateTime  @default(now())
+  cancelledAt     DateTime?
+  updatedAt       DateTime  @updatedAt
 
   @@index([shop, deliveryId])
   @@index([shop, orderLineId])
@@ -233,4 +233,25 @@ model ModeChange {
   at        DateTime @default(now())
 
   @@index([shop, variantId, at])
+}
+
+// En kundes anmodning om at se sine data (customers/data_request). Vises i
+// admin, så webshopejeren kan sende oplysningerne videre til kunden.
+// Slettes ved customers/redact og shop/redact, og 30 dage efter, den er
+// besvaret.
+model DataRequest {
+  id               String    @id @default(cuid())
+  shop             String
+  // Shopifys id på kunden og på anmodningen. Ingen navne eller mails.
+  customerId       String
+  shopifyRequestId String?
+  // JSON: ordre-id'erne, kunden spørger om.
+  orderIds         String
+  // JSON: det, PREAURA gemmer om de ordrer, da anmodningen kom.
+  data             String
+  receivedAt       DateTime  @default(now())
+  answeredAt       DateTime?
+
+  @@index([shop, answeredAt])
+  @@index([shop, customerId])
 }

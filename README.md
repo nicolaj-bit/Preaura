@@ -31,8 +31,8 @@ forudbestilling slået til, og leveringsdato og tag på forudbestilte ordrer.
 Alle webhooks verificerer HMAC-signaturen (forkert signatur giver 401),
 lægger hændelsen i tabellen `WebhookEvent` og svarer 200. Gentagne leveringer
 genkendes på `X-Shopify-Webhook-Id` og lægges ikke i køen to gange.
-Ordre-hændelser behandles bagefter af køen (se «Behandling af ordrer»);
-compliance-hændelser markeres endnu som «ikke behandlet».
+Ordre-hændelser behandles bagefter af køen (se «Behandling af ordrer»),
+compliance-hændelser også (se «Databeskyttelse (GDPR)»).
 
 ## Datamodel
 
@@ -300,6 +300,32 @@ npm run lint
 De samme tjek kører automatisk på GitHub ved hvert push
 (`.github/workflows/checks.yml`).
 
+## Databeskyttelse (GDPR)
+
+`app/models/compliance.server.ts`, `app/lib/webhookPayload.ts`.
+
+- **Kun det nødvendige gemmes.** Shopify sender hele ordren med kundens
+  navn, mail og adresse. Køen gemmer kun ordrens id og
+  bestillingstidspunkt; resten læses frisk fra Shopify ved behandlingen.
+  Migrationen `compliance` skar de allerede gemte hændelser ned på samme
+  måde.
+- **Hvad PREAURA gemmer om en kunde:** intet, der identificerer kunden.
+  Tildelingerne har ordrens id og nummer, antal og den lovede dato.
+- **`customers/data_request`:** anmodningen vises under Ordrebehandling med
+  alt, hvad appen har om kundens ordrer, og et banner på forsiden.
+  Webshopejeren sender det til kunden og markerer anmodningen som besvaret.
+- **`customers/redact`:** kundens dataanmodninger og de behandlede
+  kø-hændelser for kundens ordrer slettes. Tildelingerne bliver stående: de
+  indeholder ingen persondata og er butikkens regnskab over pladserne —
+  uden dem ville pladserne blive solgt igen.
+- **`shop/redact`** (48 timer efter afinstallation): alt om butikken slettes,
+  også tildelinger, sessioner og køen. Den eneste gang, tildelinger slettes.
+- **Opbevaringsperiode:** behandlede kø-hændelser og besvarede
+  dataanmodninger slettes efter 30 dage (en gang i timen). Fejlede
+  hændelser bliver stående, til de er behandlet.
+- Compliance-hændelser kræver ikke adgang til Shopify og behandles derfor
+  også, efter appen er afinstalleret.
+
 ## Kendte begrænsninger
 
 - **Betaling ved afsendelse:** kunden betaler intet ved bestilling. Shopify
@@ -329,12 +355,8 @@ godkendelse:
   privatlivspolitik for PREAURA, som der linkes til fra App Store-siden.
 - **Aftaler om databeskyttelse med shopejere:** kræver en
   databehandleraftale (DPA) som del af appens vilkår.
-- **Opbevaringsperioder:** køtabellen `WebhookEvent` gemmer ordredata uden
-  udløb. Der skal laves sletning af behandlede hændelser efter en fast
-  periode, og `customers/redact` og `shop/redact` skal faktisk slette data.
-  De lægges i kø i dag, men markeres som «ikke behandlet». Bemærk, at
-  tildelinger ellers aldrig slettes — `shop/redact` er den eneste bevidste
-  undtagelse.
+- **Opbevaringsperioder:** på plads (se «Databeskyttelse (GDPR)»). Svaret
+  kan sættes til «Ja».
 - **Kryptering ved lagring og overførsel:** overførsel er HTTPS. Lagring
   kræver en database, der krypterer data (fx en administreret PostgreSQL),
   i stedet for SQLite.

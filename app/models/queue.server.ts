@@ -18,9 +18,13 @@ export function queueFor(shop: string, client: PrismaClient = db) {
   if (!shop) throw new Error("queueFor kræver en butik.");
 
   return {
-    async pending(limit = 100) {
+    async pending(limit = 100, topics?: string[]) {
       return client.webhookEvent.findMany({
-        where: { shop, status: EVENT_STATUS.pending },
+        where: {
+          shop,
+          status: EVENT_STATUS.pending,
+          ...(topics ? { topic: { in: topics } } : {}),
+        },
         orderBy: { receivedAt: "asc" },
         take: limit,
       });
