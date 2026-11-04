@@ -181,6 +181,43 @@ describe("forespørgsler mod Shopifys skema", () => {
     expect(calls).toHaveLength(2);
     expectValid(calls[1]);
 
+    // Shopifys rigtige svar, når appen ikke er godkendt til e-mail (uden
+    // fejlkode): hændelsen sendes uden kunde i stedet for at sidde fast.
+    let attempt = 0;
+    const unapproved = createShopifyGateway(async () => {
+      attempt += 1;
+      return new Response(
+        JSON.stringify(
+          attempt === 1
+            ? {
+                errors: [
+                  {
+                    message:
+                      "This app is not approved to use the email field. See https://shopify.dev/docs/apps/launch/protected-customer-data for more details.",
+                  },
+                ],
+              }
+            : { data: { order: { name: "#1003", lineItems: { nodes: [] } } } },
+        ),
+      );
+    });
+    expect(await unapproved.readOrderDetails(ORDER)).toEqual({
+      name: "#1003",
+      customer: null,
+      lines: [],
+    });
+
+    // Andre fejl giver stadig en fejl, så hændelsen prøves igen.
+    const broken = createShopifyGateway(
+      async () =>
+        new Response(
+          JSON.stringify({ errors: [{ message: "Internal error" }] }),
+        ),
+    );
+    await expect(broken.readOrderDetails(ORDER)).rejects.toThrow(
+      "Internal error",
+    );
+
     expectValid(
       await capture((g) =>
         g.flowTriggerReceive("preaura-preorder-ready", { order_id: 1 }),
