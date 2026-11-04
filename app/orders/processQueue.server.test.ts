@@ -24,7 +24,10 @@ afterAll(() => testDb.teardown());
 beforeEach(() => testDb.reset());
 
 /** Variant med leverancer, synkroniseret, så hver leverance har sin plan. */
-async function setup(deliveries: { date: string; quantity: number }[]) {
+async function setup(
+  deliveries: { date: string; quantity: number }[],
+  { available = 0 }: { available?: number } = {},
+) {
   await data().variantPlans.addVariants([
     {
       productId: "gid://shopify/Product/1",
@@ -47,7 +50,7 @@ async function setup(deliveries: { date: string; quantity: number }[]) {
     );
   }
   const shopify = createFakeShopify();
-  shopify.addVariant(VARIANT);
+  shopify.addVariant(VARIANT, { available });
   const syncNow = () =>
     syncVariant({
       shop: SHOP,
@@ -623,5 +626,108 @@ describe("sikkerhedsnettet: salg uden selling plan", () => {
     await h.run();
     expect(await data().orders.withoutPlan()).toHaveLength(2);
     expect(await data().orders.countWithoutPlanSince(new Date(0))).toBe(2);
+  });
+});
+
+describe("lagermode, forudbestilling og lagerændringer gennem køen", () => {
+  const now = () => new Date(Date.now() + 1000).toISOString();
+  const inventoryEvent = (available: number, id = `inv-${Math.random()}`) =>
+    enqueueWebhook(
+      {
+        webhookId: id,
+        shop: SHOP,
+        topic: "INVENTORY_LEVELS_UPDATE",
+        payload: { inventory_item_id: 1, location_id: 1, available },
+      },
+      client,
+    );
+  const modeOf = async () => (await data().syncState.getVariant(VARIANT))!.mode;
+
+  it("et almindeligt salg i lagermode tælles ikke som forudbestilling", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }], {
+      available: 5,
+    });
+    expect(await modeOf()).toBe("STOCK");
+
+    h.shopify.variants.get(VARIANT)!.available = 4;
+    await h.order(1, [{ quantity: 1 }], { createdAt: now() });
+    await inventoryEvent(4);
+    await h.run();
+
+    expect(await client.allocation.count()).toBe(0);
+    expect(await modeOf()).toBe("STOCK");
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(4);
+  });
+
+  it("lagerwebhooken skifter til forudbestilling, når lageret rammer 0", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }], {
+      available: 2,
+    });
+    h.shopify.variants.get(VARIANT)!.available = 0; // solgt eller rettet i Shopify
+    await inventoryEvent(0);
+    expect(await h.run()).toMatchObject({ done: 1, failed: 0 });
+
+    expect(await modeOf()).toBe("PREORDER");
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(10);
+  });
+
+  it("køb i selve skiftesekundet tæller ikke to gange", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }], {
+      available: 1,
+    });
+    // Det sidste stk. på lager sælges. Ordren og lagerændringen kommer i
+    // samme omgang. Ordren er et almindeligt lagersalg og skal ikke tælles
+    // som forudbestilling; bagefter er varianten i forudbestilling med hele
+    // leverancen ledig.
+    h.shopify.variants.get(VARIANT)!.available = 0;
+    await inventoryEvent(0);
+    await h.order(1, [{ quantity: 1 }], { createdAt: now() });
+    await h.run();
+
+    expect(await client.allocation.count()).toBe(0);
+    expect(await modeOf()).toBe("PREORDER");
+    expect(await h.remaining()).toEqual([10]);
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(10);
+
+    // Det næste køb er en forudbestilling og tælles én gang.
+    h.shopify.variants.get(VARIANT)!.available = 9;
+    await h.order(2, [{ quantity: 1, deliveryId: h.ids[0] }]);
+    await inventoryEvent(9);
+    await h.run();
+    expect(await h.remaining()).toEqual([9]);
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(9);
+  });
+
+  it("varer lagt på lager skifter tilbage til lagermode — og forudbestillingerne bliver stående", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    const order = await h.order(1, [{ quantity: 3, deliveryId: h.ids[0] }]);
+    await h.run();
+    expect(await modeOf()).toBe("PREORDER");
+    const before = await client.allocation.findMany();
+    const orderBefore = structuredClone(h.shopify.orders.get(order.id));
+
+    // Leverancen kommer hjem: +10 stk. Tre går til forudbestillingen.
+    h.shopify.variants.get(VARIANT)!.available = 7 + 10;
+    await inventoryEvent(17);
+    await h.run();
+
+    expect(await modeOf()).toBe("STOCK");
+    expect(h.shopify.variants.get(VARIANT)?.available).toBe(7);
+    expect(await client.allocation.findMany()).toEqual(before);
+    expect(h.shopify.orders.get(order.id)).toEqual(orderBefore);
+  });
+
+  it("lagerændringer på varer, appen ikke styrer, markeres som behandlet", async () => {
+    const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+    await enqueueWebhook(
+      {
+        webhookId: "andet",
+        shop: SHOP,
+        topic: "INVENTORY_LEVELS_UPDATE",
+        payload: { inventory_item_id: 999, available: 3 },
+      },
+      client,
+    );
+    expect(await h.run()).toMatchObject({ done: 1, failed: 0 });
   });
 });

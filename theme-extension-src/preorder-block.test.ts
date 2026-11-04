@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readdirSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Tester app-blokkens JavaScript i en rigtig DOM med den samme fil, som

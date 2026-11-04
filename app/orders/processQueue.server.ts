@@ -24,6 +24,22 @@ const ORDER_TOPICS = new Set([
   "REFUNDS_CREATE",
 ]);
 
+const INVENTORY_TOPIC = "INVENTORY_LEVELS_UPDATE";
+
+/** Lagervarens id ud fra en inventory_levels/update-hændelse. */
+function inventoryItemRef(event: Event) {
+  try {
+    const payload = JSON.parse(event.payload) as {
+      inventory_item_id?: unknown;
+    };
+    return payload.inventory_item_id != null
+      ? `gid://shopify/InventoryItem/${payload.inventory_item_id}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export type QueueDeps = {
   readOrder(orderId: string): Promise<OrderSnapshot | null>;
   /** Synkroniserer en variants lager og selling plans. Fejl gemmes på varianten. */
@@ -88,7 +104,10 @@ export async function processShopQueue({
       const events = await queue.pending();
       if (events.length === 0) break;
 
-      const other = events.filter((e) => !ORDER_TOPICS.has(e.topic));
+      const inventory = events.filter((e) => e.topic === INVENTORY_TOPIC);
+      const other = events.filter(
+        (e) => !ORDER_TOPICS.has(e.topic) && e.topic !== INVENTORY_TOPIC,
+      );
       if (other.length > 0) {
         await queue.markSkipped(
           other.map((e) => e.id),
@@ -133,6 +152,45 @@ export async function processShopQueue({
             error instanceof Error ? error.message : "Ukendt fejl.";
           await queue.markFailed(group.ids, message);
           totals.failed += group.ids.length;
+        }
+      }
+
+      // Lagerændringer EFTER ordrerne i samme omgang: så er salg allerede
+      // talt med, før appen vurderer, om varianten skal skifte tilstand. Et
+      // køb i selve skiftesekundet kan dermed ikke tælle to gange.
+      const byVariant = new Map<string, string[]>();
+      const notOurs: string[] = [];
+      for (const event of inventory) {
+        const itemId = inventoryItemRef(event);
+        const plan = itemId
+          ? await data.variantPlans.findByInventoryItem(itemId)
+          : null;
+        if (!plan || !plan.preorderEnabled) {
+          notOurs.push(event.id);
+          continue;
+        }
+        byVariant.set(plan.variantId, [
+          ...(byVariant.get(plan.variantId) ?? []),
+          event.id,
+        ]);
+      }
+      if (notOurs.length > 0) {
+        // Varer, appen ikke styrer: intet at gøre.
+        await queue.markDone(notOurs);
+        totals.done += notOurs.length;
+      }
+      for (const [variantId, ids] of byVariant) {
+        await queue.renewLock(holder);
+        try {
+          // Fejl i synkroniseringen gemmes på varianten og vises i admin.
+          await deps.syncVariant(variantId);
+          await queue.markDone(ids);
+          totals.done += ids.length;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Ukendt fejl.";
+          await queue.markFailed(ids, message);
+          totals.failed += ids.length;
         }
       }
     }

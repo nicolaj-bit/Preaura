@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { forShop } from "../models/preorder.server";
 import { findActiveDelivery } from "../lib/deliveries";
+import { decideMode, type VariantMode } from "../lib/variantMode";
 import type { ShopifyGateway } from "./gateway";
 import {
   preorderDataMatches,
@@ -98,9 +99,96 @@ async function reconcile(
 
   const deliveries = await data.deliveries.listForVariants([variantId]);
 
-  // Forudbestilling slået fra: varianten tages ud af gruppen, så den ikke
-  // længere kan forudbestilles. Lageret røres ikke.
-  if (!plan.preorderEnabled) {
+  // --- Tilstand: lagermode eller forudbestillingsmode ----------------------
+  //
+  // Afgøres her, før noget skrives, så det gælder ens for ændringer i admin,
+  // ordrer og lagerændringer — alle går gennem syncVariant og køen pr. butik.
+  // Et skift rører aldrig eksisterende tildelinger eller ordrer.
+  // Uden lagerplacering kan tilstanden ikke afgøres — sig det tydeligt.
+  if (plan.preorderEnabled && !plan.locationId) {
+    throw new SyncError(
+      "Varianten ligger ikke på noget lager i Shopify. Tilføj den til et lager, og synkronisér igen.",
+    );
+  }
+  if (plan.preorderEnabled && state.variant.available === null) {
+    throw new SyncError(
+      "Varianten er ikke aktiveret på sit lager i Shopify. Aktivér den på lageret, og synkronisér igen.",
+    );
+  }
+
+  let mode: VariantMode = plan.preorderEnabled
+    ? (plan.mode as VariantMode)
+    : "STOCK";
+  if (plan.preorderEnabled && state.variant.available != null) {
+    const available = state.variant.available;
+    const owed = deliveries
+      .filter((d) => d.status === "OPEN")
+      .reduce((sum, d) => sum + d.allocated, 0);
+    const decision = decideMode({
+      mode,
+      forced: plan.modeForced,
+      available,
+      syncedAvailable: mode === "PREORDER" ? plan.syncedAvailable : null,
+      hasSpace: findActiveDelivery(deliveries) != null,
+      owed,
+      stockBeforeForce: plan.modeForced ? null : plan.stockBeforeForce,
+      receivedWhileForced: plan.receivedWhileForced,
+    });
+    // Tvunget forudbestilling: varer, der lægges på lager imens, gemmes til
+    // side, så de ikke forsvinder, når appen sætter lageret til sit eget tal.
+    if (
+      plan.modeForced &&
+      mode === "PREORDER" &&
+      plan.syncedAvailable != null &&
+      available > plan.syncedAvailable
+    ) {
+      await data.syncState.addReceivedWhileForced(
+        variantId,
+        available - plan.syncedAvailable,
+      );
+    }
+    if (decision.changed) {
+      if (decision.mode === "PREORDER" && plan.modeForced) {
+        // Huskes, så lageret kan gives tilbage, når tvangen slås fra.
+        await data.syncState.setStockBeforeForce(
+          variantId,
+          Math.max(0, available),
+        );
+      }
+      if (
+        decision.mode === "STOCK" &&
+        decision.stockAvailable != null &&
+        plan.locationId &&
+        available !== decision.stockAvailable
+      ) {
+        // Skiftet til lagermode: Shopify skal stå på de rigtige varer, der
+        // er tilbage efter forudbestillingerne. Det sidste, appen gør ved
+        // lageret, før webshopejeren overtager det.
+        await gateway.setAvailable({
+          inventoryItemId: plan.inventoryItemId,
+          locationId: plan.locationId,
+          quantity: decision.stockAvailable,
+          changeFrom: available,
+        });
+      }
+      await data.syncState.recordModeChange(
+        variantId,
+        decision.mode,
+        decision.reason ?? "",
+        plan.modeForced,
+      );
+      mode = decision.mode;
+    }
+    if (!plan.modeForced && plan.stockBeforeForce != null) {
+      await data.syncState.setStockBeforeForce(variantId, null);
+    }
+  }
+
+  // Forudbestilling slået fra, eller lagermode: varianten tages ud af
+  // gruppen, så den ikke kan forudbestilles. Gruppen og planerne slettes
+  // IKKE — ordrer, der allerede er solgt på dem, beholder dem. Lageret røres
+  // ikke.
+  if (!plan.preorderEnabled || mode === "STOCK") {
     if (group?.appliesToVariant) {
       await gateway.removeVariant(group.id, variantId);
     }
@@ -310,7 +398,11 @@ async function reconcileProduct(
     product.variantIds.length > 0 &&
     product.variantIds.every((id) =>
       plans.some(
-        (p) => p.variantId === id && p.preorderEnabled && p.sellingPlanGroupId,
+        (p) =>
+          p.variantId === id &&
+          p.preorderEnabled &&
+          p.mode === "PREORDER" &&
+          p.sellingPlanGroupId,
       ),
     );
   const setByApp = plans.some((p) => p.setRequiresSellingPlan);
