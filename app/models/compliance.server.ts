@@ -3,7 +3,8 @@ import db from "../db.server";
 
 // Databeskyttelse: kunders dataanmodninger og sletning.
 //
-// Hvad PREAURA gemmer om en kunde: ingenting, der identificerer kunden. Køen
+// Hvad PREAURA gemmer om en kunde: kun i udgående hændelser (Flow, webhook,
+// Klaviyo) gemmes kundens navn og e-mail — krypteret og højst 30 dage. Køen
 // gemmer kun ordrens id (se app/lib/webhookPayload.ts). Tildelingerne
 // gemmer ordrens id og nummer, antal og den lovede dato — ikke navn, mail
 // eller adresse. De er butikkens regnskab over pladserne i leverancerne og
@@ -18,6 +19,7 @@ const ORDER_TOPICS = [
 ];
 
 const RETENTION_DAYS = 30;
+const LOG_RETENTION_DAYS = 90;
 
 /** Et Shopify-id som tal eller gid → gid for en ordre. */
 export function orderGid(id: unknown) {
@@ -38,6 +40,14 @@ export type StoredOrderData = {
     status: string;
     promisedDate: string | null;
     orderedAt: string | null;
+  }[];
+  /** Hændelser sendt på butikkens instruks (Flow, webhook, Klaviyo). */
+  sentEvents?: {
+    type: string;
+    at: string;
+    recipients: string[];
+    /** Kundens navn og e-mail er stadig gemt (krypteret) i hændelsen. */
+    containsContact: boolean;
   }[];
 };
 
@@ -80,6 +90,25 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
           orderedAt: row.orderCreatedAt?.toISOString() ?? null,
         });
         byOrder.set(row.orderId, order);
+      }
+      const events = await client.outboxEvent.findMany({
+        where: { shop, orderId: { in: orderIds } },
+        include: { deliveries: { select: { channel: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      for (const event of events) {
+        const order = byOrder.get(event.orderId) ?? {
+          orderId: event.orderId,
+          orderName: event.orderName,
+          lines: [],
+        };
+        (order.sentEvents ??= []).push({
+          type: event.type,
+          at: event.createdAt.toISOString(),
+          recipients: event.deliveries.map((d) => d.channel),
+          containsContact: event.payloadEnc != null,
+        });
+        byOrder.set(event.orderId, order);
       }
       return [...byOrder.values()];
     },
@@ -147,15 +176,25 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         })
         .map((event) => event.id);
 
-      const [requests, removed] = await client.$transaction([
+      const [requests, removed, outbox] = await client.$transaction([
         client.dataRequest.deleteMany({
           where: { shop, customerId: input.customerId },
         }),
         client.webhookEvent.deleteMany({
           where: { shop, id: { in: eventIds } },
         }),
+        // Udgående hændelser: kundens navn og e-mail slettes. Hvad der blev
+        // sendt hvornår (uden kundeoplysninger) bliver stående i logbogen.
+        client.outboxEvent.updateMany({
+          where: { shop, orderId: { in: input.orderIds } },
+          data: { payloadEnc: null },
+        }),
       ]);
-      return { dataRequests: requests.count, events: removed.count };
+      return {
+        dataRequests: requests.count,
+        events: removed.count,
+        outboxEvents: outbox.count,
+      };
     },
 
     /**
@@ -175,7 +214,12 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         client.dataRequest.deleteMany(where),
         client.session.deleteMany(where),
         client.webhookEvent.deleteMany(where),
-        client.queueLock.deleteMany(where),
+        client.outboxDelivery.deleteMany(where),
+        client.outboxEvent.deleteMany(where),
+        client.integrationSetting.deleteMany(where),
+        client.queueLock.deleteMany({
+          where: { shop: { in: [shop, `${shop}#outbox`] } },
+        }),
       ]);
     },
   };
@@ -191,7 +235,10 @@ export async function purgeOldData(
   now = new Date(),
 ) {
   const before = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const [events, requests] = await client.$transaction([
+  const logBefore = new Date(
+    now.getTime() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const [events, requests, payloads, log] = await client.$transaction([
     client.webhookEvent.deleteMany({
       where: {
         status: { in: ["DONE", "SKIPPED"] },
@@ -199,6 +246,18 @@ export async function purgeOldData(
       },
     }),
     client.dataRequest.deleteMany({ where: { answeredAt: { lt: before } } }),
+    // Udgående hændelser: kundens navn og e-mail slettes efter 30 dage.
+    client.outboxEvent.updateMany({
+      where: { createdAt: { lt: before }, payloadEnc: { not: null } },
+      data: { payloadEnc: null },
+    }),
+    // Logbogen (uden kundeoplysninger) efter 90 dage.
+    client.outboxEvent.deleteMany({ where: { createdAt: { lt: logBefore } } }),
   ]);
-  return { events: events.count, dataRequests: requests.count };
+  return {
+    events: events.count,
+    dataRequests: requests.count,
+    outboxPayloads: payloads.count,
+    outboxLog: log.count,
+  };
 }

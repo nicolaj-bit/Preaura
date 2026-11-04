@@ -28,6 +28,8 @@ export type ShopifyGroupState = {
 
 export type CreatedPlan = { id: string; option: string };
 
+import type { OrderDetails } from "../events/build";
+
 export interface ShopifyGateway {
   read(input: {
     variantId: string;
@@ -73,6 +75,16 @@ export interface ShopifyGateway {
 
   /** Sætter appens metafelter (namespace "preaura") på en ordre. */
   setOrderMetafields(orderId: string, fields: OrderMetafield[]): Promise<void>;
+  /**
+   * Ordrens navn, kunde og produktnavne — til udgående hændelser. customer
+   * er null, når appen ikke har adgang til kundens navn og e-mail.
+   */
+  readOrderDetails(orderId: string): Promise<OrderDetails | null>;
+  /** Starter butikkens Flow-workflows, der bruger triggeren. */
+  flowTriggerReceive(
+    handle: string,
+    payload: Record<string, unknown>,
+  ): Promise<void>;
   addOrderTags(orderId: string, tags: string[]): Promise<void>;
   removeOrderTags(orderId: string, tags: string[]): Promise<void>;
 

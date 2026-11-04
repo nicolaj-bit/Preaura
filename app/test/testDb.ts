@@ -43,7 +43,7 @@ export function createTestDb() {
     },
     async reset() {
       await client.$executeRawUnsafe(
-        `TRUNCATE "WebhookEvent", "DataRequest", "Session", "ModeChange", "QueueLock", "SellingPlanRef", "Allocation", "Delivery", "VariantPlan", "ShopSetting"`,
+        `TRUNCATE "OutboxDelivery", "OutboxEvent", "IntegrationSetting", "WebhookEvent", "DataRequest", "Session", "ModeChange", "QueueLock", "SellingPlanRef", "Allocation", "Delivery", "VariantPlan", "ShopSetting"`,
       );
     },
     async teardown() {

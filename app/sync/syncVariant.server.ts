@@ -121,9 +121,9 @@ async function reconcile(
     : "STOCK";
   if (plan.preorderEnabled && state.variant.available != null) {
     const available = state.variant.available;
-    const owed = deliveries
-      .filter((d) => d.status === "OPEN")
-      .reduce((sum, d) => sum + d.allocated, 0);
+    // Forudbestilte stk., der stadig venter på varer (ikke klar til
+    // afsendelse). Modtagne varer går først til dem.
+    const owed = await data.syncState.owedUnits(variantId);
     const decision = decideMode({
       mode,
       forced: plan.modeForced,
@@ -146,6 +146,25 @@ async function reconcile(
         variantId,
         available - plan.syncedAvailable,
       );
+    }
+    // Varer kommet hjem til forudbestillingerne: de dækkede markeres klar
+    // til afsendelse (og giver en hændelse). Skifter varianten til
+    // lagermode, er alle dækket.
+    const received =
+      mode === "PREORDER" && !plan.modeForced && plan.syncedAvailable != null
+        ? available - plan.syncedAvailable
+        : 0;
+    if (!plan.modeForced && plan.stockBeforeForce != null) {
+      // Tvangen er slået fra: varer lagt på lager imens gik til
+      // forudbestillingerne.
+      await data.syncState.receiveForPreorders(
+        variantId,
+        plan.receivedWhileForced,
+      );
+    } else if (decision.changed && decision.mode === "STOCK") {
+      await data.syncState.markAllReady(variantId);
+    } else if (received > 0) {
+      await data.syncState.receiveForPreorders(variantId, received);
     }
     if (decision.changed) {
       if (decision.mode === "PREORDER" && plan.modeForced) {

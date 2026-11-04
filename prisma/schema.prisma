@@ -118,6 +118,10 @@ model VariantPlan {
   receivedWhileForced Int       @default(0)
   modeChangedAt       DateTime?
   modeChangeReason    String?
+  // Modtagne varer, der endnu ikke er sat på en bestemt forudbestilling.
+  // Forudbestillinger markeres klar til afsendelse én hel tildeling ad
+  // gangen, i bestillingsrækkefølge.
+  readyCredit         Int       @default(0)
 
   // Synkronisering med Shopify. Udfyldes kun af app/sync/.
   // Variantens egen selling plan group i Shopify.
@@ -197,6 +201,8 @@ model Allocation {
   // Datoen, kunden blev lovet, da tildelingen blev lavet. Den følger IKKE
   // leverancen, hvis leverancens dato senere ændres.
   promisedDate    String?
+  // Varerne til tildelingen er kommet hjem: klar til afsendelse.
+  readyAt         DateTime?
   allocatedAt     DateTime  @default(now())
   cancelledAt     DateTime?
   updatedAt       DateTime  @updatedAt
@@ -253,4 +259,93 @@ model DataRequest {
 
   @@index([shop, answeredAt])
   @@index([shop, customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Udgående hændelser (Flow, webhook, Klaviyo)
+//
+// Én hændelse bygges ét sted (app/events/build.ts) og sendes ens til alle
+// modtagere. Al adgang går gennem app/models/outbox.server.ts.
+// ---------------------------------------------------------------------------
+
+// Webshopejerens opsætning af modtagere. Én række pr. butik. Nøgler og
+// adresser gemmes krypteret (app/lib/crypto.server.ts) og læses aldrig
+// tilbage i admin — kun de sidste fire tegn vises.
+model IntegrationSetting {
+  id                       String    @id @default(cuid())
+  shop                     String    @unique
+  flowEnabled              Boolean   @default(true)
+  webhookEnabled           Boolean   @default(false)
+  webhookUrlEnc            String?
+  webhookUrlLast4          String?
+  // Signaturnøglen til webhooken. Krypteret, men vises i admin, så
+  // modtageren kan verificere kaldene.
+  webhookSecretEnc         String?
+  klaviyoEnabled           Boolean   @default(false)
+  klaviyoKeyEnc            String?
+  klaviyoKeyLast4          String?
+  // Hvornår webshopejeren bekræftede at have grundlag for at sende
+  // kundeoplysninger til tredjepart. Kræves for webhook og Klaviyo.
+  responsibilityAcceptedAt DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+}
+
+// En hændelse. Oprettes i samme transaktion som ændringen, der udløser den
+// (status NEW), og bygges bagefter med kundens navn og e-mail fra Shopify
+// (status BUILT). id er hændelsens entydige id — også unique_id hos Klaviyo.
+model OutboxEvent {
+  id           String           @id
+  shop         String
+  // "preorder.created", "preorder.delayed", "preorder.ready" eller
+  // "preorder.cancelled".
+  type         String
+  // Sikrer, at samme ændring kun giver én hændelse, uanset hvor mange gange
+  // ordren eller leverancen behandles.
+  dedupeKey    String
+  orderId      String
+  orderName    String           @default("")
+  orderLineId  String
+  variantId    String
+  quantity     Int
+  deliveryDate String?
+  previousDate String?
+  // "NEW", "BUILT" eller "FAILED" (kunne ikke bygges).
+  status       String           @default("NEW")
+  lastError    String?
+  // Den byggede hændelse som krypteret JSON. Indeholder kundens navn og
+  // e-mail. Slettes efter 30 dage og ved customers/redact.
+  payloadEnc   String?
+  createdAt    DateTime         @default(now())
+  builtAt      DateTime?
+  deliveries   OutboxDelivery[]
+
+  @@unique([shop, dedupeKey])
+  @@index([shop, status])
+  @@index([shop, orderId])
+  @@index([shop, createdAt])
+}
+
+// Én levering af en hændelse til én modtager. Genforsøg med voksende
+// ventetid; fejler den endeligt, står den som FAILED i admin.
+model OutboxDelivery {
+  id            String      @id @default(cuid())
+  shop          String
+  eventId       String
+  event         OutboxEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // "FLOW", "WEBHOOK" eller "KLAVIYO".
+  channel       String
+  // "PENDING", "DONE" eller "FAILED".
+  status        String      @default("PENDING")
+  attempts      Int         @default(0)
+  nextAttemptAt DateTime    @default(now())
+  lastError     String?
+  lastStatus    Int?
+  deliveredAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([eventId, channel])
+  @@index([shop, status, nextAttemptAt])
+  @@index([shop, createdAt])
 }

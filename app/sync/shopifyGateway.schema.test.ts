@@ -153,6 +153,41 @@ describe("forespørgsler mod Shopifys skema", () => {
     );
   });
 
+  it("udgående hændelser: ordrens detaljer (med og uden kunde) og Flow", async () => {
+    const ORDER = "gid://shopify/Order/1";
+    expectValid(await capture((g) => g.readOrderDetails(ORDER)));
+
+    // Uden adgang til kundedata spørges der igen uden kunden.
+    const calls: Call[] = [];
+    const gateway = createShopifyGateway(async (query, options) => {
+      calls.push({ query, variables: options?.variables ?? {} });
+      return new Response(
+        JSON.stringify(
+          calls.length === 1
+            ? {
+                errors: [
+                  {
+                    message: "Access denied for email field.",
+                    extensions: { code: "ACCESS_DENIED" },
+                  },
+                ],
+              }
+            : { data: { order: { name: "#1001", lineItems: { nodes: [] } } } },
+        ),
+      );
+    });
+    const details = await gateway.readOrderDetails(ORDER);
+    expect(details).toEqual({ name: "#1001", customer: null, lines: [] });
+    expect(calls).toHaveLength(2);
+    expectValid(calls[1]);
+
+    expectValid(
+      await capture((g) =>
+        g.flowTriggerReceive("preaura-preorder-ready", { order_id: 1 }),
+      ),
+    );
+  });
+
   it("produkt: krav om selling plan", async () => {
     expectValid(
       await capture((g) =>

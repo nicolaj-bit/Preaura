@@ -1,11 +1,19 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useEffect } from "react";
+import type {
+  ActionFunctionArgs,
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { forShop } from "../models/preorder.server";
 import { allocatedQuantity, remainingQuantity } from "../lib/deliveries";
 import { fetchShopTimeZone } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
+import { shopifySync } from "../sync/index.server";
+import { scheduleQueue } from "../orders/scheduler.server";
 
 // En leverance med dens ordrer. Siden, webshopejeren bruger, når sendingen
 // kommer hjem: hvem skal have hvad.
@@ -41,7 +49,33 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       status: row.status,
       orderedAt: row.orderCreatedAt ? format.format(row.orderCreatedAt) : "–",
       promisedDate: row.promisedDate,
+      ready: row.readyAt != null,
     })),
+  };
+};
+
+/**
+ * «Varerne er kommet»: alle aktive forudbestillinger i leverancen markeres
+ * klar til afsendelse og giver en hændelse hver. Bruges, når varerne ikke
+ * registreres som lager i Shopify (det gør appen ellers selv).
+ */
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { admin, session } = await authenticate.admin(request);
+  const form = await request.formData();
+  if (form.get("intent") !== "ready") {
+    return { ok: false, message: "Ukendt handling." };
+  }
+  const { variantId, count } = await forShop(session.shop).deliveries.markReady(
+    String(params.deliveryId),
+  );
+  await shopifySync(admin.graphql, session.shop).sync(variantId);
+  scheduleQueue(session.shop, 0);
+  return {
+    ok: true,
+    message:
+      count === 0
+        ? "Alle forudbestillinger var allerede klar"
+        : `${count} forudbestilling(er) markeret klar til afsendelse`,
   };
 };
 
@@ -63,6 +97,15 @@ const STATUS: Record<
 export default function DeliveryOrders() {
   const { delivery, orders } = useLoaderData<typeof loader>();
   const active = orders.filter((o) => o.status === "ACTIVE");
+  const waiting = active.filter((o) => !o.ready).length;
+  const fetcher = useFetcher<typeof action>();
+  const shopify = useAppBridge();
+
+  useEffect(() => {
+    if (fetcher.data) {
+      shopify.toast.show(fetcher.data.message, { isError: !fetcher.data.ok });
+    }
+  }, [fetcher.data, shopify]);
 
   return (
     <s-page
@@ -71,6 +114,18 @@ export default function DeliveryOrders() {
       <s-link slot="breadcrumb-actions" href="/app">
         Produkter
       </s-link>
+      {waiting > 0 && (
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          onClick={() =>
+            fetcher.submit({ intent: "ready" }, { method: "POST" })
+          }
+          {...(fetcher.state !== "idle" ? { loading: true } : {})}
+        >
+          Varerne er kommet — klar til afsendelse
+        </s-button>
+      )}
 
       <s-section>
         <s-grid gridTemplateColumns="1fr 1fr 1fr 1fr" gap="base">
@@ -124,7 +179,12 @@ export default function DeliveryOrders() {
                     </s-table-cell>
                     <s-table-cell>{order.quantity}</s-table-cell>
                     <s-table-cell>
-                      <s-badge tone={status.tone}>{status.label}</s-badge>
+                      <s-stack direction="inline" gap="small-200">
+                        <s-badge tone={status.tone}>{status.label}</s-badge>
+                        {order.status === "ACTIVE" && order.ready ? (
+                          <s-badge tone="info">Klar til afsendelse</s-badge>
+                        ) : null}
+                      </s-stack>
                     </s-table-cell>
                     <s-table-cell>{order.orderedAt}</s-table-cell>
                     <s-table-cell>

@@ -713,7 +713,12 @@ describe("lagermode, forudbestilling og lagerændringer gennem køen", () => {
 
     expect(await modeOf()).toBe("STOCK");
     expect(h.shopify.variants.get(VARIANT)?.available).toBe(7);
-    expect(await client.allocation.findMany()).toEqual(before);
+    // Tildelingerne er urørte — de er blot markeret klar til afsendelse.
+    const after = await client.allocation.findMany();
+    const strip = (rows: typeof before) =>
+      rows.map((row) => ({ ...row, readyAt: null, updatedAt: null }));
+    expect(strip(after)).toEqual(strip(before));
+    expect(after.every((row) => row.readyAt != null)).toBe(true);
     expect(h.shopify.orders.get(order.id)).toEqual(orderBefore);
   });
 

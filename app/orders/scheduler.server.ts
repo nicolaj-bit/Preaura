@@ -1,6 +1,8 @@
 import { unauthenticated } from "../shopify.server";
 import { shopifySync } from "../sync/index.server";
 import { shopsWithPendingEvents } from "../models/queue.server";
+import { shopsWithOutboxWork } from "../models/outbox.server";
+import { processOutbox } from "../events/outbox.server";
 import { processShopQueue, type QueueDeps } from "./processQueue.server";
 import { purgeOldData } from "../models/compliance.server";
 
@@ -32,9 +34,10 @@ export function scheduleQueue(shop: string, delay = DEBOUNCE_MS) {
 
 export async function runQueue(shop: string) {
   let deps: QueueDeps | null = null;
+  let sync: ReturnType<typeof shopifySync> | null = null;
   try {
     const { admin } = await unauthenticated.admin(shop);
-    const sync = shopifySync(admin.graphql, shop);
+    sync = shopifySync(admin.graphql, shop);
     deps = {
       readOrder: sync.readOrder,
       syncVariant: sync.sync,
@@ -45,12 +48,30 @@ export async function runQueue(shop: string) {
     // hændelserne behandles alligevel; resten bliver liggende som PENDING og
     // prøves igen ved næste fejning.
   }
+  let result;
   try {
-    return await processShopQueue({ shop, deps });
+    result = await processShopQueue({ shop, deps });
   } catch (error) {
     console.error(`Køen for ${shop} kunne ikke behandles:`, error);
-    return { ran: false as const };
+    result = { ran: false as const };
   }
+  // Udgående hændelser (Flow, webhook, Klaviyo) — efter køen, så hændelser
+  // fra ordrerne i denne omgang sendes med det samme.
+  if (sync) {
+    try {
+      await processOutbox({
+        shop,
+        deps: {
+          readOrderDetails: sync.readOrderDetails,
+          flowTriggerReceive: sync.flowTriggerReceive,
+          fetch,
+        },
+      });
+    } catch (error) {
+      console.error(`Udgående hændelser for ${shop} fejlede:`, error);
+    }
+  }
+  return result;
 }
 
 declare global {
@@ -72,9 +93,11 @@ export function startQueueSweeper() {
       }
     }
     try {
-      for (const shop of await shopsWithPendingEvents()) {
-        scheduleQueue(shop, 0);
-      }
+      const shops = new Set([
+        ...(await shopsWithPendingEvents()),
+        ...(await shopsWithOutboxWork()),
+      ]);
+      for (const shop of shops) scheduleQueue(shop, 0);
     } catch (error) {
       console.error("Fejning af køen fejlede:", error);
     }
