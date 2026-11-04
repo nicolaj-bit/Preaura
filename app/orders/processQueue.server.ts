@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { forShop, type OrderSnapshot } from "../models/preorder.server";
 import { EVENT_STATUS, queueFor } from "../models/queue.server";
+import { complianceFor, orderGid } from "../models/compliance.server";
 
 // Behandling af ordre-hændelser i køen → tildelinger.
 //
@@ -16,6 +17,8 @@ import { EVENT_STATUS, queueFor } from "../models/queue.server";
 // - Appen skriver kun til Shopify gennem synkroniseringen (syncVariant og
 //   syncOrder), som behandleren får udefra.
 // - En hændelse, der fejler, markeres FAILED med fejlbeskeden og vises i admin.
+// - Compliance-hændelser (GDPR) behandles først og kræver ikke adgang til
+//   Shopify — de kommer ofte, efter appen er afinstalleret.
 
 const ORDER_TOPICS = new Set([
   "ORDERS_CREATE",
@@ -25,6 +28,12 @@ const ORDER_TOPICS = new Set([
 ]);
 
 const INVENTORY_TOPIC = "INVENTORY_LEVELS_UPDATE";
+
+export const COMPLIANCE_TOPICS = [
+  "CUSTOMERS_DATA_REQUEST",
+  "CUSTOMERS_REDACT",
+  "SHOP_REDACT",
+];
 
 /** Lagervarens id ud fra en inventory_levels/update-hændelse. */
 function inventoryItemRef(event: Event) {
@@ -82,13 +91,18 @@ export function orderRef(event: Event) {
 export type QueueRunResult =
   { ran: false } | { ran: true; done: number; failed: number; skipped: number };
 
+/**
+ * Behandler butikkens kø. Uden deps (appen har ikke adgang til butikken,
+ * fx efter afinstallation) behandles kun compliance-hændelserne; resten
+ * venter.
+ */
 export async function processShopQueue({
   shop,
   deps,
   client = db,
 }: {
   shop: string;
-  deps: QueueDeps;
+  deps: QueueDeps | null;
   client?: PrismaClient;
 }): Promise<QueueRunResult> {
   const queue = queueFor(shop, client);
@@ -101,6 +115,16 @@ export async function processShopQueue({
   try {
     // Fortsæt, så længe der kommer nye hændelser ind.
     for (let round = 0; round < 50; round++) {
+      const compliance = await queue.pending(100, COMPLIANCE_TOPICS);
+      if (compliance.length > 0) {
+        const result = await processCompliance(shop, compliance, client);
+        totals.done += result.done;
+        totals.failed += result.failed;
+        if (result.shopRedacted) return { ran: true, ...totals };
+        continue;
+      }
+      if (!deps) break;
+
       const events = await queue.pending();
       if (events.length === 0) break;
 
@@ -198,6 +222,66 @@ export async function processShopQueue({
     await queue.releaseLock(holder);
   }
   return { ran: true, ...totals };
+}
+
+async function processCompliance(
+  shop: string,
+  events: Event[],
+  client: PrismaClient,
+) {
+  const queue = queueFor(shop, client);
+  const compliance = complianceFor(shop, client);
+  const result = { done: 0, failed: 0, shopRedacted: false };
+
+  // shop/redact sletter alt om butikken — også resten af køen.
+  if (events.some((e) => e.topic === "SHOP_REDACT")) {
+    await compliance.redactShop();
+    result.done += events.length;
+    result.shopRedacted = true;
+    return result;
+  }
+
+  for (const event of events) {
+    try {
+      const payload = JSON.parse(event.payload) as {
+        customer?: { id?: unknown };
+        orders_requested?: unknown[];
+        orders_to_redact?: unknown[];
+        data_request?: { id?: unknown };
+      };
+      const customerId =
+        payload.customer?.id != null ? String(payload.customer.id) : null;
+      if (!customerId) throw new Error("Hændelsen indeholder ingen kunde.");
+      const orderIds = (
+        (event.topic === "CUSTOMERS_REDACT"
+          ? payload.orders_to_redact
+          : payload.orders_requested) ?? []
+      )
+        .map(orderGid)
+        .filter((id): id is string => id != null);
+
+      if (event.topic === "CUSTOMERS_DATA_REQUEST") {
+        await compliance.recordDataRequest({
+          customerId,
+          shopifyRequestId:
+            payload.data_request?.id != null
+              ? String(payload.data_request.id)
+              : null,
+          orderIds,
+          data: await compliance.storedForOrders(orderIds),
+        });
+      } else {
+        await compliance.redactCustomer({ customerId, orderIds });
+      }
+      await queue.markDone([event.id]);
+      result.done += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ukendt fejl.";
+      await queue.markFailed([event.id], message);
+      result.failed += 1;
+    }
+  }
+  return result;
 }
 
 async function processOrder(

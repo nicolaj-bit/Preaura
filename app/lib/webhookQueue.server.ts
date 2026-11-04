@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import db from "../db.server";
+import { minimalPayload } from "./webhookPayload";
 
 type QueuedWebhook = {
   webhookId: string;
@@ -9,7 +10,8 @@ type QueuedWebhook = {
 };
 
 /**
- * Lægger en webhook i køen (tabellen WebhookEvent).
+ * Lægger en webhook i køen (tabellen WebhookEvent). Kun de felter, appen
+ * bruger, gemmes — se webhookPayload.ts.
  *
  * Er hændelsen der allerede (samme webhookId), gør vi ingenting — Shopify
  * leverer nogle gange den samme webhook flere gange. Andre fejl kastes
@@ -21,7 +23,12 @@ export async function enqueueWebhook(
 ): Promise<void> {
   try {
     await client.webhookEvent.create({
-      data: { webhookId, shop, topic, payload: JSON.stringify(payload ?? {}) },
+      data: {
+        webhookId,
+        shop,
+        topic,
+        payload: JSON.stringify(minimalPayload(topic, payload)),
+      },
     });
   } catch (error) {
     if (

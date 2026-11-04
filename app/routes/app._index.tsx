@@ -11,6 +11,7 @@ import { authenticate } from "../shopify.server";
 import { forShop } from "../models/preorder.server";
 import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
 import { queueFor } from "../models/queue.server";
+import { complianceFor } from "../models/compliance.server";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
 // produktvælger. Et produkt står som slået til, hvis mindst én variant er.
@@ -26,16 +27,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const byId = new Map(products.map((product) => [product.id, product]));
 
-  const [counts, unresolved, withoutPlan7] = await Promise.all([
+  const [counts, unresolved, withoutPlan7, dataRequests] = await Promise.all([
     queueFor(session.shop).countByStatus(),
     data.orders.unresolved(),
     data.orders.countWithoutPlanSince(
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     ),
+    complianceFor(session.shop).countUnansweredDataRequests(),
   ]);
 
   return {
     failedEvents: counts.FAILED ?? 0,
+    dataRequests,
     withoutPlan7,
     unresolvedOrders: new Set(unresolved.map((row) => row.orderId)).size,
     products: summaries.map((summary) => {
@@ -88,8 +91,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { products, failedEvents, unresolvedOrders, withoutPlan7 } =
-    useLoaderData<typeof loader>();
+  const {
+    products,
+    failedEvents,
+    unresolvedOrders,
+    withoutPlan7,
+    dataRequests,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const busy = fetcher.state !== "idle";
@@ -135,6 +143,19 @@ export default function Index() {
           </s-paragraph>
           <s-link slot="secondary-actions" href="/app/queue">
             Se ordrerne
+          </s-link>
+        </s-banner>
+      )}
+      {dataRequests > 0 && (
+        <s-banner tone="warning" heading="En kunde har bedt om sine data">
+          <s-paragraph>
+            {dataRequests === 1
+              ? "1 dataanmodning venter"
+              : `${dataRequests} dataanmodninger venter`}{" "}
+            på svar. Kunden har ret til svar inden for 30 dage.
+          </s-paragraph>
+          <s-link slot="secondary-actions" href="/app/queue">
+            Se anmodningen
           </s-link>
         </s-banner>
       )}

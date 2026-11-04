@@ -482,10 +482,10 @@ describe("fejl og samtidighed", () => {
     expect(await h.remaining()).toEqual([8]);
   });
 
-  it("andre emner (fx compliance) markeres som ikke behandlet og blokerer ikke køen", async () => {
+  it("andre emner (fx app/uninstalled) markeres som ikke behandlet og blokerer ikke køen", async () => {
     const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
     await enqueueWebhook(
-      { webhookId: "c", shop: SHOP, topic: "SHOP_REDACT", payload: {} },
+      { webhookId: "c", shop: SHOP, topic: "APP_UNINSTALLED", payload: {} },
       client,
     );
     expect(await h.run()).toMatchObject({ skipped: 1 });

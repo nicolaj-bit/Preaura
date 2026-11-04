@@ -10,6 +10,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { forShop } from "../models/preorder.server";
 import { queueFor } from "../models/queue.server";
+import { complianceFor } from "../models/compliance.server";
 import { enqueueWebhook } from "../lib/webhookQueue.server";
 import { scheduleQueue } from "../orders/scheduler.server";
 import { orderRef } from "../orders/processQueue.server";
@@ -17,9 +18,19 @@ import { fetchShopTimeZone } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
 
 // Ordrebehandling: hændelser, der ikke kunne behandles, og ordrelinjer uden
-// plads i nogen leverance. Intet må forsvinde i en log.
+// plads i nogen leverance. Intet må forsvinde i en log. Og kunders
+// anmodninger om at se deres data (GDPR).
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Tildelt",
+  UNRESOLVED: "Uafklaret",
+  CANCELLED: "Annulleret",
+};
 
 const TOPIC_LABELS: Record<string, string> = {
+  CUSTOMERS_DATA_REQUEST: "Dataanmodning",
+  CUSTOMERS_REDACT: "Sletning af kunde",
+  SHOP_REDACT: "Sletning af butik",
   ORDERS_CREATE: "Ny ordre",
   ORDERS_UPDATED: "Ordre ændret",
   ORDERS_CANCELLED: "Ordre annulleret",
@@ -31,23 +42,57 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const queue = queueFor(session.shop);
   const data = forShop(session.shop);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [counts, failed, unresolved, withoutPlan, withoutPlan30, timeZone] =
-    await Promise.all([
-      queue.countByStatus(),
-      queue.failed(),
-      data.orders.unresolved(),
-      data.orders.withoutPlan(50),
-      data.orders.countWithoutPlanSince(thirtyDaysAgo),
-      fetchShopTimeZone(admin.graphql),
-    ]);
+  const [
+    counts,
+    failed,
+    unresolved,
+    withoutPlan,
+    withoutPlan30,
+    timeZone,
+    dataRequests,
+  ] = await Promise.all([
+    queue.countByStatus(),
+    queue.failed(),
+    data.orders.unresolved(),
+    data.orders.withoutPlan(50),
+    data.orders.countWithoutPlanSince(thirtyDaysAgo),
+    fetchShopTimeZone(admin.graphql),
+    complianceFor(session.shop).dataRequests(),
+  ]);
   const format = new Intl.DateTimeFormat("da-DK", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone,
   });
 
+  const dateOnly = new Intl.DateTimeFormat("da-DK", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  });
+
   return {
     pending: counts.PENDING ?? 0,
+    dataRequests: dataRequests.map((request) => ({
+      id: request.id,
+      customerId: request.customerId,
+      receivedAt: format.format(request.receivedAt),
+      answeredAt: request.answeredAt ? format.format(request.answeredAt) : null,
+      orderCount: request.orderIds.length,
+      orders: request.data.map((order) => ({
+        name: order.orderName || `Ordre ${numericId(order.orderId)}`,
+        lines: order.lines.map((line) =>
+          [
+            `${line.quantity} stk.`,
+            STATUS_LABELS[line.status] ?? line.status,
+            line.promisedDate
+              ? `lovet ${dateOnly.format(new Date(`${line.promisedDate}T12:00:00Z`))}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(", "),
+        ),
+      })),
+    })),
     failed: failed.map((event) => {
       const ref = orderRef(event);
       return {
@@ -91,6 +136,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       scheduleQueue(session.shop, 0);
       return { ok: true, message: `${count} hændelse(r) sat i kø igen` };
     }
+    case "answer": {
+      const count = await complianceFor(session.shop).markAnswered(
+        String(form.get("requestId")),
+      );
+      return count === 1
+        ? { ok: true, message: "Markeret som besvaret" }
+        : { ok: false, message: "Anmodningen findes ikke." };
+    }
     case "reprocess": {
       // Behandl en ordre igen, fx når der er kommet en ny leverance med plads.
       const orderId = String(form.get("orderId"));
@@ -112,8 +165,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function QueuePage() {
-  const { pending, failed, unresolved, withoutPlan, withoutPlan30 } =
-    useLoaderData<typeof loader>();
+  const {
+    pending,
+    failed,
+    unresolved,
+    withoutPlan,
+    withoutPlan30,
+    dataRequests,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const busy = fetcher.state !== "idle";
@@ -145,6 +204,72 @@ export default function QueuePage() {
           {pending} hændelse(r) venter på at blive behandlet. Det sker normalt
           inden for et minut.
         </s-banner>
+      )}
+
+      {dataRequests.length > 0 && (
+        <s-section heading="Kunders dataanmodninger">
+          <s-stack gap="base">
+            <s-paragraph>
+              En kunde har bedt butikken om at se de oplysninger, der gemmes om
+              kunden. Her er alt, hvad PREAURA gemmer om kundens ordrer — ingen
+              navne, mails eller adresser. Send det til kunden sammen med
+              butikkens egne oplysninger, og markér anmodningen som besvaret.
+              Besvarede anmodninger slettes efter 30 dage.
+            </s-paragraph>
+            {dataRequests.map((request) => (
+              <s-box
+                key={request.id}
+                padding="base"
+                borderWidth="base"
+                borderRadius="base"
+              >
+                <s-stack gap="small-200">
+                  <s-stack direction="inline" gap="small-200">
+                    <s-link
+                      href={`shopify://admin/customers/${request.customerId}`}
+                    >
+                      Kunde {request.customerId}
+                    </s-link>
+                    {request.answeredAt ? (
+                      <s-badge tone="success">
+                        Besvaret {request.answeredAt}
+                      </s-badge>
+                    ) : (
+                      <s-badge tone="warning">Venter på svar</s-badge>
+                    )}
+                  </s-stack>
+                  <s-text color="subdued">Modtaget {request.receivedAt}</s-text>
+                  {request.orders.length === 0 ? (
+                    <s-paragraph>
+                      PREAURA gemmer ingen oplysninger om{" "}
+                      {request.orderCount === 1
+                        ? "kundens ordre"
+                        : `kundens ${request.orderCount} ordrer`}
+                      .
+                    </s-paragraph>
+                  ) : (
+                    <s-unordered-list>
+                      {request.orders.map((order) => (
+                        <s-list-item key={order.name}>
+                          {order.name}: {order.lines.join("; ")}
+                        </s-list-item>
+                      ))}
+                    </s-unordered-list>
+                  )}
+                  {!request.answeredAt && (
+                    <s-button
+                      onClick={() =>
+                        submit({ intent: "answer", requestId: request.id })
+                      }
+                    >
+                      Markér som besvaret
+                    </s-button>
+                  )}
+                </s-stack>
+              </s-box>
+            ))}
+          </s-stack>
+        </s-section>
       )}
 
       <s-section heading="Uafklarede ordrer">

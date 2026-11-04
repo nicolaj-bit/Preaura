@@ -18,10 +18,11 @@ export function createTestDb() {
 
   return {
     client,
-    async setup() {
+    /** Kører migrationerne. Med `only` kun dem, filteret siger ja til. */
+    async setup(only: (name: string) => boolean = () => true) {
       const migrations = join(__dirname, "../../prisma/migrations");
       const names = readdirSync(migrations)
-        .filter((n) => /^\d/.test(n))
+        .filter((n) => /^\d/.test(n) && only(n))
         .sort();
       for (const name of names) {
         const sql = readFileSync(
@@ -38,6 +39,8 @@ export function createTestDb() {
     },
     async reset() {
       await client.webhookEvent.deleteMany();
+      await client.dataRequest.deleteMany();
+      await client.session.deleteMany();
       await client.modeChange.deleteMany();
       await client.queueLock.deleteMany();
       await client.sellingPlanRef.deleteMany();
