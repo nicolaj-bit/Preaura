@@ -16,6 +16,8 @@ import { scheduleQueue } from "../orders/scheduler.server";
 import { orderRef } from "../orders/processQueue.server";
 import { fetchShopTimeZone } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
+import { EVENT_LABELS, isEventType } from "../events/build";
+import { CHANNEL_LABELS, type Channel } from "../events/labels";
 
 // Ordrebehandling: hændelser, der ikke kunne behandles, og ordrelinjer uden
 // plads i nogen leverance. Intet må forsvinde i en log. Og kunders
@@ -90,6 +92,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           ]
             .filter(Boolean)
             .join(", "),
+        ),
+        events: (order.sentEvents ?? []).map(
+          (event) =>
+            `${isEventType(event.type) ? EVENT_LABELS[event.type] : event.type} sendt til ${
+              event.recipients
+                .map((r) => CHANNEL_LABELS[r as Channel] ?? r)
+                .join(", ") || "ingen modtagere"
+            }${event.containsContact ? " (navn og e-mail gemt krypteret)" : ""}`,
         ),
       })),
     })),
@@ -211,10 +221,12 @@ export default function QueuePage() {
           <s-stack gap="base">
             <s-paragraph>
               En kunde har bedt butikken om at se de oplysninger, der gemmes om
-              kunden. Her er alt, hvad PREAURA gemmer om kundens ordrer — ingen
-              navne, mails eller adresser. Send det til kunden sammen med
-              butikkens egne oplysninger, og markér anmodningen som besvaret.
-              Besvarede anmodninger slettes efter 30 dage.
+              kunden. Her er alt, hvad PREAURA gemmer om kundens ordrer. Navn og
+              e-mail gemmes kun i hændelser, der sendes på butikkens instruks
+              (Flow, webhook, Klaviyo), krypteret og højst 30 dage. Send det til
+              kunden sammen med butikkens egne oplysninger, og markér
+              anmodningen som besvaret. Besvarede anmodninger slettes efter 30
+              dage.
             </s-paragraph>
             {dataRequests.map((request) => (
               <s-box
@@ -252,6 +264,9 @@ export default function QueuePage() {
                       {request.orders.map((order) => (
                         <s-list-item key={order.name}>
                           {order.name}: {order.lines.join("; ")}
+                          {order.events.length > 0
+                            ? `. Hændelser: ${order.events.join("; ")}`
+                            : ""}
                         </s-list-item>
                       ))}
                     </s-unordered-list>

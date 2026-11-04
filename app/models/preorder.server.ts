@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import db from "../db.server";
+import type { EventType } from "../events/build";
 import {
   planLineAllocation,
   sameAllocation,
@@ -317,11 +319,57 @@ export function forShop(shop: string, client: PrismaClient = db) {
           });
           if (!result.ok) throw new DeliveryValidationError(result.errors);
 
+          // Linjernes forventede dato før ændringen (til «forsinket»).
+          const before =
+            result.value.date > delivery.date
+              ? await lineDates(tx, { deliveryId: id })
+              : new Map<string, LineDate>();
+
           await tx.delivery.updateMany({
             where: { id, shop },
             data: result.value,
           });
+
+          // Datoen er rykket senere: hver berørt forudbestilling, der ikke
+          // allerede er klar, får en «forsinket»-hændelse.
+          if (before.size > 0) {
+            const after = await lineDates(tx, { deliveryId: id });
+            for (const [lineId, line] of after) {
+              const previous = before.get(lineId);
+              if (!previous || line.allReady) continue;
+              if (line.date > previous.date) {
+                await recordEvent(tx, line, "preorder.delayed", {
+                  dedupeKey: `delayed:${lineId}:${line.date}`,
+                  deliveryDate: line.date,
+                  previousDate: previous.date,
+                });
+              }
+            }
+          }
           return { variantId: delivery.variantId };
+        });
+      },
+
+      /**
+       * Markerer alle forudbestillinger i leverancen som klar til afsendelse
+       * (varerne er kommet hjem). Giver «klar til afsendelse»-hændelser.
+       */
+      async markReady(id: string) {
+        return client.$transaction(async (tx) => {
+          const delivery = await findDelivery(tx, id);
+          const rows = await tx.allocation.findMany({
+            where: { shop, deliveryId: id, status: "ACTIVE", readyAt: null },
+            select: { id: true, orderLineId: true },
+          });
+          await tx.allocation.updateMany({
+            where: { shop, id: { in: rows.map((r) => r.id) } },
+            data: { readyAt: new Date() },
+          });
+          await emitReady(
+            tx,
+            rows.map((r) => r.orderLineId),
+          );
+          return { variantId: delivery.variantId, count: rows.length };
         });
       },
 
@@ -396,6 +444,106 @@ export function forShop(shop: string, client: PrismaClient = db) {
         await client.variantPlan.updateMany({
           where: { shop, variantId },
           data: { stockBeforeForce: value, receivedWhileForced: 0 },
+        });
+      },
+
+      /**
+       * Forudbestilte stk., der stadig venter på varer: aktive tildelinger i
+       * åbne leverancer, som ikke er klar, minus modtagne varer, der endnu
+       * ikke er sat på en bestemt forudbestilling.
+       */
+      async owedUnits(variantId: string) {
+        const [rows, plan] = await Promise.all([
+          client.allocation.aggregate({
+            where: {
+              shop,
+              variantId,
+              status: "ACTIVE",
+              readyAt: null,
+              delivery: { status: "OPEN" },
+            },
+            _sum: { quantity: true },
+          }),
+          client.variantPlan.findFirst({ where: { shop, variantId } }),
+        ]);
+        return Math.max(
+          0,
+          (rows._sum.quantity ?? 0) - (plan?.readyCredit ?? 0),
+        );
+      },
+
+      /**
+       * Varer kommet hjem til forudbestillingerne. De fordeles i
+       * bestillingsrækkefølge, én hel tildeling ad gangen; resten gemmes,
+       * til der kommer nok til den næste.
+       */
+      async receiveForPreorders(variantId: string, quantity: number) {
+        if (quantity <= 0) return;
+        await client.$transaction(async (tx) => {
+          const plan = await tx.variantPlan.findFirst({
+            where: { shop, variantId },
+          });
+          let credit = (plan?.readyCredit ?? 0) + quantity;
+          const rows = await tx.allocation.findMany({
+            where: {
+              shop,
+              variantId,
+              status: "ACTIVE",
+              readyAt: null,
+              delivery: { status: "OPEN" },
+            },
+            include: { delivery: { select: { position: true } } },
+            orderBy: [{ orderCreatedAt: "asc" }, { allocatedAt: "asc" }],
+          });
+          rows.sort(
+            (a, b) => (a.delivery?.position ?? 0) - (b.delivery?.position ?? 0),
+          );
+          const ready: typeof rows = [];
+          for (const row of rows) {
+            if (row.quantity > credit) break;
+            credit -= row.quantity;
+            ready.push(row);
+          }
+          await tx.allocation.updateMany({
+            where: { shop, id: { in: ready.map((r) => r.id) } },
+            data: { readyAt: new Date() },
+          });
+          await tx.variantPlan.updateMany({
+            where: { shop, variantId },
+            data: { readyCredit: credit },
+          });
+          await emitReady(
+            tx,
+            ready.map((r) => r.orderLineId),
+          );
+        });
+      },
+
+      /** Alle forudbestillinger er dækket af varer (skift til lagermode). */
+      async markAllReady(variantId: string) {
+        await client.$transaction(async (tx) => {
+          const rows = await tx.allocation.findMany({
+            where: {
+              shop,
+              variantId,
+              status: "ACTIVE",
+              readyAt: null,
+              delivery: { status: "OPEN" },
+            },
+            select: { id: true, orderLineId: true },
+          });
+          await tx.allocation.updateMany({
+            where: { shop, id: { in: rows.map((r) => r.id) } },
+            data: { readyAt: new Date() },
+          });
+          await tx.variantPlan.updateMany({
+            where: { shop, variantId },
+            data: { readyCredit: 0 },
+          });
+          await emitReady(
+            tx,
+            rows.map((r) => r.orderLineId),
+          );
         });
       },
 
@@ -490,10 +638,19 @@ export function forShop(shop: string, client: PrismaClient = db) {
               orderLineId: { notIn: [...handledLines] },
             },
           });
+          const orphanLines = await lineDates(tx, {
+            lineIds: [...new Set(orphans.map((r) => r.orderLineId))],
+          });
           for (const row of orphans) {
             await cancelRow(tx, row.id);
             variantIds.add(row.variantId);
             changed = true;
+          }
+          for (const [lineId, line] of orphanLines) {
+            await recordEvent(tx, line, "preorder.cancelled", {
+              dedupeKey: `cancelled:${lineId}`,
+              deliveryDate: line.date,
+            });
           }
 
           return { variantIds: [...variantIds], changed };
@@ -692,6 +849,44 @@ export function forShop(shop: string, client: PrismaClient = db) {
     });
     if (sameAllocation(target, current)) return false;
 
+    const activeBefore = rows.filter((r) => r.status === "ACTIVE");
+    const activeAfter = target.filter((b) => b.deliveryId != null);
+    const sum = (xs: { quantity: number }[]) =>
+      xs.reduce((n, x) => n + x.quantity, 0);
+    const latest = (dates: (string | null)[]) =>
+      dates
+        .filter((d): d is string => d != null)
+        .sort()
+        .pop() ?? null;
+    const event = {
+      orderId: order.id,
+      orderName: order.name,
+      orderLineId,
+      variantId,
+    };
+    if (activeBefore.length === 0 && activeAfter.length > 0) {
+      // Første gang linjen får plads i en leverance.
+      await recordEvent(
+        tx,
+        { ...event, quantity: sum(activeAfter) },
+        "preorder.created",
+        {
+          dedupeKey: `created:${orderLineId}`,
+          deliveryDate: latest(activeAfter.map((b) => b.promisedDate)),
+        },
+      );
+    } else if (activeBefore.length > 0 && desired === 0) {
+      await recordEvent(
+        tx,
+        { ...event, quantity: sum(activeBefore) },
+        "preorder.cancelled",
+        {
+          dedupeKey: `cancelled:${orderLineId}`,
+          deliveryDate: latest(activeBefore.map((r) => r.promisedDate)),
+        },
+      );
+    }
+
     // Rækker, hvis antal ikke passer, annulleres; nye oprettes. Ingen rækker
     // slettes, og ingen rækkers antal ændres.
     for (const row of rows) {
@@ -701,6 +896,12 @@ export function forShop(shop: string, client: PrismaClient = db) {
     for (const bucket of target) {
       const existing = rows.find((row) => keyOf(row) === bucket.deliveryId);
       if (existing?.quantity === bucket.quantity) continue;
+      // Var varerne allerede kommet hjem til en større række i samme
+      // leverance, er den mindre række også klar.
+      const readyAt =
+        existing?.readyAt && existing.quantity >= bucket.quantity
+          ? existing.readyAt
+          : null;
       await tx.allocation.create({
         data: {
           shop,
@@ -714,10 +915,114 @@ export function forShop(shop: string, client: PrismaClient = db) {
           status: bucket.deliveryId ? "ACTIVE" : "UNRESOLVED",
           promisedDate: bucket.promisedDate,
           soldWithoutPlan,
+          readyAt,
         },
       });
     }
     return true;
+  }
+
+  type LineDate = {
+    orderId: string;
+    orderName: string;
+    orderLineId: string;
+    variantId: string;
+    quantity: number;
+    /** Den seneste leverancedato for linjens aktive tildelinger. */
+    date: string;
+    allReady: boolean;
+  };
+
+  /** Linjers aktive tildelinger, samlet pr. linje, med leverancens dato nu. */
+  async function lineDates(
+    tx: Tx,
+    by: { deliveryId?: string; lineIds?: string[] },
+  ): Promise<Map<string, LineDate>> {
+    const lineIds =
+      by.lineIds ??
+      (
+        await tx.allocation.findMany({
+          where: { shop, deliveryId: by.deliveryId, status: "ACTIVE" },
+          select: { orderLineId: true },
+          distinct: ["orderLineId"],
+        })
+      ).map((r) => r.orderLineId);
+    if (lineIds.length === 0) return new Map();
+    const rows = await tx.allocation.findMany({
+      where: { shop, orderLineId: { in: lineIds }, status: "ACTIVE" },
+      include: { delivery: { select: { date: true } } },
+    });
+    const lines = new Map<string, LineDate>();
+    for (const row of rows) {
+      const date = row.delivery?.date ?? row.promisedDate ?? "";
+      const line = lines.get(row.orderLineId) ?? {
+        orderId: row.orderId,
+        orderName: row.orderName,
+        orderLineId: row.orderLineId,
+        variantId: row.variantId,
+        quantity: 0,
+        date,
+        allReady: true,
+      };
+      line.quantity += row.quantity;
+      if (date > line.date) line.date = date;
+      line.allReady &&= row.readyAt != null;
+      lines.set(row.orderLineId, line);
+    }
+    return lines;
+  }
+
+  /** «Klar til afsendelse» for linjer, hvor alle aktive tildelinger er klar. */
+  async function emitReady(tx: Tx, lineIds: string[]) {
+    const lines = await lineDates(tx, { lineIds: [...new Set(lineIds)] });
+    for (const [lineId, line] of lines) {
+      if (!line.allReady) continue;
+      await recordEvent(tx, line, "preorder.ready", {
+        dedupeKey: `ready:${lineId}`,
+        deliveryDate: line.date,
+      });
+    }
+  }
+
+  /**
+   * Lægger en hændelse i udbakken i samme transaktion som ændringen.
+   * dedupeKey gør det idempotent: samme ændring giver kun én hændelse.
+   * Hændelsen bygges og sendes bagefter af app/events/outbox.server.ts.
+   */
+  async function recordEvent(
+    tx: Tx,
+    line: {
+      orderId: string;
+      orderName: string;
+      orderLineId: string;
+      variantId: string;
+      quantity: number;
+    },
+    type: EventType,
+    extra: {
+      dedupeKey: string;
+      deliveryDate: string | null;
+      previousDate?: string | null;
+    },
+  ) {
+    await tx.outboxEvent.createMany({
+      data: [
+        {
+          id: randomUUID(),
+          shop,
+          type,
+          dedupeKey: extra.dedupeKey,
+          orderId: line.orderId,
+          orderName: line.orderName,
+          orderLineId: line.orderLineId,
+          variantId: line.variantId,
+          quantity: line.quantity,
+          deliveryDate: extra.deliveryDate,
+          previousDate: extra.previousDate ?? null,
+        },
+      ],
+      skipDuplicates: true,
+    });
   }
 }
 

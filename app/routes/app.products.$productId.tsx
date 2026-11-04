@@ -20,6 +20,7 @@ import {
 } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
 import { shopifySync } from "../sync/index.server";
+import { scheduleQueue } from "../orders/scheduler.server";
 import {
   addDays,
   todayInTimeZone,
@@ -163,6 +164,8 @@ export const action = async ({
     message: string,
   ): Promise<ActionResult> {
     const result = await sync.sync(variantId);
+    // Hændelser, ændringen har givet (fx «forsinket»), sendes med det samme.
+    scheduleQueue(session.shop);
     if (result.ok) return { ok: true, message };
     // Ændringen er gemt i appen; kun Shopify mangler. Fejlen står fast ved
     // varianten, indtil en synkronisering lykkes.

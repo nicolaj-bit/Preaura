@@ -520,6 +520,125 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       };
     },
 
+    async readOrderDetails(orderId) {
+      type Line = {
+        id: string;
+        sku: string | null;
+        title: string;
+        variantTitle: string | null;
+        product: { id: string; title: string } | null;
+      };
+      type Data = {
+        order: {
+          name: string;
+          email?: string | null;
+          customer?: {
+            firstName: string | null;
+            lastName: string | null;
+          } | null;
+          lineItems: { nodes: Line[] };
+        } | null;
+      };
+      const lineFields = `lineItems(first: 250) {
+                nodes {
+                  id
+                  sku
+                  title
+                  variantTitle
+                  product {
+                    id
+                    title
+                  }
+                }
+              }`;
+      // Kundens navn og e-mail er beskyttede kundedata. Har appen ikke fået
+      // adgang til dem, afviser Shopify hele forespørgslen — så hentes ordren
+      // igen uden, og hændelsen sendes uden kunde.
+      const response = await graphql(
+        `#graphql
+          query PreauraOrderDetails($id: ID!) {
+            order(id: $id) {
+              name
+              email
+              customer {
+                firstName
+                lastName
+              }
+              ${lineFields}
+            }
+          }`,
+        { variables: { id: orderId } },
+      );
+      const json = (await response.json()) as {
+        data?: Data;
+        errors?: { message: string; extensions?: { code?: string } }[];
+      };
+      let data = json.data;
+      let withCustomer = true;
+      if (json.errors?.length) {
+        const denied = json.errors.every(
+          (e) =>
+            e.extensions?.code === "ACCESS_DENIED" ||
+            /access|protected customer data/i.test(e.message),
+        );
+        if (!denied) {
+          throw new Error(
+            `Shopify afviste forespørgslen: ${json.errors.map((e) => e.message).join("; ")}`,
+          );
+        }
+        withCustomer = false;
+        data = await run<Data>(
+          graphql,
+          `#graphql
+            query PreauraOrderDetailsWithoutCustomer($id: ID!) {
+              order(id: $id) {
+                name
+                ${lineFields}
+              }
+            }`,
+          { id: orderId },
+        );
+      }
+      const order = data?.order;
+      if (!order) return null;
+      return {
+        name: order.name,
+        customer: withCustomer
+          ? {
+              email: order.email ?? null,
+              firstName: order.customer?.firstName ?? null,
+              lastName: order.customer?.lastName ?? null,
+            }
+          : null,
+        lines: order.lineItems.nodes.map((line) => ({
+          id: line.id,
+          productId: line.product?.id ?? null,
+          productTitle: line.product?.title ?? line.title,
+          variantTitle: line.variantTitle,
+          sku: line.sku,
+        })),
+      };
+    },
+
+    async flowTriggerReceive(handle, payload) {
+      const data = await run<{
+        flowTriggerReceive: { userErrors: UserErrors };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraFlowTrigger($handle: String, $payload: JSON) {
+            flowTriggerReceive(handle: $handle, payload: $payload) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        { handle, payload },
+      );
+      check("Shopify Flow", data.flowTriggerReceive.userErrors);
+    },
+
     async setOrderMetafields(orderId, fields) {
       const data = await run<{
         metafieldsSet: { userErrors: UserErrors };

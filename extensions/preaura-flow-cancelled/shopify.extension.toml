@@ -1,0 +1,57 @@
+# Shopify Flow-trigger. Felterne skal svare præcis til toFlowPayload() i
+# app/events/channels.ts. Handle kan ikke ændres, når den er udrullet.
+[[extensions]]
+name = "Forudbestilling annulleret"
+type = "flow_trigger"
+handle = "preaura-preorder-cancelled"
+description = "Når en forudbestilling annulleres, refunderes eller fjernes fra ordren."
+
+[settings]
+
+  [[settings.fields]]
+  type = "order_reference"
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Event id"
+  description = "Hændelsens entydige id. Det samme ved genforsøg."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Order name"
+  description = "Ordrenummeret, fx #1042."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Customer email"
+  description = "Kundens e-mail. Tom, hvis appen ikke har adgang til den."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Customer name"
+  description = "Kundens navn. Tomt, hvis appen ikke har adgang til det."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Product title"
+  description = "Produktets navn."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Variant title"
+  description = "Variantens navn."
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Quantity"
+  description = "Antal forudbestilte stk. på linjen."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Delivery date"
+  description = "Leverancens dato (ÅÅÅÅ-MM-DD)."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Previous delivery date"
+  description = "Den tidligere dato, hvis datoen er ændret. Ellers tom."

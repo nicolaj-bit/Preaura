@@ -22,6 +22,13 @@ export function shopifySync(graphql: AdminGraphql, shop: string) {
       return (await gateway.readOrder(orderId))?.snapshot ?? null;
     },
 
+    /** Ordrens navn, kunde og produktnavne — til udgående hændelser. */
+    readOrderDetails: (orderId: string) => gateway.readOrderDetails(orderId),
+
+    /** Starter butikkens Flow-workflows for en af appens triggere. */
+    flowTriggerReceive: (handle: string, payload: Record<string, unknown>) =>
+      gateway.flowTriggerReceive(handle, payload),
+
     /** Læser variantens lagerantal i Shopify lige nu. Skriver intet. */
     async readAvailable(variantId: string, locationId: string | null) {
       const state = await gateway.read({

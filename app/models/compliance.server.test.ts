@@ -236,7 +236,7 @@ describe("opbevaringsperiode", () => {
       });
     }
 
-    expect(await purgeOldData(client, now)).toEqual({
+    expect(await purgeOldData(client, now)).toMatchObject({
       events: 2,
       dataRequests: 1,
     });

@@ -304,6 +304,42 @@ npm run lint
 De samme tjek kører automatisk på GitHub ved hvert push
 (`.github/workflows/checks.yml`).
 
+## Udgående hændelser (Flow, webhook, Klaviyo)
+
+Fire hændelser: `preorder.created`, `preorder.delayed`, `preorder.ready` og
+`preorder.cancelled`. Indholdet bestemmes ét sted, `app/events/build.ts`;
+modtagerne i `app/events/channels.ts` omformaterer kun.
+
+- **Hvor de opstår** (`app/models/preorder.server.ts`), i samme
+  transaktion som ændringen og med en `dedupeKey`, så samme ændring kun
+  giver én hændelse:
+  - *oprettet*: en ordrelinje får for første gang plads i en leverance.
+  - *annulleret*: linjen annulleres, refunderes helt eller fjernes.
+  - *forsinket*: en leverances dato rykkes senere (linjer, der ikke er klar).
+  - *klar til afsendelse*: varerne er kommet. Sker af sig selv, når der
+    lægges lager på i forudbestillingsmode (fordeles i bestillingsrækkefølge,
+    én hel tildeling ad gangen; resten gemmes i `readyCredit`), når
+    varianten skifter til lagermode, eller med knappen på leverancens side.
+- **Afsenderen** (`app/events/outbox.server.ts`) kører efter køen og hvert
+  minut. Den bygger hver hændelse én gang med kundens navn og e-mail fra
+  Shopify, gemmer den krypteret og sender til hver modtager for sig. Fejl
+  prøves igen 10 gange med voksende ventetid (1, 2, 4 … minutter, omkring 8
+  timer i alt) og står derefter under **Hændelser → Fejlede leveringer**.
+- **Shopify Flow:** fire triggere i `extensions/preaura-flow-*`. Felterne
+  skal svare til `toFlowPayload()`.
+- **Webhook:** JSON med POST, signeret med HMAC-SHA256 (base64) i
+  `X-Preaura-Hmac-Sha256`. Vejledning til Zapier og Make: `docs/webhook.md`.
+- **Klaviyo:** Create Event med `unique_id` = hændelsens id, så et genforsøg
+  ikke giver en dublet. API-versionen står i `KLAVIYO_REVISION`.
+- **Hemmeligheder:** API-nøgle, webhook-adresse og signaturnøgle krypteres
+  med `PREAURA_ENCRYPTION_KEY` (AES-256-GCM). Admin viser kun de sidste fire
+  tegn (signaturnøglen vises, så modtageren kan verificere).
+- **Ansvar:** webhook og Klaviyo kan først slås til, når butikken har
+  bekræftet at have grundlag for at sende kundeoplysninger videre.
+- **Kundens navn og e-mail** er beskyttede kundedata (niveau 2). Uden
+  Shopifys godkendelse sendes hændelserne uden kunde, og Klaviyo fejler med
+  en forklaring.
+
 ## Databeskyttelse (GDPR)
 
 `app/models/compliance.server.ts`, `app/lib/webhookPayload.ts`.
@@ -313,13 +349,15 @@ De samme tjek kører automatisk på GitHub ved hvert push
   bestillingstidspunkt; resten læses frisk fra Shopify ved behandlingen.
   Migrationen `compliance` skar de allerede gemte hændelser ned på samme
   måde.
-- **Hvad PREAURA gemmer om en kunde:** intet, der identificerer kunden.
-  Tildelingerne har ordrens id og nummer, antal og den lovede dato.
+- **Hvad PREAURA gemmer om en kunde:** tildelingerne har ordrens id og
+  nummer, antal og den lovede dato. Kun udgående hændelser indeholder
+  kundens navn og e-mail — krypteret og slettet efter 30 dage.
 - **`customers/data_request`:** anmodningen vises under Ordrebehandling med
   alt, hvad appen har om kundens ordrer, og et banner på forsiden.
   Webshopejeren sender det til kunden og markerer anmodningen som besvaret.
-- **`customers/redact`:** kundens dataanmodninger og de behandlede
-  kø-hændelser for kundens ordrer slettes. Tildelingerne bliver stående: de
+- **`customers/redact`:** kundens dataanmodninger, de behandlede
+  kø-hændelser for kundens ordrer og navn og e-mail i udgående hændelser
+  slettes. Tildelingerne bliver stående: de
   indeholder ingen persondata og er butikkens regnskab over pladserne —
   uden dem ville pladserne blive solgt igen.
 - **`shop/redact`** (48 timer efter afinstallation): alt om butikken slettes,

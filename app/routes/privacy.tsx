@@ -90,9 +90,10 @@ export default function Privacy() {
       <h2>2. Kort fortalt</h2>
       <ul>
         <li>
-          PREAURA gemmer <strong>ingen</strong> navne, e-mailadresser,
-          telefonnumre, adresser eller betalingsoplysninger om webshoppens
-          kunder.
+          PREAURA gemmer <strong>ingen</strong> telefonnumre, adresser eller
+          betalingsoplysninger om webshoppens kunder. Kundens navn og e-mail
+          bruges kun, når webshoppen selv har slået udsendelse af hændelser til
+          (fx til Klaviyo), og gemmes da krypteret i højst 30 dage.
         </li>
         <li>
           Om en ordre gemmes kun det, der skal til for at holde styr på
@@ -151,6 +152,11 @@ export default function Privacy() {
             how="Slettes 30 dage efter behandling"
           />
           <Row
+            what="Hændelser om forudbestillingen (oprettet, forsinket, klar til afsendelse, annulleret): kundens navn og e-mail, ordrenummer, produkt, variant, antal og leveringsdatoer"
+            why="Sende hændelsen til de modtagere, webshoppen selv har slået til: Shopify Flow, en webhook-adresse eller Klaviyo — fx så webshoppen kan sende kunden en mail, når varen er klar"
+            how="Kundens navn og e-mail gemmes krypteret og slettes efter 30 dage eller når kunden skal slettes. Logbogen over, hvad der blev sendt hvornår (uden kundeoplysninger), slettes efter 90 dage"
+          />
+          <Row
             what="En kundes anmodning om indsigt: Shopifys id på kunden og på de ordrer, anmodningen gælder"
             why="Vise webshoppen, hvad appen har om kundens ordrer, så webshoppen kan svare kunden"
             how="Slettes 30 dage efter, webshoppen har markeret den som besvaret, eller når kunden skal slettes"
@@ -159,9 +165,9 @@ export default function Privacy() {
       </table>
       <p>
         Når Shopify sender en ordre til appen, indeholder beskeden også kundens
-        navn, e-mail og adresse. De oplysninger smides væk med det samme og
-        gemmes aldrig. Appen læser selv ordrens linjer fra Shopify uden
-        kundeoplysninger.
+        navn, e-mail og adresse. De oplysninger smides væk med det samme.
+        Kundens navn og e-mail hentes kun fra Shopify, når en hændelse skal
+        sendes til en modtager, webshoppen har slået til.
       </p>
       <p>
         Appen skriver den lovede leveringsdato og et tag («Forudbestilling») på
@@ -188,6 +194,14 @@ export default function Privacy() {
           <strong>Render Services, Inc.</strong> — hosting af appen og databasen
           på servere i Frankfurt, Tyskland. Render er underdatabehandler.
         </li>
+        <li>
+          <strong>Modtagere, webshoppen selv vælger</strong> — slår webshoppen
+          udsendelse af hændelser til, sender PREAURA hændelsen til den
+          webhook-adresse (fx Zapier eller Make) eller den Klaviyo-konto,
+          webshoppen har angivet. Det sker kun på webshoppens instruks.
+          Webshoppen er ansvarlig for sit grundlag for at sende kundens
+          oplysninger dertil og for sin egen aftale med modtageren.
+        </li>
       </ul>
 
       <h2>6. Sikkerhed</h2>
@@ -199,13 +213,24 @@ export default function Privacy() {
           behandles.
         </li>
         <li>Hver butik kan kun se sine egne data.</li>
+        <li>
+          API-nøgler, webhook-adresser og kundens navn og e-mail i hændelser
+          gemmes krypteret og vises aldrig igen i appen — kun de sidste fire
+          tegn.
+        </li>
+        <li>
+          Hver webhook er signeret, så modtageren kan kontrollere, at den kommer
+          fra PREAURA.
+        </li>
       </ul>
 
       <h2>7. Sletning</h2>
       <ul>
         <li>
           Når en kunde beder webshoppen om at blive slettet, sletter appen
-          kundens anmodninger og beskeder om kundens ordrer.
+          kundens anmodninger, beskeder om kundens ordrer og kundens navn og
+          e-mail i hændelser. Hvad der allerede er sendt til webshoppens
+          modtagere, skal webshoppen selv slette hos dem.
         </li>
         <li>
           Afinstalleres appen, sletter appen alle butikkens data 48 timer

@@ -83,7 +83,41 @@ export function createFakeShopify() {
 
   const orders = new Map<string, ShopifyOrderState>();
 
+  const flowTriggers: { handle: string; payload: Record<string, unknown> }[] =
+    [];
+  /** Kundens navn og e-mail pr. ordre. null: appen har ikke adgang. */
+  const customers = new Map<
+    string,
+    {
+      email: string | null;
+      firstName: string | null;
+      lastName: string | null;
+    } | null
+  >();
+
   const gateway: ShopifyGateway = {
+    async readOrderDetails(orderId) {
+      const order = orders.get(orderId);
+      if (!order) return null;
+      const customer = customers.has(orderId)
+        ? customers.get(orderId)!
+        : { email: "kunde@example.com", firstName: "Anna", lastName: "Jensen" };
+      return {
+        name: order.snapshot.name,
+        customer: customer ? { ...customer } : null,
+        lines: order.snapshot.lines.map((line) => ({
+          id: line.id,
+          productId: "gid://shopify/Product/1",
+          productTitle: "Oxygen",
+          variantTitle: "158 cm",
+          sku: "OXY-158",
+        })),
+      };
+    },
+    async flowTriggerReceive(handle, payload) {
+      write("flowTriggerReceive", [handle, payload]);
+      flowTriggers.push({ handle, payload: structuredClone(payload) });
+    },
     async readOrder(orderId) {
       const order = orders.get(orderId);
       return order ? structuredClone(order) : null;
@@ -209,6 +243,8 @@ export function createFakeShopify() {
     gateway,
     writes,
     orders,
+    flowTriggers,
+    customers,
     products,
     /** Opretter eller erstatter en ordre i den simulerede Shopify. */
     putOrder(snapshot: ShopifyOrderState["snapshot"]) {

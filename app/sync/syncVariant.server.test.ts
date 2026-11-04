@@ -806,8 +806,13 @@ describe("lagermode og forudbestillingsmode", () => {
     await sync();
     expect((await modeOf()).mode).toBe("PREORDER");
 
+    // Antal, leverance og status er urørt. Det eneste nye er, at
+    // forudbestillingerne er markeret klar til afsendelse, da varerne kom.
     const after = await client.allocation.findMany({ orderBy: { id: "asc" } });
-    expect(after).toEqual(before);
+    const strip = (rows: typeof before) =>
+      rows.map((row) => ({ ...row, readyAt: null, updatedAt: null }));
+    expect(strip(after)).toEqual(strip(before));
+    expect(after.every((row) => row.readyAt != null)).toBe(true);
   });
 
   it("tvungen forudbestilling: med lager — og lageret gives tilbage, når tvangen slås fra", async () => {
