@@ -9,9 +9,9 @@ import type { MetaFunction } from "react-router";
 
 const COMPANY = {
   name: "LALATOTO of Denmark ApS",
-  cvr: "[CVR-nummer]",
-  address: "[Adresse]",
-  email: "[Kontakt-e-mail]",
+  cvr: "45149218",
+  address: "Kulbyvej 16, 4270 Høng",
+  email: "nicolaj@lalatoto.dk",
 };
 
 const UPDATED = "4. november 2026";
@@ -77,7 +77,7 @@ export default function Privacy() {
         <br />
         {COMPANY.address}
         <br />
-        E-mail: {COMPANY.email}
+        E-mail: <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
       </p>
       <p>
         Over for <strong>webshoppens kunder</strong> er webshoppen
@@ -224,7 +224,8 @@ export default function Privacy() {
         dine ordrer.
       </p>
       <p>
-        <strong>Er du webshop,</strong> kan du skrive til {COMPANY.email}.
+        <strong>Er du webshop,</strong> kan du skrive til{" "}
+        <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>.
       </p>
       <p>
         Du kan klage til Datatilsynet, Carl Jacobsens Vej 35, 2500 Valby,{" "}
