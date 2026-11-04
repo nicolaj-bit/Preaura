@@ -146,8 +146,18 @@ export function createFakeShopify() {
       return addPlans(groups.get(groupId)!, plans);
     },
     async deletePlans(groupId, planIds) {
-      write("deletePlans", [groupId, planIds]);
       const group = groups.get(groupId)!;
+      // Som i Shopify: en gruppe må aldrig stå uden planer (fundet i
+      // testbutikken).
+      if (group.plans.every((plan) => planIds.includes(plan.id))) {
+        throw new ShopifyUserError("Udfasning af selling plan", [
+          {
+            message:
+              "Selling plans to delete can't result in a selling plan group with no selling plan.",
+          },
+        ]);
+      }
+      write("deletePlans", [groupId, planIds]);
       group.plans = group.plans.filter((plan) => !planIds.includes(plan.id));
     },
     async deleteGroup(groupId) {
