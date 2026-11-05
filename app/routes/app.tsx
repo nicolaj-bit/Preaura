@@ -9,6 +9,7 @@ import {
   clearEntitlementCache,
   pricingPageUrl,
 } from "../billing/entitlements.server";
+import { PartnerApiError } from "../billing/partnerApi.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session, redirect } = await authenticate.admin(request);
@@ -22,20 +23,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Intet aktivt abonnement: til Shopifys prisvalgsside. target "_top" er
   // nødvendig — siden ligger uden for app-rammen (iframen).
-  const access = await accessFor(admin, session.shop);
+  // eslint-disable-next-line no-undef
+  const apiKey = process.env.SHOPIFY_API_KEY || "";
+  let access;
+  try {
+    access = await accessFor(admin, session.shop);
+  } catch (error) {
+    // Abonnementet kunne ikke tjekkes. Butikken sendes IKKE til
+    // prisvalgssiden; i stedet vises årsagen (uden hemmeligheder).
+    console.error(
+      `Abonnementet for ${session.shop} kunne ikke tjekkes:`,
+      error,
+    );
+    return {
+      apiKey,
+      plan: null,
+      billingError:
+        error instanceof PartnerApiError
+          ? error.message
+          : "Abonnementet kunne ikke tjekkes. Prøv igen om lidt.",
+    };
+  }
   if (access.status === "none") {
     throw redirect(pricingPageUrl(session.shop), { target: "_top" });
   }
 
-  return {
-    // eslint-disable-next-line no-undef
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    plan: access.entitlement.plan,
-  };
+  return { apiKey, plan: access.entitlement.plan, billingError: null };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, billingError } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider apiKey={apiKey}>
@@ -45,7 +62,15 @@ export default function App() {
         <s-link href="/app/events">Hændelser</s-link>
         <s-link href="/app/settings">Indstillinger</s-link>
       </s-app-nav>
-      <Outlet />
+      {billingError ? (
+        <s-page heading="PREAURA">
+          <s-banner tone="critical" heading="Abonnementet kunne ikke tjekkes">
+            <s-paragraph>{billingError}</s-paragraph>
+          </s-banner>
+        </s-page>
+      ) : (
+        <Outlet />
+      )}
     </AppProvider>
   );
 }

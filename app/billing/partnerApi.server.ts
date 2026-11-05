@@ -17,9 +17,31 @@ export type ActiveSubscription = {
   trialEndsAt: string | null;
 };
 
+/**
+ * Fjerner alt, der ligner en nøgle (fx Partner API-nøgler «prtapi_…» og
+ * Shopify-adgangsnøgler «shpat_…»), så en fejlbesked aldrig kan lække en
+ * hemmelighed i loggen eller på skærmen — heller ikke når Shopify selv
+ * gentager den i sit svar.
+ */
+export function redactSecrets(
+  text: string,
+  secrets: (string | undefined)[] = [],
+) {
+  let result = text.replace(
+    /\b(prtapi|shpat|shpca|shpss|shppa|pk)_[A-Za-z0-9]+/g,
+    "[skjult nøgle]",
+  );
+  for (const secret of secrets) {
+    if (secret && secret.length >= 8) {
+      result = result.split(secret).join("[skjult nøgle]");
+    }
+  }
+  return result;
+}
+
 export class PartnerApiError extends Error {
   constructor(message: string) {
-    super(message);
+    super(redactSecrets(message));
     this.name = "PartnerApiError";
   }
 }
@@ -91,7 +113,10 @@ export async function fetchActiveSubscription(
   } | null;
   if (!response.ok || !json || json.errors || !json.data) {
     throw new PartnerApiError(
-      `Partner API svarede ${response.status}: ${JSON.stringify(json?.errors ?? null)}`,
+      redactSecrets(
+        `Partner API svarede ${response.status}: ${JSON.stringify(json?.errors ?? null)}`,
+        [token, orgId, appGid],
+      ),
     );
   }
   const subscription = json.data.activeSubscription;
