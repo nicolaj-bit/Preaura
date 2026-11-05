@@ -183,6 +183,11 @@ export default function Privacy() {
         dens instruks som databehandler (GDPR art. 28).
       </p>
 
+      <p>
+        Vilkårene for PREAURAs behandling på webshoppens vegne står i{" "}
+        <a href="/dpa">databehandleraftalen</a>.
+      </p>
+
       <h2>5. Hvem oplysningerne deles med</h2>
       <p>Oplysninger sælges eller deles aldrig til markedsføring.</p>
       <ul>
