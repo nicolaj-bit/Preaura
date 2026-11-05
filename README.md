@@ -316,10 +316,11 @@ modtagerne i `app/events/channels.ts` omformaterer kun.
   - *oprettet*: en ordrelinje får for første gang plads i en leverance.
   - *annulleret*: linjen annulleres, refunderes helt eller fjernes.
   - *forsinket*: en leverances dato rykkes senere (linjer, der ikke er klar).
-  - *klar til afsendelse*: varerne er kommet. Sker af sig selv, når der
-    lægges lager på i forudbestillingsmode (fordeles i bestillingsrækkefølge,
-    én hel tildeling ad gangen; resten gemmes i `readyCredit`), når
-    varianten skifter til lagermode, eller med knappen på leverancens side.
+  - *klar til afsendelse*: varerne er kommet. Sker af sig selv kun, når de
+    modtagne varer dækker alle ventende forudbestillinger (og varianten
+    skifter til lagermode). Ellers med knappen «Varerne er kommet» på
+    leverancens side. En mindre stigning i lageret giver aldrig hændelsen —
+    den kan skyldes en annullering, en refundering eller Shopify selv.
 - **Afsenderen** (`app/events/outbox.server.ts`) kører efter køen og hvert
   minut. Den bygger hver hændelse én gang med kundens navn og e-mail fra
   Shopify, gemmer den krypteret og sender til hver modtager for sig. Fejl

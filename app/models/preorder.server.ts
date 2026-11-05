@@ -449,74 +449,20 @@ export function forShop(shop: string, client: PrismaClient = db) {
 
       /**
        * Forudbestilte stk., der stadig venter på varer: aktive tildelinger i
-       * åbne leverancer, som ikke er klar, minus modtagne varer, der endnu
-       * ikke er sat på en bestemt forudbestilling.
+       * åbne leverancer, som ikke er markeret klar til afsendelse.
        */
       async owedUnits(variantId: string) {
-        const [rows, plan] = await Promise.all([
-          client.allocation.aggregate({
-            where: {
-              shop,
-              variantId,
-              status: "ACTIVE",
-              readyAt: null,
-              delivery: { status: "OPEN" },
-            },
-            _sum: { quantity: true },
-          }),
-          client.variantPlan.findFirst({ where: { shop, variantId } }),
-        ]);
-        return Math.max(
-          0,
-          (rows._sum.quantity ?? 0) - (plan?.readyCredit ?? 0),
-        );
-      },
-
-      /**
-       * Varer kommet hjem til forudbestillingerne. De fordeles i
-       * bestillingsrækkefølge, én hel tildeling ad gangen; resten gemmes,
-       * til der kommer nok til den næste.
-       */
-      async receiveForPreorders(variantId: string, quantity: number) {
-        if (quantity <= 0) return;
-        await client.$transaction(async (tx) => {
-          const plan = await tx.variantPlan.findFirst({
-            where: { shop, variantId },
-          });
-          let credit = (plan?.readyCredit ?? 0) + quantity;
-          const rows = await tx.allocation.findMany({
-            where: {
-              shop,
-              variantId,
-              status: "ACTIVE",
-              readyAt: null,
-              delivery: { status: "OPEN" },
-            },
-            include: { delivery: { select: { position: true } } },
-            orderBy: [{ orderCreatedAt: "asc" }, { allocatedAt: "asc" }],
-          });
-          rows.sort(
-            (a, b) => (a.delivery?.position ?? 0) - (b.delivery?.position ?? 0),
-          );
-          const ready: typeof rows = [];
-          for (const row of rows) {
-            if (row.quantity > credit) break;
-            credit -= row.quantity;
-            ready.push(row);
-          }
-          await tx.allocation.updateMany({
-            where: { shop, id: { in: ready.map((r) => r.id) } },
-            data: { readyAt: new Date() },
-          });
-          await tx.variantPlan.updateMany({
-            where: { shop, variantId },
-            data: { readyCredit: credit },
-          });
-          await emitReady(
-            tx,
-            ready.map((r) => r.orderLineId),
-          );
+        const rows = await client.allocation.aggregate({
+          where: {
+            shop,
+            variantId,
+            status: "ACTIVE",
+            readyAt: null,
+            delivery: { status: "OPEN" },
+          },
+          _sum: { quantity: true },
         });
+        return rows._sum.quantity ?? 0;
       },
 
       /** Alle forudbestillinger er dækket af varer (skift til lagermode). */
@@ -535,10 +481,6 @@ export function forShop(shop: string, client: PrismaClient = db) {
           await tx.allocation.updateMany({
             where: { shop, id: { in: rows.map((r) => r.id) } },
             data: { readyAt: new Date() },
-          });
-          await tx.variantPlan.updateMany({
-            where: { shop, variantId },
-            data: { readyCredit: 0 },
           });
           await emitReady(
             tx,
