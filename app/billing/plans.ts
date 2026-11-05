@@ -27,6 +27,8 @@ export type Limit = (typeof LIMITS)[number];
 export type PlanKey = string;
 
 export type PlanDefinition = {
+  /** Navnet, butikken ser i appen, fx «Basis». */
+  label: string;
   features: Feature[];
   limits: Record<Limit, number | null>;
 };
@@ -61,7 +63,11 @@ export function parsePlansConfig(input: unknown): PlansConfig {
   }
   const plans: Record<PlanKey, PlanDefinition> = {};
   for (const [key, value] of Object.entries(plansRaw)) {
-    const plan = value as { features?: unknown; limits?: unknown };
+    const plan = value as {
+      label?: unknown;
+      features?: unknown;
+      limits?: unknown;
+    };
     if (!Array.isArray(plan?.features)) {
       throw new PlansConfigError(`planen «${key}» mangler «features».`);
     }
@@ -83,7 +89,14 @@ export function parsePlansConfig(input: unknown): PlansConfig {
       }
       limits[limit] = (v as number | null | undefined) ?? null;
     }
-    plans[key] = { features: plan.features as Feature[], limits };
+    plans[key] = {
+      label:
+        typeof plan.label === "string" && plan.label
+          ? plan.label
+          : key.charAt(0).toUpperCase() + key.slice(1),
+      features: plan.features as Feature[],
+      limits,
+    };
   }
   const handles = (raw.shopifyHandles ?? {}) as Record<string, unknown>;
   const shopifyHandles: Record<string, PlanKey> = {};

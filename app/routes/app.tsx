@@ -61,6 +61,7 @@ export default function App() {
         <s-link href="/app/queue">Ordrebehandling</s-link>
         <s-link href="/app/events">Hændelser</s-link>
         <s-link href="/app/settings">Indstillinger</s-link>
+        <s-link href="/app/subscription">Abonnement</s-link>
       </s-app-nav>
       {billingError ? (
         <s-page heading="PREAURA">
