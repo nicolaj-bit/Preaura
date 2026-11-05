@@ -12,6 +12,7 @@ import { forShop } from "../models/preorder.server";
 import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
 import { queueFor } from "../models/queue.server";
 import { complianceFor } from "../models/compliance.server";
+import { dashboardStats, progressPct } from "../lib/dashboard";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
 // produktvælger. Et produkt står som slået til, hvis mindst én variant er.
@@ -27,16 +28,84 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const byId = new Map(products.map((product) => [product.id, product]));
 
-  const [counts, unresolved, withoutPlan7, dataRequests] = await Promise.all([
-    queueFor(session.shop).countByStatus(),
-    data.orders.unresolved(),
-    data.orders.countWithoutPlanSince(
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+  const [counts, unresolved, withoutPlan7, dataRequests, overview] =
+    await Promise.all([
+      queueFor(session.shop).countByStatus(),
+      data.orders.unresolved(),
+      data.orders.countWithoutPlanSince(
+        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      ),
+      complianceFor(session.shop).countUnansweredDataRequests(),
+      data.dashboard.overview(),
+    ]);
+
+  // Leverancer på forsiden: åbne leverancer på varianter med forudbestilling,
+  // sorteret efter dato.
+  const enabledVariants = overview.plans
+    .filter((plan) => plan.preorderEnabled)
+    .map((plan) => plan.variantId);
+  const allViews = await data.deliveries.listForVariants(
+    overview.plans.map((plan) => plan.variantId),
+  );
+  const enabledSet = new Set(enabledVariants);
+  const views = allViews.filter((view) => enabledSet.has(view.variantId));
+  const variantInfo = new Map(
+    products.flatMap((product) =>
+      product.variants.map((variant) => [
+        variant.id,
+        { product, variantTitle: variant.title },
+      ]),
     ),
-    complianceFor(session.shop).countUnansweredDataRequests(),
-  ]);
+  );
+  const dateFormat = new Intl.DateTimeFormat("da-DK", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  });
+  const formatDate = (date: string) =>
+    dateFormat.format(new Date(`${date}T12:00:00Z`));
+  const deliveries = views
+    .filter((view) => view.state !== "CANCELLED")
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((view) => {
+      const info = variantInfo.get(view.variantId);
+      return {
+        id: view.id,
+        productTitle: info?.product.title ?? "Ukendt produkt",
+        variantTitle:
+          info && info.variantTitle !== "Default Title"
+            ? info.variantTitle
+            : null,
+        imageUrl: info?.product.imageUrl ?? null,
+        date: formatDate(view.date),
+        allocated: view.allocated,
+        quantity: view.quantity,
+        pct: progressPct(view.allocated, view.quantity),
+        state: view.state,
+      };
+    });
+  const next = deliveries.find(
+    (d) => d.state === "ACTIVE" || d.state === "UPCOMING",
+  );
+  const stats = dashboardStats(overview.recent, new Date());
 
   return {
+    stats: {
+      ...stats,
+      waitingUnits: overview.waitingUnits,
+      readyUnits: overview.readyUnits,
+      nextDelivery: next
+        ? { date: next.date, product: next.productTitle }
+        : null,
+    },
+    deliveries: deliveries.slice(0, 10),
+    setup: {
+      hasProducts: summaries.length > 0,
+      hasDelivery: allViews.length > 0,
+      hasEnabled: enabledVariants.length > 0,
+      // Åbner temaeditoren med PREAURA-blokken klar til at blive tilføjet.
+      themeBlockUrl: `shopify://admin/themes/current/editor?template=product&addAppBlockId=${process.env.SHOPIFY_API_KEY}/preorder&target=mainSection`,
+    },
+
     failedEvents: counts.FAILED ?? 0,
     dataRequests,
     withoutPlan7,
@@ -97,6 +166,9 @@ export default function Index() {
     unresolvedOrders,
     withoutPlan7,
     dataRequests,
+    stats,
+    deliveries,
+    setup,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
@@ -185,19 +257,130 @@ export default function Index() {
         </s-banner>
       )}
 
-      {products.length === 0 ? (
-        <s-section>
-          <s-stack gap="base" alignItems="center">
-            <s-heading>Ingen produkter endnu</s-heading>
+      {!(setup.hasProducts && setup.hasDelivery && setup.hasEnabled) && (
+        <s-section heading="Kom i gang">
+          <s-stack gap="base">
             <s-paragraph>
-              Vælg de produkter, der skal kunne forudbestilles. Bagefter slår du
-              forudbestilling til pr. variant og opretter leverancer.
+              Fire trin, så kan dine kunder forudbestille. Det tager et par
+              minutter.
             </s-paragraph>
-            <s-button onClick={selectProducts}>Vælg produkter</s-button>
+            <SetupStep
+              done={setup.hasProducts}
+              title="1. Vælg produkter"
+              text="Vælg de produkter, der skal kunne forudbestilles."
+            >
+              <s-button onClick={selectProducts}>Vælg produkter</s-button>
+            </SetupStep>
+            <SetupStep
+              done={setup.hasDelivery}
+              title="2. Opret en leverance"
+              text="Åbn et produkt, og angiv dato og antal for den næste leverance."
+            />
+            <SetupStep
+              done={setup.hasEnabled}
+              title="3. Slå forudbestilling til"
+              text="Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv, når lageret rammer 0."
+            />
+            <SetupStep
+              done={false}
+              title="4. Vis forudbestillingen på produktsiden"
+              text="Tilføj PREAURA-blokken i dit tema, så kunderne ser datoen."
+            >
+              <s-button href={setup.themeBlockUrl} target="_top">
+                Tilføj blokken
+              </s-button>
+            </SetupStep>
           </s-stack>
         </s-section>
-      ) : (
-        <s-section padding="none">
+      )}
+
+      {setup.hasProducts && (
+        <s-grid
+          gridTemplateColumns="repeat(auto-fit, minmax(180px, 1fr))"
+          gap="base"
+        >
+          <StatCard
+            label="Forudbestillinger (30 dage)"
+            value={String(stats.orders30)}
+            trend={stats.ordersTrendPct}
+          />
+          <StatCard
+            label="Forudbestilte stk. (30 dage)"
+            value={String(stats.units30)}
+          />
+          <StatCard
+            label="Venter på varer"
+            value={`${stats.waitingUnits} stk.`}
+            note={
+              stats.readyUnits > 0
+                ? `${stats.readyUnits} stk. klar til afsendelse`
+                : undefined
+            }
+          />
+          <StatCard
+            label="Næste leverance"
+            value={stats.nextDelivery?.date ?? "Ingen"}
+            note={stats.nextDelivery?.product}
+          />
+        </s-grid>
+      )}
+
+      {deliveries.length > 0 && (
+        <s-section heading="Leverancer" padding="base">
+          <s-table>
+            <s-table-header-row>
+              <s-table-header listSlot="primary">Produkt</s-table-header>
+              <s-table-header>Dato</s-table-header>
+              <s-table-header>Solgt</s-table-header>
+              <s-table-header listSlot="secondary">Status</s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {deliveries.map((d) => (
+                <s-table-row key={d.id}>
+                  <s-table-cell>
+                    <s-stack direction="inline" gap="small" alignItems="center">
+                      <s-thumbnail
+                        src={d.imageUrl ?? undefined}
+                        alt=""
+                        size="small"
+                      />
+                      <s-stack gap="none">
+                        <s-link href={`/app/deliveries/${d.id}`}>
+                          {d.productTitle}
+                        </s-link>
+                        {d.variantTitle && (
+                          <s-text color="subdued">{d.variantTitle}</s-text>
+                        )}
+                      </s-stack>
+                    </s-stack>
+                  </s-table-cell>
+                  <s-table-cell>{d.date}</s-table-cell>
+                  <s-table-cell>
+                    <s-stack direction="inline" gap="small" alignItems="center">
+                      <ProgressBar pct={d.pct} />
+                      <s-text>
+                        {d.allocated} af {d.quantity}
+                      </s-text>
+                    </s-stack>
+                  </s-table-cell>
+                  <s-table-cell>
+                    {d.state === "ACTIVE" ? (
+                      <s-badge tone="success">Aktiv</s-badge>
+                    ) : d.state === "SOLD_OUT" ? (
+                      <s-badge tone="warning">Udsolgt</s-badge>
+                    ) : (
+                      <s-badge>Kommende</s-badge>
+                    )}
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        </s-section>
+      )}
+
+      {products.length > 0 && (
+        <s-section heading="Produkter" padding="base">
           <s-table>
             <s-table-header-row>
               <s-table-header listSlot="primary">Produkt</s-table-header>
@@ -240,6 +423,94 @@ export default function Index() {
         </s-section>
       )}
     </s-page>
+  );
+}
+
+function SetupStep({
+  done,
+  title,
+  text,
+  children,
+}: {
+  done: boolean;
+  title: string;
+  text: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <s-box padding="base" borderWidth="base" borderRadius="base">
+      <s-stack
+        direction="inline"
+        gap="base"
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        <s-stack gap="small-300">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-icon type={done ? "check-circle-filled" : "circle-dashed"} />
+            <s-text type="strong">{title}</s-text>
+          </s-stack>
+          <s-text color="subdued">{text}</s-text>
+        </s-stack>
+        {!done && children}
+      </s-stack>
+    </s-box>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  trend,
+  note,
+}: {
+  label: string;
+  value: string;
+  trend?: number | null;
+  note?: string;
+}) {
+  return (
+    <s-section>
+      <s-stack gap="small-200">
+        <s-text color="subdued">{label}</s-text>
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <s-heading>{value}</s-heading>
+          {trend != null && trend !== 0 && (
+            <s-badge tone={trend > 0 ? "success" : "critical"}>
+              {trend > 0 ? "↑" : "↓"} {Math.abs(trend)} %
+            </s-badge>
+          )}
+        </s-stack>
+        {note && <s-text color="subdued">{note}</s-text>}
+      </s-stack>
+    </s-section>
+  );
+}
+
+/** Fremdriftslinje: hvor stor en del af leverancen der er solgt. */
+function ProgressBar({ pct }: { pct: number }) {
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      style={{
+        width: 120,
+        height: 8,
+        borderRadius: 4,
+        background: "#e3e3e3",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: `${pct}%`,
+          height: "100%",
+          background: pct >= 100 ? "#e0b600" : "#4a9ff5",
+        }}
+      />
+    </div>
   );
 }
 

@@ -14,6 +14,7 @@ import {
   PartnerApiError,
   redactSecrets,
 } from "./partnerApi.server";
+import { FEATURE_LABELS, subscriptionView } from "./view";
 import {
   clearEntitlementCache,
   FeatureNotIncludedError,
@@ -334,5 +335,53 @@ describe("nedgradering og opsigelse rører aldrig data", () => {
       // Ingen databaseklient (db, client, tx, prisma) bruges.
       expect(source).not.toMatch(/\b(db|client|tx|prisma)\.\w+/);
     }
+  });
+});
+
+describe("siden Abonnement", () => {
+  const active = (handles: string[], cancelAtEndOfCycle = false) =>
+    resolveAccess(SHOP, {
+      shopGid: async () => "gid://shopify/Shop/1",
+      fetchSubscription: async () => ({
+        handles,
+        cancelAtEndOfCycle,
+        trialEndsAt: null,
+      }),
+      config,
+      env: ON,
+    });
+
+  it("viser planens navn og hvad den giver adgang til — ingen priser", async () => {
+    const view = subscriptionView(await active(["basis-maaned"]), config, true);
+    expect(view).toMatchObject({
+      kind: "active",
+      planLabel: "Basis",
+      included: [FEATURE_LABELS.preorders, FEATURE_LABELS["events.flow"]],
+      notIncluded: [
+        FEATURE_LABELS["events.webhook"],
+        FEATURE_LABELS["events.klaviyo"],
+      ],
+      endsAtPeriodEnd: false,
+    });
+    expect(JSON.stringify(view)).not.toMatch(/kr|\$|USD|DKK/);
+  });
+
+  it("viser, når abonnementet stopper ved periodens udgang", async () => {
+    clearEntitlementCache();
+    const view = subscriptionView(await active(["pro"], true), config, true);
+    expect(view).toMatchObject({
+      kind: "active",
+      planLabel: "Pro",
+      endsAtPeriodEnd: true,
+    });
+  });
+
+  it("slået fra, eller intet abonnement", () => {
+    expect(subscriptionView({ status: "none" }, config, false)).toEqual({
+      kind: "off",
+    });
+    expect(subscriptionView({ status: "none" }, config, true)).toEqual({
+      kind: "none",
+    });
   });
 });

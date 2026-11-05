@@ -2,16 +2,40 @@
   "_kommentar": "Planer og rettigheder. Nøglerne (gratis, basis, pro) er appens egne; shopifyHandles oversætter fra plan-handle i Shopify App Pricing. Grænserne fastsættes senere — indtil da har alle planer alle funktioner. Kan overstyres uden kodeændring med miljøvariablen PREAURA_PLANS_JSON.",
   "plans": {
     "gratis": {
-      "features": ["preorders", "events.flow", "events.webhook", "events.klaviyo"],
-      "limits": { "preorderVariants": null }
+      "label": "Gratis",
+      "features": [
+        "preorders",
+        "events.flow",
+        "events.webhook",
+        "events.klaviyo"
+      ],
+      "limits": {
+        "preorderVariants": null
+      }
     },
     "basis": {
-      "features": ["preorders", "events.flow", "events.webhook", "events.klaviyo"],
-      "limits": { "preorderVariants": null }
+      "label": "Basis",
+      "features": [
+        "preorders",
+        "events.flow",
+        "events.webhook",
+        "events.klaviyo"
+      ],
+      "limits": {
+        "preorderVariants": null
+      }
     },
     "pro": {
-      "features": ["preorders", "events.flow", "events.webhook", "events.klaviyo"],
-      "limits": { "preorderVariants": null }
+      "label": "Pro",
+      "features": [
+        "preorders",
+        "events.flow",
+        "events.webhook",
+        "events.klaviyo"
+      ],
+      "limits": {
+        "preorderVariants": null
+      }
     }
   },
   "shopifyHandles": {
