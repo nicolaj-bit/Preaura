@@ -6,7 +6,7 @@
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
-    "deploy": "shopify app deploy",
+    "deploy": "node -e \"console.error('Vælg miljø: npm run deploy:test eller npm run deploy:prod'); process.exit(1)\"",
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
@@ -20,7 +20,11 @@
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
     "build:block": "esbuild theme-extension-src/preaura-preorder.js --minify --target=es2018 \"--banner:js=/* PREAURA. Genereret fra theme-extension-src/preaura-preorder.js med npm run build:block - ret ikke her. */\" --outfile=extensions/preaura-preorder/assets/preaura-preorder.js",
-    "pretest": "npm run build:block"
+    "pretest": "npm run build:block",
+    "deploy:test": "shopify app deploy --config shopify.app.test.toml",
+    "deploy:prod": "shopify app deploy --config shopify.app.toml",
+    "config:test": "shopify app config use shopify.app.test.toml",
+    "config:prod": "shopify app config use shopify.app.toml"
   },
   "type": "module",
   "engines": {

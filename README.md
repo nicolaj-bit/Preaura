@@ -277,6 +277,74 @@ Sættes af `render.yaml`. Kun `SHOPIFY_API_SECRET` skal indtastes.
 | `SCOPES` | Samme liste som i `shopify.app.toml` |
 | `SHOP_CUSTOM_DOMAIN` | Kun hvis butikker bruger et eget admin-domæne (valgfri) |
 
+## Testmiljø
+
+Produktion og test er to helt adskilte miljøer — se reglerne i `AGENTS.md`.
+Kort: hver sin app i Shopify, hver sin server og database på Render, egne
+hemmeligheder, og data kopieres aldrig mellem dem.
+
+```bash
+npm run config:test     # arbejd mod testappen
+npm run deploy:test     # udrul konfiguration og extensions til testappen
+npm run config:prod     # tilbage til produktionsappen
+npm run deploy:prod     # udrul til produktionsappen
+```
+
+`npm run deploy` alene nægter at køre, så man ikke kommer til at udrulle til
+det forkerte miljø.
+
+## Abonnement og rettigheder
+
+Shopify App Pricing: planerne oprettes i Partner Dashboard, Shopify er vært
+for prisvalgssiden og opretter abonnementet. Appen bygger ingen prisside og
+kalder ikke `appSubscriptionCreate`.
+
+- **Planerne** står i `config/plans.json` som plannøgler (`gratis`, `basis`,
+  `pro`) med funktioner og grænser. `shopifyHandles` oversætter fra
+  plan-handle i Shopify. Kan overstyres uden kodeændring med miljøvariablen
+  `PREAURA_PLANS_JSON`.
+- **Adgangen** læses fra butikkens aktive abonnement i Shopify (Partner API,
+  `activeSubscription`) — ikke fra vores database. Svaret caches i 5 minutter
+  (`PREAURA_ENTITLEMENT_TTL_SECONDS`) og tømmes, når butikken kommer tilbage
+  fra prisvalgssiden.
+- **Intet aktivt abonnement:** appens rod omdirigerer til Shopifys
+  prisvalgsside med `target: "_top"`, så siden forlader app-rammen.
+- **Fejler Shopify,** beholder en butik med kendt abonnement sin adgang;
+  ingen sendes til prisvalg på grund af en fejl.
+- **Slås til** med `PREAURA_BILLING=shopify` og miljøvariablerne
+  `SHOPIFY_PARTNER_ORG_ID`, `SHOPIFY_PARTNER_API_ACCESS_TOKEN`,
+  `SHOPIFY_APP_GID` og `PREAURA_APP_HANDLE` (pr. miljø, sat i Render).
+- **Test af planer:** en udviklingsbutik i samme Partner-organisation kan
+  vælge enhver plan til 0 kr. Billing API'ens `test`-felt bruges ikke.
+
+### Sådan gøres en funktion planafhængig
+
+1. Tilføj funktionens nøgle til `FEATURES` i `app/billing/plans.ts`, fx
+   `"rapporter"`.
+2. Skriv den på de planer, der skal have den, i `config/plans.json`.
+3. Én kontrol i funktionens loader og action:
+
+   ```ts
+   const access = await accessFor(admin, session.shop);
+   requireFeature(access, "rapporter"); // 403, hvis planen ikke giver adgang
+   ```
+
+   Til at skjule en knap: `can(access.entitlement, "rapporter")`. Til en
+   talgrænse: tilføj den til `LIMITS` og læs den med `limitOf(...)`.
+
+### Nedgradering og opsigelse
+
+- **Nedgradering:** funktioner, den nye plan ikke har, lukkes. Leverancer,
+  tildelinger, ordrer, hændelser og indstillinger bliver stående uændret.
+  Opgraderer butikken igen, er alt der.
+- **Opsigelse (appen stadig installeret):** appen sender til prisvalgssiden.
+  Intet slettes eller nulstilles.
+- **Afinstallation** er noget andet: Shopify sender `shop/redact` 48 timer
+  efter, og så sletter appen butikkens data, som GDPR kræver (se
+  «Databeskyttelse»).
+- Ordrebehandlingen (kø, tildelinger, lager, hændelser) kører uafhængigt af
+  planen, så løfter, der allerede er givet, stadig holdes.
+
 ## Lokal udvikling
 
 `automatically_update_urls_on_dev` står til `false`, så `npm run dev` aldrig

@@ -136,6 +136,35 @@ module.exports = {
       },
     },
 
+    // 3. Abonnement og rettigheder (app/billing/) må ALDRIG røre data. En
+    //    nedgradering eller opsigelse lukker kun funktioner — den må ikke
+    //    kunne slette eller nulstille leverancer, tildelinger eller ordrer.
+    {
+      files: ["app/billing/**/*.{ts,tsx}"],
+      excludedFiles: ["**/*.test.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "**/db.server",
+                  "**/models/*",
+                  "**/sync/*",
+                  "**/orders/*",
+                  "**/events/*",
+                  "@prisma/client",
+                ],
+                message:
+                  "app/billing/ styrer kun adgang og må ikke røre data (leverancer, tildelinger, ordrer, hændelser).",
+              },
+            ],
+          },
+        ],
+      },
+    },
+
     // Node
     {
       files: [
