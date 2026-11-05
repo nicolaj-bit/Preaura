@@ -6,9 +6,9 @@
 #
 # OBS: `shopify app config link` overskriver denne fil med appens tomme
 # standardkonfiguration og sletter bl.a. scopes. Kør `git diff` bagefter.
-# Udfyldes, når testappen er oprettet i Dev Dashboard (client ID er
-# offentligt; client secret står kun i Render).
-client_id = ""
+# Client ID er offentligt (det sendes til browseren i Shopify Admin).
+# Client secret er hemmelig og står kun i Render.
+client_id = "cac03e5556504208e9d2aa98420a0dc7"
 name = "PREAURA Test"
 embedded = true
 # Testserveren på Render (preaura-test i render.yaml).
