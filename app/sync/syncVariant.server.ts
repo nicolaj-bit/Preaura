@@ -147,24 +147,32 @@ async function reconcile(
         available - plan.syncedAvailable,
       );
     }
-    // Varer kommet hjem til forudbestillingerne: de dækkede markeres klar
-    // til afsendelse (og giver en hændelse). Skifter varianten til
-    // lagermode, er alle dækket.
+    // «Klar til afsendelse» sættes kun af sig selv, når de modtagne varer
+    // dækker ALLE ventende forudbestillinger (og varianten derfor skifter
+    // til lagermode). En lille stigning i lageret kan også skyldes en
+    // annullering, en refundering eller Shopify selv — den må aldrig give
+    // kunderne besked om, at varen er klar. Delvise leverancer markeres med
+    // knappen på leverancens side.
     const received =
       mode === "PREORDER" && !plan.modeForced && plan.syncedAvailable != null
         ? available - plan.syncedAvailable
         : 0;
-    if (!plan.modeForced && plan.stockBeforeForce != null) {
-      // Tvangen er slået fra: varer lagt på lager imens gik til
-      // forudbestillingerne.
-      await data.syncState.receiveForPreorders(
-        variantId,
-        plan.receivedWhileForced,
+    const covered =
+      !plan.modeForced && plan.stockBeforeForce != null
+        ? plan.receivedWhileForced
+        : received;
+    if (received > 0) {
+      console.info(
+        `${variantId}: lageret i Shopify er ${available}, appen satte det til ${plan.syncedAvailable}. ${owed} stk. venter på varer.`,
       );
-    } else if (decision.changed && decision.mode === "STOCK") {
+    }
+    if (
+      decision.changed &&
+      decision.mode === "STOCK" &&
+      owed > 0 &&
+      covered >= owed
+    ) {
       await data.syncState.markAllReady(variantId);
-    } else if (received > 0) {
-      await data.syncState.receiveForPreorders(variantId, received);
     }
     if (decision.changed) {
       if (decision.mode === "PREORDER" && plan.modeForced) {

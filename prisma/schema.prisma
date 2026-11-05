@@ -118,10 +118,6 @@ model VariantPlan {
   receivedWhileForced Int       @default(0)
   modeChangedAt       DateTime?
   modeChangeReason    String?
-  // Modtagne varer, der endnu ikke er sat på en bestemt forudbestilling.
-  // Forudbestillinger markeres klar til afsendelse én hel tildeling ad
-  // gangen, i bestillingsrækkefølge.
-  readyCredit         Int       @default(0)
 
   // Synkronisering med Shopify. Udfyldes kun af app/sync/.
   // Variantens egen selling plan group i Shopify.

@@ -223,23 +223,37 @@ describe("hændelserne opstår de rigtige steder", () => {
     });
   });
 
-  it("klar til afsendelse, når varerne kommer på lager — i bestillingsrækkefølge", async () => {
+  it("en lille stigning i lageret giver ALDRIG «klar til afsendelse»", async () => {
+    // Det, der skete i testbutikken: lageret steg med 3 (fx en annullering
+    // eller Shopify selv), og tre kunder fik besked om, at varen var klar.
+    const h = await setup();
+    await h.order(1, 1);
+    await h.order(2, 1);
+    await h.order(3, 1);
+    await h.sync();
+    const variant = h.shopify.variants.get(VARIANT)!;
+    variant.available = (variant.available ?? 0) + 3;
+    await h.sync();
+    expect(
+      (await h.events()).filter((e) => e.type === "preorder.ready"),
+    ).toHaveLength(0);
+    // Forudbestillingerne venter stadig på varer.
+    expect(await data().syncState.owedUnits(VARIANT)).toBe(3);
+  });
+
+  it("klar til afsendelse, når varerne dækker alle forudbestillinger", async () => {
     const h = await setup();
     await h.order(1, 2);
     await h.order(2, 3);
     await h.sync();
-    // 2 stk. kommer hjem: nok til ordre 1, ikke til ordre 2.
+    // 5 stk. til forudbestillingerne og 1 til salg: varianten skifter til
+    // lagermode, og alle forudbestillinger er klar.
     const variant = h.shopify.variants.get(VARIANT)!;
-    variant.available = (variant.available ?? 0) + 2;
+    variant.available = (variant.available ?? 0) + 6;
     await h.sync();
-    let ready = (await h.events()).filter((e) => e.type === "preorder.ready");
-    expect(ready.map((e) => e.orderName)).toEqual(["#1001"]);
-
-    // 3 mere: nu også ordre 2.
-    variant.available = (variant.available ?? 0) + 3;
-    await h.sync();
-    ready = (await h.events()).filter((e) => e.type === "preorder.ready");
-    expect(ready.map((e) => e.orderName)).toEqual(["#1001", "#1002"]);
+    const ready = (await h.events()).filter((e) => e.type === "preorder.ready");
+    expect(ready.map((e) => e.orderName).sort()).toEqual(["#1001", "#1002"]);
+    expect(variant.available).toBe(1);
   });
 
   it("klar til afsendelse med knappen på leverancen", async () => {
