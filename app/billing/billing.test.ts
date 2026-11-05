@@ -9,7 +9,11 @@ import {
   planForHandles,
   PlansConfigError,
 } from "./plans";
-import { fetchActiveSubscription, PartnerApiError } from "./partnerApi.server";
+import {
+  fetchActiveSubscription,
+  PartnerApiError,
+  redactSecrets,
+} from "./partnerApi.server";
 import {
   clearEntitlementCache,
   FeatureNotIncludedError,
@@ -268,6 +272,34 @@ describe("Partner API", () => {
       appId: "gid://shopify/App/9",
       shopId: "gid://shopify/Shop/1",
     });
+  });
+
+  it("en fejlbesked kan aldrig vise en nøgle — heller ikke når Shopify gentager den", async () => {
+    // Det, der skete i testmiljøet: nøglen stod i SHOPIFY_APP_GID, og
+    // Shopify gentog den i sin fejlbesked.
+    const echoing = (async (_url: string, init: RequestInit) => {
+      const appId = JSON.parse(String(init.body)).variables.appId;
+      return new Response(
+        JSON.stringify({
+          errors: [
+            {
+              message: `Invalid GID '${appId}'`,
+              extensions: { code: "INVALID_GID" },
+            },
+          ],
+        }),
+      );
+    }) as unknown as typeof fetch;
+    const error = (await fetchActiveSubscription("g", {
+      fetchFn: echoing,
+      env: { ...env, SHOPIFY_APP_GID: "prtapi_abc123def456" },
+    }).catch((e: Error) => e)) as Error;
+    expect(error).toBeInstanceOf(PartnerApiError);
+    expect(error.message).not.toContain("prtapi_abc123def456");
+    expect(error.message).toContain("INVALID_GID");
+    expect(redactSecrets("token shpat_XYZ123 og pk_abc987", [])).toBe(
+      "token [skjult nøgle] og [skjult nøgle]",
+    );
   });
 
   it("null betyder intet abonnement; fejl kastes", async () => {
