@@ -4,12 +4,34 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
+import {
+  accessFor,
+  clearEntitlementCache,
+  pricingPageUrl,
+} from "../billing/entitlements.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { admin, session, redirect } = await authenticate.admin(request);
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  // Kommer butikken tilbage fra Shopifys prisvalgsside, står plan_handle i
+  // adressen. Den bruges kun som signal om at tømme cachen — adgangen læses
+  // altid fra Shopify, aldrig fra adressen.
+  if (new URL(request.url).searchParams.has("plan_handle")) {
+    clearEntitlementCache(session.shop);
+  }
+
+  // Intet aktivt abonnement: til Shopifys prisvalgsside. target "_top" er
+  // nødvendig — siden ligger uden for app-rammen (iframen).
+  const access = await accessFor(admin, session.shop);
+  if (access.status === "none") {
+    throw redirect(pricingPageUrl(session.shop), { target: "_top" });
+  }
+
+  return {
+    // eslint-disable-next-line no-undef
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    plan: access.entitlement.plan,
+  };
 };
 
 export default function App() {

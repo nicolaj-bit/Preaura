@@ -1,0 +1,62 @@
+# Konfiguration af testappen «PREAURA Test». Skift hertil med
+# `npm run config:test`, udrul med `npm run deploy:test`.
+# Kun til udviklingsbutikker. Deler intet med produktionsappen (se AGENTS.md).
+# Distribution (offentlig / App Store) vælges i Dev Dashboard og kan ikke
+# ændres bagefter.
+#
+# OBS: `shopify app config link` overskriver denne fil med appens tomme
+# standardkonfiguration og sletter bl.a. scopes. Kør `git diff` bagefter.
+# Udfyldes, når testappen er oprettet i Dev Dashboard (client ID er
+# offentligt; client secret står kun i Render).
+client_id = ""
+name = "PREAURA Test"
+embedded = true
+# Testserveren på Render (preaura-test i render.yaml).
+application_url = "https://preaura-test.onrender.com"
+
+[build]
+# Slået fra: ellers ville `npm run dev` skrive en midlertidig tunnel-adresse
+# ind i den rigtige app, og butikkerne ville miste forbindelsen. Lokal
+# udvikling kræver sin egen udviklings-app, se README.
+automatically_update_urls_on_dev = false
+include_config_on_deploy = true
+
+[auth]
+redirect_urls = [ "https://preaura-test.onrender.com/auth/callback" ]
+
+[access_scopes]
+# Hold listen kort. Hvert ekstra scope forlænger Shopifys gennemgang.
+# write_purchase_options er påkrævet af sellingPlanGroupCreate (selling plans
+# til forudbestilling) — write_products alene er ikke nok.
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options"
+
+[webhooks]
+api_version = "2026-10"
+
+  # Lovpligtige compliance-webhooks (krævet for apps i App Store).
+  # Håndteres af: /app/routes/webhooks.compliance.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/compliance"
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+
+  # Ordrer. Håndteres af: /app/routes/webhooks.orders.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders"
+  topics = ["orders/create", "orders/updated", "orders/cancelled", "refunds/create"]
+
+  # Lagerændringer, også uden for appen. Skift mellem lager og forudbestilling.
+  # Håndteres af: /app/routes/webhooks.inventory.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/inventory"
+  topics = ["inventory_levels/update"]
+
+  # Håndteres af: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Holder gemte sessioners scopes ajour. Fra Shopifys skabelon.
+  # Håndteres af: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = ["app/scopes_update"]
