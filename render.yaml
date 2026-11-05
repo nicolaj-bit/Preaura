@@ -105,5 +105,10 @@ services:
         generateValue: true
       - key: SCOPES
         value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options
+      # Abonnementstjekket er slået til i testmiljøet. Partner API-nøglen,
+      # SHOPIFY_PARTNER_ORG_ID og SHOPIFY_APP_GID sættes direkte i Render.
       - key: PREAURA_BILLING
-        value: "off"
+        value: shopify
+      # Testappens handle (ikke hemmelig) — bruges til prisvalgssidens adresse.
+      - key: PREAURA_APP_HANDLE
+        value: preaura-test
