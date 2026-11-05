@@ -126,6 +126,51 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
     },
 
+    dashboard: {
+      /** Det, forsiden viser: varianter, ordrer de seneste 60 dage og ventende stk. */
+      async overview(now = new Date()) {
+        const since60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        const [plans, recent, waiting, ready] = await Promise.all([
+          client.variantPlan.findMany({
+            where: { shop },
+            select: {
+              variantId: true,
+              productId: true,
+              preorderEnabled: true,
+              mode: true,
+            },
+          }),
+          client.allocation.findMany({
+            where: {
+              shop,
+              status: { in: ["ACTIVE", "UNRESOLVED"] },
+              orderCreatedAt: { gte: since60 },
+            },
+            select: { orderId: true, quantity: true, orderCreatedAt: true },
+          }),
+          client.allocation.aggregate({
+            where: {
+              shop,
+              status: "ACTIVE",
+              readyAt: null,
+              delivery: { status: "OPEN" },
+            },
+            _sum: { quantity: true },
+          }),
+          client.allocation.aggregate({
+            where: { shop, status: "ACTIVE", readyAt: { not: null } },
+            _sum: { quantity: true },
+          }),
+        ]);
+        return {
+          plans,
+          recent,
+          waitingUnits: waiting._sum.quantity ?? 0,
+          readyUnits: ready._sum.quantity ?? 0,
+        };
+      },
+    },
+
     variantPlans: {
       /** Produkter med mindst én variant i appen, og hvor mange der er slået til. */
       async listProducts() {
