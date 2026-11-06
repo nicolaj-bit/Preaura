@@ -65,8 +65,8 @@ services:
         generateValue: true
       - key: SCOPES
         value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options
-      # Abonnementstjek (Shopify App Pricing). "off" indtil planerne er
-      # oprettet; derefter "shopify" sammen med SHOPIFY_PARTNER_ORG_ID,
+      # Abonnementstjek (Shopify App Pricing). "off" indtil abonnementet er
+      # oprettet på produktionsappen; derefter "shopify" sammen med SHOPIFY_PARTNER_ORG_ID,
       # SHOPIFY_PARTNER_API_ACCESS_TOKEN, SHOPIFY_APP_GID og
       # PREAURA_APP_HANDLE, som sættes direkte i Render (aldrig her).
       - key: PREAURA_BILLING

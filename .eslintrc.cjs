@@ -136,8 +136,8 @@ module.exports = {
       },
     },
 
-    // 3. Abonnement og rettigheder (app/billing/) må ALDRIG røre data. En
-    //    nedgradering eller opsigelse lukker kun funktioner — den må ikke
+    // 3. Abonnementet (app/billing/) må ALDRIG røre data. En udløbet
+    //    prøveperiode eller en opsigelse lukker kun funktioner — den må ikke
     //    kunne slette eller nulstille leverancer, tildelinger eller ordrer.
     {
       files: ["app/billing/**/*.{ts,tsx}"],

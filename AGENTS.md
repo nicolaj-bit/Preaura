@@ -32,6 +32,10 @@ PREAURA har to miljøer, der ikke deler noget:
 4. **Skift miljø med en kommando**, ikke ved at redigere filer:
    `npm run config:test` / `npm run config:prod`, og udrul med
    `npm run deploy:test` / `npm run deploy:prod`.
-5. **Abonnement og rettigheder (`app/billing/`) må aldrig røre data.** En
-   nedgradering eller opsigelse lukker funktioner; den sletter eller nulstiller
-   aldrig leverancer, tildelinger eller ordredata. Lint håndhæver det.
+5. **Abonnementet (`app/billing/`) må aldrig røre data.** En udløbet
+   prøveperiode eller en opsigelse lukker funktioner; den sletter eller
+   nulstiller aldrig leverancer, tildelinger eller ordredata. Lint håndhæver
+   det.
+6. **Ét abonnement, ingen planer.** Adgang er enten «aktivt abonnement» eller
+   «intet». Pris og prøveperiode står kun i Partner Dashboard. Byg ikke
+   plannøgler, grænser eller planvælger ind igen uden en ny beslutning.
