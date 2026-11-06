@@ -1,0 +1,62 @@
+# Shopify Flow-trigger for ventelisten. Felterne skal svare præcis til
+# toFlowWaitlistPayload() i app/events/channels.ts. Handle kan ikke ændres,
+# når den er udrullet.
+#
+# Beskeden er noget, kunden selv har bedt om. Læg ikke tilbud, andre varer
+# eller rabatkoder i den — så bliver den markedsføring og kræver samtykke
+# (markedsføringslovens § 10).
+[[extensions]]
+name = "Venteliste: varen kan købes"
+type = "flow_trigger"
+handle = "preaura-waitlist-available"
+description = "Når en vare, kunden har bedt om besked på, kan købes igen — på lager eller på forudbestilling i en ny leverance."
+
+[settings]
+
+  [[settings.fields]]
+  type = "product_reference"
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Event id"
+  description = "Hændelsens entydige id. Det samme ved genforsøg."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Customer email"
+  description = "E-mailen, kunden skrev sig op med."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Product title"
+  description = "Produktets navn."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Variant title"
+  description = "Variantens navn."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Variant id"
+  description = "Variantens id (gid://shopify/ProductVariant/…)."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Availability"
+  description = "stock: varen er kommet på lager. preorder: en leverance med ledige pladser er åbnet."
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Available quantity"
+  description = "Antal, der kunne købes, da kunden fik besked."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Delivery id"
+  description = "Leverancen, der blev åbnet. Tom, når varen kom på lager."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Delivery date"
+  description = "Leverancens dato (ÅÅÅÅ-MM-DD). Tom, når varen kom på lager."

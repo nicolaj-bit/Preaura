@@ -293,6 +293,45 @@ npm run deploy:prod     # udrul til produktionsappen
 `npm run deploy` alene nægter at køre, så man ikke kommer til at udrulle til
 det forkerte miljø.
 
+## Venteliste
+
+«Giv mig besked, når varen kan købes.» Én mekanisme med to udløsere: varen
+kommer på lager, eller en leverance med ledige pladser åbnes. Begge betyder,
+at varianten kan købes i Shopify (`availableForSale`), og det er det eneste,
+der tjekkes.
+
+- **Produktsiden:** feltet ligger i blokken «Forudbestilling» og vises, når
+  varianten hverken kan købes på lager eller forudbestilles
+  (`variant.available` er falsk). Slås til i blokkens indstillinger
+  (standard: fra). Ingen egen styling; knappen får temaets klasse `button`.
+- **Tilmelding:** sendes til `/apps/preaura/waitlist` (app-proxy, signeret af
+  Shopify) → `app/routes/proxy.waitlist.tsx`. Begrænset pr. afsender (5 på 15
+  minutter, 20 i døgnet) og pr. butik (500 i timen). Svaret er det samme,
+  uanset om e-mailen står på listen. Et skjult felt fanger simple robotter.
+- **Gemmes:** e-mail (krypteret + envejs-nøgle), produkt, variant, butik og
+  tidspunkt (`WaitlistEntry`). Højst én åben tilmelding pr. e-mail og
+  variant.
+- **Udløsning** (`app/waitlist/process.server.ts`, kører hvert minut):
+  varianten skal have kunnet købes i hele ventetiden (standard 10 min), før
+  der udløses. Derefter i tilmeldingsrækkefølge i portioner (standard 50
+  hvert 30. minut). Før hver portion tjekkes det igen. En udløst tilmelding
+  er lukket og udløses aldrig igen. Kræver aktivt abonnement og mindst én
+  modtager slået til — ellers venter tilmeldingerne.
+- **Beskeden** er hændelsen `waitlist.available` i den fælles udbakke (Flow,
+  webhook, Klaviyo). Den bærer kundens e-mail, produkt, variant, antal til
+  salg og — for forudbestilling — leverancen, der blev åbnet.
+- **Admin:** siden «Venteliste» viser ventende pr. variant og antal, der har
+  fået besked pr. leverance, og indstillingerne for ventetid, portion og
+  interval.
+- **Jura:** beskeden må kun handle om varen. Tilbud, andre varer eller
+  rabatkoder gør den til markedsføring (markedsføringslovens § 10). Formularen
+  har ingen afkrydsningsfelter, og tilmeldingen er ikke en tilmelding til
+  nyhedsbrev.
+- **Frister:** åbne tilmeldinger slettes efter 180 dage, udløste 7 dage efter
+  udløsning. E-mailen i den byggede hændelse slettes efter 30 dage som andre
+  hændelser. customers/redact sletter kundens tilmeldinger (fundet via en
+  envejs-nøgle af e-mailen; selve e-mailen gemmes ikke i køen).
+
 ## Abonnement
 
 PREAURA har ét abonnement, der dækker alle funktioner. Ingen planer at vælge

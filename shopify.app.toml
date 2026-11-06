@@ -24,8 +24,9 @@ redirect_urls = [ "https://preaura.onrender.com/auth/callback" ]
 [access_scopes]
 # Hold listen kort. Hvert ekstra scope forlænger Shopifys gennemgang.
 # write_purchase_options er påkrævet af sellingPlanGroupCreate (selling plans
-# til forudbestilling) — write_products alene er ikke nok.
-scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options"
+# til forudbestilling) — write_products alene er ikke nok. write_app_proxy
+# kræves af ventelisten på produktsiden (se [app_proxy] nederst).
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy"
 
 [webhooks]
 api_version = "2026-10"
@@ -57,3 +58,11 @@ api_version = "2026-10"
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
   topics = ["app/scopes_update"]
+
+# Ventelisten på produktsiden: /apps/preaura/waitlist i butikken sendes
+# hertil (app/routes/proxy.waitlist.tsx). Shopify signerer hvert kald.
+# Kræver scopet write_app_proxy.
+[app_proxy]
+url = "https://preaura.onrender.com/proxy"
+prefix = "apps"
+subpath = "preaura"

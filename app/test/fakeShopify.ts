@@ -114,6 +114,36 @@ export function createFakeShopify() {
         })),
       };
     },
+    async readVariantDetails(variantId) {
+      const variant = variants.get(variantId);
+      if (!variant) return null;
+      return {
+        productId: variant.productId,
+        productTitle: "Produkt",
+        variantTitle: "Variant",
+        sku: null,
+      };
+    },
+    async readVariantAvailability(variantIds) {
+      const result = new Map<
+        string,
+        { available: boolean; quantity: number | null; productId: string }
+      >();
+      for (const id of variantIds) {
+        const variant = variants.get(id);
+        if (!variant) continue;
+        const quantity = variant.tracked ? variant.available : null;
+        result.set(id, {
+          available:
+            !variant.tracked ||
+            variant.inventoryPolicy === "CONTINUE" ||
+            (variant.available ?? 0) > 0,
+          quantity,
+          productId: variant.productId,
+        });
+      }
+      return result;
+    },
     async flowTriggerReceive(handle, payload) {
       write("flowTriggerReceive", [handle, payload]);
       flowTriggers.push({ handle, payload: structuredClone(payload) });

@@ -28,7 +28,7 @@ export type ShopifyGroupState = {
 
 export type CreatedPlan = { id: string; option: string };
 
-import type { OrderDetails } from "../events/build";
+import type { OrderDetails, VariantDetails } from "../events/build";
 
 export interface ShopifyGateway {
   read(input: {
@@ -80,6 +80,20 @@ export interface ShopifyGateway {
    * er null, når appen ikke har adgang til kundens navn og e-mail.
    */
   readOrderDetails(orderId: string): Promise<OrderDetails | null>;
+  /** Produkt- og variantnavn — til hændelser fra ventelisten. */
+  readVariantDetails(variantId: string): Promise<VariantDetails | null>;
+  /**
+   * Kan varianterne købes lige nu (Shopifys availableForSale), og hvor mange
+   * er der på lager? Varianter, der ikke findes, er ikke med.
+   */
+  readVariantAvailability(
+    variantIds: string[],
+  ): Promise<
+    Map<
+      string,
+      { available: boolean; quantity: number | null; productId: string }
+    >
+  >;
   /** Starter butikkens Flow-workflows, der bruger triggeren. */
   flowTriggerReceive(
     handle: string,

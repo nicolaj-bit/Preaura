@@ -2,6 +2,7 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes,
 } from "node:crypto";
 
@@ -53,4 +54,25 @@ export function last4(value: string) {
 
 export function randomSecret() {
   return randomBytes(32).toString("hex");
+}
+
+/**
+ * Envejs-nøgle til en e-mail (HMAC-SHA256). Samme e-mail giver altid samme
+ * nøgle, men e-mailen kan ikke læses ud af den. Bruges til at finde dubletter
+ * og kundens tilmeldinger, uden at e-mailen skal dekrypteres.
+ */
+export function hashEmail(email: string) {
+  return createHmac(
+    "sha256",
+    createHash("sha256")
+      .update(`email:${key().toString("hex")}`)
+      .digest(),
+  )
+    .update(normalizeEmail(email))
+    .digest("hex");
+}
+
+/** Små bogstaver og uden mellemrum. */
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }

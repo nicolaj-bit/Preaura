@@ -139,6 +139,7 @@ async function setup({ webhookStatus = 200 }: { webhookStatus?: number } = {}) {
         client,
         now: () => clock,
         deps: {
+          readVariantDetails: async () => null,
           readOrderDetails: shopify.gateway.readOrderDetails,
           flowTriggerReceive: shopify.gateway.flowTriggerReceive,
           fetch: fetchFn,
@@ -300,7 +301,7 @@ describe("alle fire hændelser bygges ens uanset modtager", () => {
     },
   );
 
-  it.each(EVENT_TYPES)(
+  it.each(EVENT_TYPES.filter((t) => t.startsWith("preorder.")))(
     "%s: samme indhold i Flow, webhook og Klaviyo",
     (type) => {
       const e = { ...event, type };
@@ -314,7 +315,7 @@ describe("alle fire hændelser bygges ens uanset modtager", () => {
         id: [flow["Event id"], webhook.id, klaviyo.unique_id],
         order: [
           flow["Order name"],
-          webhook.order.name,
+          webhook.order!.name,
           klaviyo.properties.order_name,
         ],
         email: [
@@ -519,5 +520,55 @@ describe("hemmeligheder", () => {
     expect(h.sent.webhook).toHaveLength(0);
     expect(h.sent.klaviyo).toHaveLength(0);
     expect(h.shopify.flowTriggers).toHaveLength(1);
+  });
+});
+
+describe("Flow-triggerne", () => {
+  it("felterne i hver triggers shopify.extension.toml svarer til det, appen sender", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const root = join(__dirname, "../../extensions");
+    const tomls = readdirSync(root)
+      .filter((d) => d.startsWith("preaura-flow-"))
+      .map((d) =>
+        readFileSync(join(root, d, "shopify.extension.toml"), "utf8"),
+      );
+    const REFERENCE_KEYS: Record<string, string> = {
+      order_reference: "order_id",
+      product_reference: "product_id",
+    };
+    for (const type of EVENT_TYPES) {
+      const toml = tomls.find((t) =>
+        t.includes(`handle = "${FLOW_HANDLES[type]}"`),
+      );
+      expect(toml, `Flow-trigger for ${type}`).toBeDefined();
+      const keys = [...toml!.matchAll(/^\s*key = "([^"]+)"/gm)].map(
+        (m) => m[1],
+      );
+      const refs = [...toml!.matchAll(/^\s*type = "(\w+_reference)"/gm)].map(
+        (m) => REFERENCE_KEYS[m[1]],
+      );
+      const event: PreauraEvent = {
+        id: "e",
+        type,
+        occurredAt: "2026-11-06T10:00:00.000Z",
+        shop: SHOP,
+        customer: { email: null, firstName: null, lastName: null, name: null },
+        order:
+          type === "waitlist.available"
+            ? null
+            : { id: "gid://shopify/Order/1", name: "#1001" },
+        product: { id: "gid://shopify/Product/1", title: null },
+        variant: { id: VARIANT, title: null, sku: null },
+        quantity: 1,
+        deliveryDate: null,
+        previousDeliveryDate: null,
+        deliveryId: null,
+        availability: null,
+      };
+      expect(Object.keys(toFlowPayload(event)).sort()).toEqual(
+        [...refs, ...keys].sort(),
+      );
+    }
   });
 });

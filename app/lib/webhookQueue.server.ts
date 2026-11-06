@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { minimalPayload } from "./webhookPayload";
+import { hashEmail } from "./crypto.server";
 
 type QueuedWebhook = {
   webhookId: string;
@@ -8,6 +9,19 @@ type QueuedWebhook = {
   topic: string;
   payload: unknown;
 };
+
+/**
+ * Uden krypteringsnøgle kan e-mailen ikke gøres til en envejs-nøgle. Det må
+ * aldrig forhindre en compliance-hændelse i at komme i køen — og uden nøgle
+ * kan der heller ikke være gemt tilmeldinger til ventelisten.
+ */
+function safeHashEmail(email: string) {
+  try {
+    return hashEmail(email);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Lægger en webhook i køen (tabellen WebhookEvent). Kun de felter, appen
@@ -27,7 +41,7 @@ export async function enqueueWebhook(
         webhookId,
         shop,
         topic,
-        payload: JSON.stringify(minimalPayload(topic, payload)),
+        payload: JSON.stringify(minimalPayload(topic, payload, safeHashEmail)),
       },
     });
   } catch (error) {

@@ -25,6 +25,14 @@ export function shopifySync(graphql: AdminGraphql, shop: string) {
     /** Ordrens navn, kunde og produktnavne — til udgående hændelser. */
     readOrderDetails: (orderId: string) => gateway.readOrderDetails(orderId),
 
+    /** Produkt- og variantnavn — til hændelser fra ventelisten. */
+    readVariantDetails: (variantId: string) =>
+      gateway.readVariantDetails(variantId),
+
+    /** Kan varianterne købes lige nu? Skriver intet. */
+    readVariantAvailability: (variantIds: string[]) =>
+      gateway.readVariantAvailability(variantIds),
+
     /** Starter butikkens Flow-workflows for en af appens triggere. */
     flowTriggerReceive: (handle: string, payload: Record<string, unknown>) =>
       gateway.flowTriggerReceive(handle, payload),

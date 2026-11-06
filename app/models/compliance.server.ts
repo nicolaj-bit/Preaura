@@ -1,10 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
+import { purgeWaitlist, waitlistFor } from "./waitlist.server";
 
 // Databeskyttelse: kunders dataanmodninger og sletning.
 //
-// Hvad PREAURA gemmer om en kunde: kun i udgående hændelser (Flow, webhook,
-// Klaviyo) gemmes kundens navn og e-mail — krypteret og højst 30 dage. Køen
+// Hvad PREAURA gemmer om en kunde: i udgående hændelser (Flow, webhook,
+// Klaviyo) gemmes kundens navn og e-mail — krypteret og højst 30 dage. På
+// ventelisten gemmes e-mail (krypteret), produkt, variant og tidspunkt —
+// højst 180 dage, og 7 dage efter, kunden har fået besked. Køen
 // gemmer kun ordrens id (se app/lib/webhookPayload.ts). Tildelingerne
 // gemmer ordrens id og nummer, antal og den lovede dato — ikke navn, mail
 // eller adresse. De er butikkens regnskab over pladserne i leverancerne og
@@ -31,6 +34,13 @@ export function orderGid(id: unknown) {
   }
   return null;
 }
+
+export type StoredWaitlist = {
+  productId: string;
+  variantId: string;
+  signedUpAt: string;
+  notifiedAt: string | null;
+};
 
 export type StoredOrderData = {
   orderId: string;
@@ -97,6 +107,7 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         orderBy: { createdAt: "asc" },
       });
       for (const event of events) {
+        if (!event.orderId) continue;
         const order = byOrder.get(event.orderId) ?? {
           orderId: event.orderId,
           orderName: event.orderName,
@@ -113,11 +124,19 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
       return [...byOrder.values()];
     },
 
+    /** Kundens tilmeldinger til ventelisten — til en dataanmodning. */
+    async waitlistForEmailHash(
+      emailHash: string | null,
+    ): Promise<StoredWaitlist[]> {
+      return emailHash ? waitlistFor(shop, client).forEmailHash(emailHash) : [];
+    },
+
     async recordDataRequest(input: {
       customerId: string;
       shopifyRequestId: string | null;
       orderIds: string[];
       data: StoredOrderData[];
+      waitlist?: StoredWaitlist[];
     }) {
       return client.dataRequest.create({
         data: {
@@ -126,6 +145,7 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
           shopifyRequestId: input.shopifyRequestId,
           orderIds: JSON.stringify(input.orderIds),
           data: JSON.stringify(input.data),
+          waitlist: JSON.stringify(input.waitlist ?? []),
         },
       });
     },
@@ -139,6 +159,7 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         ...row,
         orderIds: JSON.parse(row.orderIds) as string[],
         data: JSON.parse(row.data) as StoredOrderData[],
+        waitlist: JSON.parse(row.waitlist) as StoredWaitlist[],
       }));
     },
 
@@ -155,11 +176,17 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
     },
 
     /**
-     * customers/redact: kundens dataanmodninger og de behandlede
-     * kø-hændelser for kundens ordrer slettes. Tildelingerne bliver stående
-     * (se øverst i filen).
+     * customers/redact: kundens dataanmodninger, de behandlede kø-hændelser
+     * for kundens ordrer og kundens tilmeldinger til ventelisten slettes.
+     * Tildelingerne bliver stående (se øverst i filen).
      */
-    async redactCustomer(input: { customerId: string; orderIds: string[] }) {
+    async redactCustomer(input: {
+      customerId: string;
+      orderIds: string[];
+      /** Envejs-nøglen til kundens e-mail (se app/lib/webhookPayload.ts). */
+      emailHash?: string | null;
+    }) {
+      const emailHash = input.emailHash ?? null;
       const orders = new Set(input.orderIds);
       const events = await client.webhookEvent.findMany({
         where: {
@@ -176,24 +203,35 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         })
         .map((event) => event.id);
 
-      const [requests, removed, outbox] = await client.$transaction([
-        client.dataRequest.deleteMany({
-          where: { shop, customerId: input.customerId },
-        }),
-        client.webhookEvent.deleteMany({
-          where: { shop, id: { in: eventIds } },
-        }),
-        // Udgående hændelser: kundens navn og e-mail slettes. Hvad der blev
-        // sendt hvornår (uden kundeoplysninger) bliver stående i logbogen.
-        client.outboxEvent.updateMany({
-          where: { shop, orderId: { in: input.orderIds } },
-          data: { payloadEnc: null },
-        }),
-      ]);
+      const [requests, removed, outbox, waitlist, waitlistEvents] =
+        await client.$transaction([
+          client.dataRequest.deleteMany({
+            where: { shop, customerId: input.customerId },
+          }),
+          client.webhookEvent.deleteMany({
+            where: { shop, id: { in: eventIds } },
+          }),
+          // Udgående hændelser: kundens navn og e-mail slettes. Hvad der blev
+          // sendt hvornår (uden kundeoplysninger) bliver stående i logbogen.
+          client.outboxEvent.updateMany({
+            where: { shop, orderId: { in: input.orderIds } },
+            data: { payloadEnc: null },
+          }),
+          // Ventelisten: tilmeldingerne slettes, og e-mailen i hændelser, der
+          // allerede er bygget.
+          client.waitlistEntry.deleteMany({
+            where: { shop, emailHash: emailHash ?? "-" },
+          }),
+          client.outboxEvent.updateMany({
+            where: { shop, emailHash: emailHash ?? "-" },
+            data: { payloadEnc: null },
+          }),
+        ]);
       return {
         dataRequests: requests.count,
         events: removed.count,
-        outboxEvents: outbox.count,
+        outboxEvents: outbox.count + waitlistEvents.count,
+        waitlist: waitlist.count,
       };
     },
 
@@ -217,8 +255,13 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         client.outboxDelivery.deleteMany(where),
         client.outboxEvent.deleteMany(where),
         client.integrationSetting.deleteMany(where),
+        client.waitlistEntry.deleteMany(where),
+        client.waitlistWatch.deleteMany(where),
+        client.waitlistStat.deleteMany(where),
         client.queueLock.deleteMany({
-          where: { shop: { in: [shop, `${shop}#outbox`] } },
+          where: {
+            shop: { in: [shop, `${shop}#outbox`, `${shop}#waitlist`] },
+          },
         }),
       ]);
     },
@@ -254,10 +297,13 @@ export async function purgeOldData(
     // Logbogen (uden kundeoplysninger) efter 90 dage.
     client.outboxEvent.deleteMany({ where: { createdAt: { lt: logBefore } } }),
   ]);
+  const waitlist = await purgeWaitlist(client, now);
   return {
     events: events.count,
     dataRequests: requests.count,
     outboxPayloads: payloads.count,
     outboxLog: log.count,
+    waitlistOpen: waitlist.open,
+    waitlistNotified: waitlist.notified,
   };
 }

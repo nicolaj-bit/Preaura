@@ -16,7 +16,7 @@ const PROCESSOR = {
   email: "nicolaj@lalatoto.dk",
 };
 
-const UPDATED = "5. november 2026";
+const UPDATED = "6. november 2026";
 
 export const meta: MetaFunction = () => [
   { title: "Databehandleraftale – PREAURA" },
@@ -157,15 +157,15 @@ export default function Dpa() {
         <li>
           <strong>Indsigt:</strong> Når Shopify sender en kundes anmodning om
           indsigt, viser appen under «Ordrebehandling», hvad PREAURA har om
-          kundens ordrer.
+          kundens ordrer og kundens tilmeldinger til ventelisten.
         </li>
         <li>
           <strong>Sletning:</strong> Når Shopify sender en anmodning om sletning
           af en kunde, sletter PREAURA kundens navn og e-mail i hændelser,
-          kundens indsigtsanmodninger og beskeder om kundens ordrer.
-          Tildelingerne (ordrenummer, antal og dato) bevares, fordi de er
-          webshoppens regnskab over pladserne i leverancerne og ikke indeholder
-          kundens navn eller kontaktoplysninger.
+          kundens tilmeldinger til ventelisten, kundens indsigtsanmodninger og
+          beskeder om kundens ordrer. Tildelingerne (ordrenummer, antal og dato)
+          bevares, fordi de er webshoppens regnskab over pladserne i
+          leverancerne og ikke indeholder kundens navn eller kontaktoplysninger.
         </li>
       </ul>
       <p>
@@ -224,14 +224,21 @@ export default function Dpa() {
               ajour, skrive den lovede leveringsdato på ordren, og — når
               webshoppen slår det til — sende hændelser om forudbestillingen
               (oprettet, forsinket, klar til afsendelse, annulleret) til de
-              modtagere, webshoppen vælger.
+              modtagere, webshoppen vælger. Når webshoppen slår ventelisten til:
+              modtage kunders tilmelding til besked om en udsolgt vare og sende
+              hændelsen «varen kan købes» til de samme modtagere, så webshoppen
+              kan give kunden besked. Ventelisten bruges ikke til markedsføring
+              eller nyhedsbrev.
             </Cell>
           </tr>
           <tr>
             <Cell>
               <strong>Registrerede</strong>
             </Cell>
-            <Cell>Webshoppens kunder, der forudbestiller en vare.</Cell>
+            <Cell>
+              Webshoppens kunder, der forudbestiller en vare eller skriver sig
+              på ventelisten til en udsolgt vare.
+            </Cell>
           </tr>
           <tr>
             <Cell>
@@ -240,9 +247,10 @@ export default function Dpa() {
             <Cell>
               Almindelige personoplysninger: ordrenummer og -id, antal,
               bestillingstidspunkt og lovet leveringsdato. Kun ved udsendelse af
-              hændelser desuden kundens navn og e-mail. Ingen følsomme
-              oplysninger, ingen betalingsoplysninger, ingen adresser eller
-              telefonnumre.
+              hændelser desuden kundens navn og e-mail. Ved tilmelding til
+              ventelisten: kundens e-mail, produkt, variant og tidspunkt. Ingen
+              følsomme oplysninger, ingen betalingsoplysninger, ingen adresser
+              eller telefonnumre.
             </Cell>
           </tr>
           <tr>
@@ -251,7 +259,9 @@ export default function Dpa() {
             </Cell>
             <Cell>
               Så længe appen er installeret. Kundens navn og e-mail i hændelser
-              slettes efter 30 dage. Se Bilag C.
+              slettes efter 30 dage. Tilmeldinger til ventelisten slettes 7 dage
+              efter, kunden har fået besked, og senest efter 180 dage. Se Bilag
+              C.
             </Cell>
           </tr>
         </tbody>
@@ -289,11 +299,26 @@ export default function Dpa() {
           Kundens navn og e-mail hentes kun fra Shopify, når en hændelse skal
           sendes til en modtager, webshoppen har slået til.
         </li>
+        <li>
+          Ventelisten: kunden skriver selv sin e-mail på produktsiden. Den
+          bruges kun til én besked om, at netop den vare kan købes. Der er ingen
+          afkrydsningsfelter, og tilmeldingen er ikke en tilmelding til
+          nyhedsbrev. Hver tilmelding giver højst én besked.
+        </li>
       </ul>
       <h3>Opbevaring og sletning</h3>
       <ul>
         <li>Beskeder fra Shopify (kun ordrens id og tidspunkt): 30 dage.</li>
         <li>Kundens navn og e-mail i hændelser: højst 30 dage.</li>
+        <li>
+          Tilmelding til ventelisten (e-mail, produkt, variant, tidspunkt): 7
+          dage efter, kunden har fået besked. En tilmelding, der aldrig bliver
+          udløst, slettes efter 180 dage.
+        </li>
+        <li>
+          Antal, der har fået besked pr. vare og leverance (kun tal, ingen
+          persondata): så længe appen er installeret.
+        </li>
         <li>Logbog over sendte hændelser (uden kundeoplysninger): 90 dage.</li>
         <li>Besvarede indsigtsanmodninger: 30 dage.</li>
         <li>Alt om webshoppen: 48 timer efter afinstallation.</li>
@@ -307,6 +332,11 @@ export default function Dpa() {
         <li>
           Kundens navn og e-mail, API-nøgler og webhook-adresser krypteres
           desuden af appen selv (AES-256-GCM), før de gemmes.
+        </li>
+        <li>
+          Tilmeldinger til ventelisten kommer gennem Shopify, som signerer dem.
+          Antallet pr. afsender er begrænset, og svaret er det samme, uanset om
+          e-mailen allerede står på listen. Afsenderens IP-adresse gemmes ikke.
         </li>
         <li>Beskeder fra Shopify kontrolleres med en digital signatur.</li>
         <li>Hver webshop kan kun se sine egne data.</li>

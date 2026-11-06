@@ -11,6 +11,7 @@ import { getVariableValues } from "graphql/execution/values";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createShopifyGateway } from "./shopifyGateway.server";
 import { desiredPlans } from "./plans";
+import { fetchVariantNames } from "../lib/shopifyProducts.server";
 
 // Validerer hver forespørgsel og mutation, appen sender til Shopify, mod
 // Shopifys rigtige Admin-skema — inklusive variablerne (feltnavne og
@@ -263,5 +264,28 @@ describe("forespørgsler mod Shopifys skema", () => {
         ),
       ),
     );
+  });
+
+  it("venteliste: kan varianterne købes, og hvad hedder de", async () => {
+    const VARIANT = "gid://shopify/ProductVariant/1";
+    expectValid(await capture((g) => g.readVariantAvailability([VARIANT])));
+    expectValid(await capture((g) => g.readVariantDetails(VARIANT)));
+    expectValid(
+      await capture((g) =>
+        g.flowTriggerReceive("preaura-waitlist-available", { product_id: 1 }),
+      ),
+    );
+  });
+
+  it("venteliste: navne til admin", async () => {
+    let call: Call | undefined;
+    await fetchVariantNames(
+      async (query, options) => {
+        call = { query, variables: options?.variables ?? {} };
+        return new Response(JSON.stringify({ data: { nodes: [] } }));
+      },
+      ["gid://shopify/ProductVariant/1"],
+    );
+    expectValid(call!);
   });
 });

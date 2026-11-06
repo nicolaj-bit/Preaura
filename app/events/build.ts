@@ -7,6 +7,7 @@ export const EVENT_TYPES = [
   "preorder.delayed",
   "preorder.ready",
   "preorder.cancelled",
+  "waitlist.available",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -16,6 +17,7 @@ export const EVENT_LABELS: Record<EventType, string> = {
   "preorder.delayed": "Forudbestilling forsinket",
   "preorder.ready": "Forudbestilling klar til afsendelse",
   "preorder.cancelled": "Forudbestilling annulleret",
+  "waitlist.available": "Venteliste: varen kan købes",
 };
 
 export type PreauraEvent = {
@@ -32,14 +34,26 @@ export type PreauraEvent = {
     lastName: string | null;
     name: string | null;
   };
-  order: { id: string; name: string };
+  /** Null for hændelser fra ventelisten, som ikke hører til en ordre. */
+  order: { id: string; name: string } | null;
   product: { id: string | null; title: string | null };
   variant: { id: string; title: string | null; sku: string | null };
+  /**
+   * Forudbestilling: antal stk. på ordrelinjen. Venteliste: antal, der kunne
+   * købes, da kunden fik besked.
+   */
   quantity: number;
   /** Leverancens dato (YYYY-MM-DD). */
   deliveryDate: string | null;
   /** Den tidligere dato, når datoen er ændret (forsinket). Ellers null. */
   previousDeliveryDate: string | null;
+  /** Venteliste: den leverance, der blev åbnet. Null for lager. */
+  deliveryId: string | null;
+  /**
+   * Venteliste: «stock» (varen kom på lager) eller «preorder» (en leverance
+   * med ledige pladser blev åbnet). Null for forudbestillinger.
+   */
+  availability: "stock" | "preorder" | null;
 };
 
 /** Det, appen selv ved om hændelsen, da den skete. */
@@ -47,10 +61,12 @@ export type EventIntent = {
   id: string;
   shop: string;
   type: string;
-  orderId: string;
+  orderId: string | null;
   orderName: string;
-  orderLineId: string;
+  orderLineId: string | null;
   variantId: string;
+  productId?: string | null;
+  deliveryId?: string | null;
   quantity: number;
   deliveryDate: string | null;
   previousDate: string | null;
@@ -101,7 +117,9 @@ export function buildEvent(
       lastName: customer?.lastName ?? null,
       name: fullName,
     },
-    order: { id: intent.orderId, name: details?.name || intent.orderName },
+    order: intent.orderId
+      ? { id: intent.orderId, name: details?.name || intent.orderName }
+      : null,
     product: {
       id: line?.productId ?? null,
       title: line?.productTitle ?? null,
@@ -114,5 +132,48 @@ export function buildEvent(
     quantity: intent.quantity,
     deliveryDate: intent.deliveryDate,
     previousDeliveryDate: intent.previousDate,
+    deliveryId: null,
+    availability: null,
+  };
+}
+
+/** Det, der hentes fra Shopify om varianten til en hændelse fra ventelisten. */
+export type VariantDetails = {
+  productId: string | null;
+  productTitle: string | null;
+  variantTitle: string | null;
+  sku: string | null;
+};
+
+/**
+ * Hændelsen fra ventelisten: kunden har bedt om besked, og varen kan købes.
+ * Kun kundens e-mail — ventelisten kender ikke navnet.
+ */
+export function buildWaitlistEvent(
+  intent: EventIntent,
+  email: string,
+  details: VariantDetails | null,
+): PreauraEvent {
+  return {
+    id: intent.id,
+    type: "waitlist.available",
+    occurredAt: intent.createdAt.toISOString(),
+    shop: intent.shop,
+    customer: { email, firstName: null, lastName: null, name: null },
+    order: null,
+    product: {
+      id: details?.productId ?? intent.productId ?? null,
+      title: details?.productTitle ?? null,
+    },
+    variant: {
+      id: intent.variantId,
+      title: details?.variantTitle ?? null,
+      sku: details?.sku ?? null,
+    },
+    quantity: intent.quantity,
+    deliveryDate: intent.deliveryDate,
+    previousDeliveryDate: null,
+    deliveryId: intent.deliveryId ?? null,
+    availability: intent.deliveryId ? "preorder" : "stock",
   };
 }

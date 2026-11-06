@@ -3,7 +3,14 @@ import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { queueFor } from "../models/queue.server";
 import { outboxFor, type DeliveryResult } from "../models/outbox.server";
-import { buildEvent, type OrderDetails, type PreauraEvent } from "./build";
+import { waitlistFor } from "../models/waitlist.server";
+import {
+  buildEvent,
+  buildWaitlistEvent,
+  type OrderDetails,
+  type PreauraEvent,
+  type VariantDetails,
+} from "./build";
 import {
   FLOW_HANDLES,
   KLAVIYO_URL,
@@ -29,6 +36,8 @@ import {
 
 export type OutboxDeps = {
   readOrderDetails(orderId: string): Promise<OrderDetails | null>;
+  /** Produkt- og variantnavn til hændelser fra ventelisten. */
+  readVariantDetails(variantId: string): Promise<VariantDetails | null>;
   flowTriggerReceive(
     handle: string,
     payload: Record<string, unknown>,
@@ -64,15 +73,45 @@ export async function processOutbox({
       ...(settings.klaviyo ? (["KLAVIYO"] as const) : []),
     ];
     const details = new Map<string, OrderDetails | null>();
+    const variants = new Map<string, VariantDetails | null>();
+    const waitlist = waitlistFor(shop, client);
     for (const intent of await outbox.events.unbuilt()) {
       try {
-        if (!details.has(intent.orderId)) {
-          details.set(
-            intent.orderId,
-            await deps.readOrderDetails(intent.orderId),
+        let event: PreauraEvent;
+        if (intent.type === "waitlist.available") {
+          // Kundens e-mail ligger kun på tilmeldingen. Er den slettet (på
+          // kundens anmodning), kan hændelsen ikke sendes.
+          const email = intent.waitlistEntryId
+            ? await waitlist.emailFor(intent.waitlistEntryId)
+            : null;
+          if (!email) {
+            await outbox.events.markFailed(
+              intent.id,
+              "Tilmeldingen er slettet, før beskeden kunne sendes.",
+            );
+            continue;
+          }
+          if (!variants.has(intent.variantId)) {
+            variants.set(
+              intent.variantId,
+              await deps.readVariantDetails(intent.variantId),
+            );
+          }
+          event = buildWaitlistEvent(
+            intent,
+            email,
+            variants.get(intent.variantId) ?? null,
           );
+        } else {
+          const orderId = intent.orderId ?? "";
+          if (!details.has(orderId)) {
+            details.set(
+              orderId,
+              orderId ? await deps.readOrderDetails(orderId) : null,
+            );
+          }
+          event = buildEvent(intent, details.get(orderId) ?? null);
         }
-        const event = buildEvent(intent, details.get(intent.orderId) ?? null);
         await outbox.events.markBuilt(
           intent.id,
           JSON.stringify(event),

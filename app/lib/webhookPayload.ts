@@ -24,7 +24,25 @@ function pick(source: unknown, keys: string[]): Json {
   return result;
 }
 
-export function minimalPayload(topic: string, payload: unknown): Json {
+/**
+ * hashEmail: til compliance-hændelser. Kundens e-mail gemmes ikke — kun en
+ * envejs-nøgle (email_hash), så kundens tilmeldinger til ventelisten kan
+ * findes og slettes.
+ */
+export function minimalPayload(
+  topic: string,
+  payload: unknown,
+  hashEmail?: (email: string) => string | null,
+): Json {
+  const customer = (payload as Json | null)?.customer as Json | undefined;
+  const customerRef = () => {
+    const ref = pick(customer, ["id"]);
+    const email = customer?.email;
+    const hash =
+      hashEmail && typeof email === "string" && email ? hashEmail(email) : null;
+    if (hash) ref.email_hash = hash;
+    return ref;
+  };
   if (ORDER_TOPICS.has(topic)) {
     return pick(payload, ["id", "admin_graphql_api_id", "created_at"]);
   }
@@ -36,13 +54,13 @@ export function minimalPayload(topic: string, payload: unknown): Json {
     case "CUSTOMERS_DATA_REQUEST":
       return {
         ...pick(payload, ["orders_requested"]),
-        customer: pick((payload as Json | null)?.customer, ["id"]),
+        customer: customerRef(),
         data_request: pick((payload as Json | null)?.data_request, ["id"]),
       };
     case "CUSTOMERS_REDACT":
       return {
         ...pick(payload, ["orders_to_redact"]),
-        customer: pick((payload as Json | null)?.customer, ["id"]),
+        customer: customerRef(),
       };
     default:
       // fx app/uninstalled (butikkens ejer og mail) og shop/redact.

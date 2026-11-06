@@ -6,9 +6,9 @@
 
 const TABLE_RULE = {
   selector:
-    "MemberExpression[object.name=/^(db|prisma|client|tx)$/][property.name=/^(shopSetting|variantPlan|delivery|allocation|modeChange|sellingPlanRef|dataRequest|integrationSetting|outboxEvent|outboxDelivery)$/]",
+    "MemberExpression[object.name=/^(db|prisma|client|tx)$/][property.name=/^(shopSetting|variantPlan|delivery|allocation|modeChange|sellingPlanRef|dataRequest|integrationSetting|outboxEvent|outboxDelivery|waitlistEntry|waitlistWatch|waitlistStat)$/]",
   message:
-    "Brug forShop(shop), complianceFor(shop) eller outboxFor(shop) fra app/models/ — så filtreres der altid på butik.",
+    "Brug forShop(shop), complianceFor(shop), outboxFor(shop) eller waitlistFor(shop) fra app/models/ — så filtreres der altid på butik.",
 };
 
 const MUTATION_RULE = {

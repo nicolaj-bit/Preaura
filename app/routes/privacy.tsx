@@ -5,7 +5,8 @@ import type { MetaFunction } from "react-router";
 //
 // Teksten skal passe til, hvad koden faktisk gør. Ændres det, appen gemmer
 // eller sletter (prisma/schema.prisma, app/lib/webhookPayload.ts,
-// app/models/compliance.server.ts), skal siden rettes med.
+// app/models/compliance.server.ts, app/models/waitlist.server.ts), skal siden
+// rettes med.
 
 const COMPANY = {
   name: "LALATOTO of Denmark ApS",
@@ -14,7 +15,7 @@ const COMPANY = {
   email: "nicolaj@lalatoto.dk",
 };
 
-const UPDATED = "4. november 2026";
+const UPDATED = "6. november 2026";
 
 export const meta: MetaFunction = () => [
   { title: "Privatlivspolitik – PREAURA" },
@@ -96,6 +97,12 @@ export default function Privacy() {
           (fx til Klaviyo), og gemmes da krypteret i højst 30 dage.
         </li>
         <li>
+          Skriver en kunde sig på ventelisten til en udsolgt vare, gemmes
+          kundens e-mail krypteret sammen med varen. Den bruges kun til én
+          besked om, at varen kan købes — aldrig til nyhedsbrev — og slettes
+          senest 7 dage efter beskeden, eller efter 180 dage.
+        </li>
+        <li>
           Om en ordre gemmes kun det, der skal til for at holde styr på
           pladserne i leverancerne: ordrens id og nummer, antal, tidspunkt og
           den lovede dato.
@@ -155,6 +162,11 @@ export default function Privacy() {
             what="Hændelser om forudbestillingen (oprettet, forsinket, klar til afsendelse, annulleret): kundens navn og e-mail, ordrenummer, produkt, variant, antal og leveringsdatoer"
             why="Sende hændelsen til de modtagere, webshoppen selv har slået til: Shopify Flow, en webhook-adresse eller Klaviyo — fx så webshoppen kan sende kunden en mail, når varen er klar"
             how="Kundens navn og e-mail gemmes krypteret og slettes efter 30 dage eller når kunden skal slettes. Logbogen over, hvad der blev sendt hvornår (uden kundeoplysninger), slettes efter 90 dage"
+          />
+          <Row
+            what="Tilmelding til ventelisten: kundens e-mail, produkt, variant og tidspunkt"
+            why="Give kunden én besked, når netop den vare kan købes igen — på lager eller i en ny leverance. Beskeden sendes som hændelse til den modtager, webshoppen har slået til (Shopify Flow, Klaviyo eller en webhook-adresse). Bruges ikke til nyhedsbrev eller markedsføring"
+            how="E-mailen gemmes krypteret. Slettes 7 dage efter, kunden har fået besked, og senest efter 180 dage, eller når kunden skal slettes. Antallet, der har fået besked pr. vare, gemmes uden persondata"
           />
           <Row
             what="En kundes anmodning om indsigt: Shopifys id på kunden og på de ordrer, anmodningen gælder"
@@ -227,15 +239,21 @@ export default function Privacy() {
           Hver webhook er signeret, så modtageren kan kontrollere, at den kommer
           fra PREAURA.
         </li>
+        <li>
+          Tilmeldinger til ventelisten kommer gennem Shopify, som signerer dem.
+          Antallet pr. afsender er begrænset, og svaret er det samme, uanset om
+          e-mailen allerede står på listen. IP-adressen gemmes ikke.
+        </li>
       </ul>
 
       <h2>7. Sletning</h2>
       <ul>
         <li>
           Når en kunde beder webshoppen om at blive slettet, sletter appen
-          kundens anmodninger, beskeder om kundens ordrer og kundens navn og
-          e-mail i hændelser. Hvad der allerede er sendt til webshoppens
-          modtagere, skal webshoppen selv slette hos dem.
+          kundens anmodninger, beskeder om kundens ordrer, kundens tilmeldinger
+          til ventelisten og kundens navn og e-mail i hændelser. Hvad der
+          allerede er sendt til webshoppens modtagere, skal webshoppen selv
+          slette hos dem.
         </li>
         <li>
           Afinstalleres appen, sletter appen alle butikkens data 48 timer
