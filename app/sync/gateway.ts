@@ -94,6 +94,24 @@ export interface ShopifyGateway {
       { available: boolean; quantity: number | null; productId: string }
     >
   >;
+  /**
+   * Annullerer ordren i Shopify. Uden refundering (appen udbetaler aldrig
+   * penge) og uden at lægge varer på lager (appen styrer selv lageret).
+   * Er ordren allerede annulleret, sker der intet.
+   */
+  cancelOrder(
+    orderId: string,
+    reason: "CUSTOMER" | "DECLINED" | "STAFF",
+  ): Promise<void>;
+  /**
+   * Sætter ordrelinjers antal (nedad) med en rettelse af ordren — igen uden
+   * refundering og uden at lægge på lager. Antallet er MÅLET, så samme kald to
+   * gange giver samme ordre.
+   */
+  setOrderLineQuantities(
+    orderId: string,
+    targets: { lineId: string; quantity: number }[],
+  ): Promise<void>;
   /** Starter butikkens Flow-workflows, der bruger triggeren. */
   flowTriggerReceive(
     handle: string,
@@ -120,7 +138,7 @@ export type ShopifyOrderState = {
 
 export type OrderMetafield = {
   key: string;
-  type: "date" | "json";
+  type: "date" | "json" | "url";
   value: string;
 };
 

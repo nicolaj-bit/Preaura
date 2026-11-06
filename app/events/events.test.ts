@@ -565,6 +565,7 @@ describe("Flow-triggerne", () => {
         previousDeliveryDate: null,
         deliveryId: null,
         availability: null,
+        cancelUrl: null,
       };
       expect(Object.keys(toFlowPayload(event)).sort()).toEqual(
         [...refs, ...keys].sort(),

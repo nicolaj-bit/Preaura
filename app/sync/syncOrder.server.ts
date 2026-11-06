@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { forShop } from "../models/preorder.server";
+import { releaseFor } from "../models/release.server";
+import { cancelLink } from "../release/link.server";
 import type { ShopifyGateway } from "./gateway";
 import {
   UNRESOLVED_TAG,
@@ -32,7 +34,21 @@ export async function syncOrder({
   const order = await gateway.readOrder(orderId);
   if (!order) throw new Error("Ordren findes ikke længere i Shopify.");
 
-  const fields = desiredOrderMetafields(rows).filter(
+  // Kundens annulleringslink (preaura.cancel_url), så butikken kan vise det
+  // i sine notifikationer og på ordrestatussiden. Kun mens der er
+  // reserverede enheder; ellers røres det ikke.
+  const wantedFields = desiredOrderMetafields(rows);
+  if (rows.some((r) => r.status === "ACTIVE") && !order.snapshot.cancelled) {
+    const link = await cancelLinkOrNull(
+      shop,
+      orderId,
+      order.snapshot.createdAt,
+      client,
+    );
+    if (link)
+      wantedFields.push({ key: "cancel_url", type: "url", value: link });
+  }
+  const fields = wantedFields.filter(
     (field) => !metafieldMatches(field, order.metafields[field.key] ?? null),
   );
   if (fields.length > 0) await gateway.setOrderMetafields(orderId, fields);
@@ -43,5 +59,23 @@ export async function syncOrder({
 
   if (!wanted.includes(UNRESOLVED_TAG) && order.tags.includes(UNRESOLVED_TAG)) {
     await gateway.removeOrderTags(orderId, [UNRESOLVED_TAG]);
+  }
+}
+
+/**
+ * Linket kræver krypteringsnøglen. Mangler den, springes linket over — det
+ * må aldrig forhindre, at datoen og tagget kommer på ordren.
+ */
+async function cancelLinkOrNull(
+  shop: string,
+  orderId: string,
+  createdAt: string,
+  client: PrismaClient,
+) {
+  try {
+    const settings = await releaseFor(shop, client).settings();
+    return cancelLink(shop, orderId, new Date(createdAt), settings);
+  } catch {
+    return null;
   }
 }

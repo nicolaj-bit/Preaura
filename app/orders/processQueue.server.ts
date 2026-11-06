@@ -4,6 +4,8 @@ import db from "../db.server";
 import { forShop, type OrderSnapshot } from "../models/preorder.server";
 import { EVENT_STATUS, queueFor } from "../models/queue.server";
 import { complianceFor, orderGid } from "../models/compliance.server";
+import { releaseFor, type LineTarget } from "../models/release.server";
+import { processReleases } from "../release/process.server";
 
 // Behandling af ordre-hændelser i køen → tildelinger.
 //
@@ -25,6 +27,8 @@ const ORDER_TOPICS = new Set([
   "ORDERS_UPDATED",
   "ORDERS_CANCELLED",
   "REFUNDS_CREATE",
+  // Betalingsforsøg (også afviste opkrævninger ved afsendelse).
+  "ORDER_TRANSACTIONS_CREATE",
 ]);
 
 const INVENTORY_TOPIC = "INVENTORY_LEVELS_UPDATE";
@@ -55,6 +59,19 @@ export type QueueDeps = {
   syncVariant(variantId: string): Promise<unknown>;
   /** Synkroniserer ordrens metafelter og tags. Kaster ved fejl. */
   syncOrder(orderId: string): Promise<void>;
+  /**
+   * Frigivelse (annullering og afvist betaling). Uden disse udføres ingen
+   * frigivelser i denne kørsel — de venter til næste.
+   */
+  cancelOrder?(
+    orderId: string,
+    reason: "CUSTOMER" | "DECLINED" | "STAFF",
+  ): Promise<void>;
+  setOrderLineQuantities?(
+    orderId: string,
+    targets: LineTarget[],
+  ): Promise<void>;
+  hasAccess?(): Promise<boolean>;
 };
 
 type Event = { id: string; topic: string; payload: string; receivedAt: Date };
@@ -67,7 +84,10 @@ export function orderRef(event: Event) {
   } catch {
     return null;
   }
-  if (event.topic === "REFUNDS_CREATE") {
+  if (
+    event.topic === "REFUNDS_CREATE" ||
+    event.topic === "ORDER_TRANSACTIONS_CREATE"
+  ) {
     if (payload.order_id == null) return null;
     return {
       orderId: `gid://shopify/Order/${payload.order_id}`,
@@ -168,7 +188,7 @@ export async function processShopQueue({
       for (const [orderId, group] of ordered) {
         await queue.renewLock(holder);
         try {
-          await processOrder(orderId, data, deps);
+          await processOrder(orderId, data, deps, shop, client);
           await queue.markDone(group.ids);
           totals.done += group.ids.length;
         } catch (error) {
@@ -217,6 +237,24 @@ export async function processShopQueue({
           totals.failed += ids.length;
         }
       }
+    }
+
+    // Frigivelser (godkendte annulleringer, afviste betalinger efter
+    // fristen) — under samme lås som ordrerne, så de aldrig løber om kap.
+    if (deps?.cancelOrder && deps.setOrderLineQuantities && deps.hasAccess) {
+      await queue.renewLock(holder);
+      const d = deps;
+      await processReleases({
+        shop,
+        client,
+        deps: {
+          readOrder: d.readOrder,
+          cancelOrder: d.cancelOrder!,
+          setOrderLineQuantities: d.setOrderLineQuantities!,
+          hasAccess: d.hasAccess!,
+          reconcile: (orderId) => processOrder(orderId, data, d, shop, client),
+        },
+      });
     }
   } finally {
     await queue.releaseLock(holder);
@@ -294,11 +332,15 @@ async function processOrder(
   orderId: string,
   data: ReturnType<typeof forShop>,
   deps: QueueDeps,
+  shop: string,
+  client: PrismaClient,
 ) {
   const order = await deps.readOrder(orderId);
   if (!order) throw new Error("Ordren findes ikke i Shopify.");
 
   const { variantIds } = await data.orders.apply(order);
+  // Afvist betaling ved afsendelse: opret, luk eller lad sagen være.
+  await releaseFor(shop, client).payments.observe(order);
 
   // Shopifys lager skal igen svare til det resterende. Fejler det, står
   // fejlen på varianten i admin; tildelingen er gemt uanset.

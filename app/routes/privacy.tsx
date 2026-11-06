@@ -15,7 +15,7 @@ const COMPANY = {
   email: "nicolaj@lalatoto.dk",
 };
 
-const UPDATED = "6. november 2026";
+const UPDATED = "7. november 2026";
 
 export const meta: MetaFunction = () => [
   { title: "Privatlivspolitik – PREAURA" },
@@ -167,6 +167,11 @@ export default function Privacy() {
             what="Tilmelding til ventelisten: kundens e-mail, produkt, variant og tidspunkt"
             why="Give kunden én besked, når netop den vare kan købes igen — på lager eller i en ny leverance. Beskeden sendes som hændelse til den modtager, webshoppen har slået til (Shopify Flow, Klaviyo eller en webhook-adresse). Bruges ikke til nyhedsbrev eller markedsføring"
             how="E-mailen gemmes krypteret. Slettes 7 dage efter, kunden har fået besked, og senest efter 180 dage, eller når kunden skal slettes. Antallet, der har fået besked pr. vare, gemmes uden persondata"
+          />
+          <Row
+            what="Annulleringer og afviste betalinger: ordrens id og nummer, de berørte ordrelinjer og antal, og tidspunkter"
+            why="Frigive reserverede enheder, når kunden annullerer, eller når en betaling ved afsendelse er afvist og ikke rettet inden butikkens frist. Ingen kort- eller betalingsoplysninger"
+            how="Slettes 90 dage efter, sagen er afsluttet, eller når kunden skal slettes"
           />
           <Row
             what="En kundes anmodning om indsigt: Shopifys id på kunden og på de ordrer, anmodningen gælder"

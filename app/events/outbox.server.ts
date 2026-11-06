@@ -4,6 +4,8 @@ import db from "../db.server";
 import { queueFor } from "../models/queue.server";
 import { outboxFor, type DeliveryResult } from "../models/outbox.server";
 import { waitlistFor } from "../models/waitlist.server";
+import { releaseFor } from "../models/release.server";
+import { cancelLink } from "../release/link.server";
 import {
   buildEvent,
   buildWaitlistEvent,
@@ -75,6 +77,9 @@ export async function processOutbox({
     const details = new Map<string, OrderDetails | null>();
     const variants = new Map<string, VariantDetails | null>();
     const waitlist = waitlistFor(shop, client);
+    const release = releaseFor(shop, client);
+    let releaseSettings: Awaited<ReturnType<typeof release.settings>> | null =
+      null;
     for (const intent of await outbox.events.unbuilt()) {
       try {
         let event: PreauraEvent;
@@ -110,7 +115,20 @@ export async function processOutbox({
               orderId ? await deps.readOrderDetails(orderId) : null,
             );
           }
-          event = buildEvent(intent, details.get(orderId) ?? null);
+          // Kundens annulleringslink, så butikken kan sætte det i sin mail.
+          let url: string | null = null;
+          const createdAt = orderId
+            ? await release.orderCreatedAt(orderId)
+            : null;
+          if (createdAt) {
+            releaseSettings ??= await release.settings();
+            try {
+              url = cancelLink(shop, orderId, createdAt, releaseSettings);
+            } catch {
+              url = null; // Uden krypteringsnøgle intet link.
+            }
+          }
+          event = buildEvent(intent, details.get(orderId) ?? null, url);
         }
         await outbox.events.markBuilt(
           intent.id,

@@ -314,6 +314,45 @@ npm run deploy:prod     # udrul til produktionsappen
 `npm run deploy` alene nægter at køre, så man ikke kommer til at udrulle til
 det forkerte miljø.
 
+## Annullering og afvist betaling (frigivelse)
+
+En reserveret enhed kommer tilbage i leverancen gennem ÉN mekanisme:
+ordren ændres i Shopify (annulleres helt eller får nedsat antal), og den
+eksisterende afstemning (`orders.apply`) frigiver forskellen. Appen frigiver
+aldrig i sit eget regnskab alene, så to veje kan ikke blive uenige.
+
+- **Udløsere:** kunden annullerer via link (godkendt automatisk eller af
+  butikken), butikken annullerer eller refunderer i Shopify (webhook direkte
+  til afstemningen), og en afvist betaling, der stadig er ubetalt, når fristen
+  er udløbet.
+- **Præcis én gang:** en anmodning gemmer det ANTAL, linjen skal ende på —
+  ikke «træk 2 fra». Er ordren allerede der, skrives intet. Højst én åben
+  anmodning pr. ordre (unikt indeks), godkendelse kun fra «venter», og alt
+  udføres i køen under butikkens lås (`app/release/process.server.ts`).
+- **Delvis:** `orderEditBegin/SetQuantity/Commit` nedsætter antallet; de
+  resterende enheder beholder deres tildeling og dato. Ender hele ordren på
+  0, bruges `orderCancel`. Allerede sendte enheder røres aldrig.
+- **Ingen udbetaling:** begge dele sker uden refundering og uden at lægge på
+  lager (`restock: false`). Butikken refunderer selv i Shopify.
+- **Kundens link:** `https://<butik>/apps/preaura/cancel?o=…&x=…&s=…`
+  (app-proxy, `app/routes/proxy.cancel.tsx`). HMAC-signeret (192 bit) over
+  butik, ordre og udløb; intet login. Siden vises i butikkens tema og viser
+  kun ordrenummer, de forudbestilte varer, antal og lovet dato. Linket står
+  på ordren som metafeltet `preaura.cancel_url` og i hændelserne
+  (`cancelUrl` / «Cancel url» / `cancel_url`).
+- **Butikkens regler** (siden «Annulleringer»): frist «indtil varen er
+  sendt» eller N dage efter bestilling (mindst 1 — annullering kan ikke slås
+  fra), godkendelse manuel eller automatisk inden for N dage, og frist ved
+  afvist betaling (standard 7 dage). Ingen bestemt lovgivning er lagt ind.
+- **Afvist betaling:** webhooken `order_transactions/create` og ordrens
+  transaktioner i Shopify. En sag oprettes, når en opkrævning er afvist, og
+  ordren ikke er betalt; den lukkes, når kunden betaler. Efter fristen
+  annulleres ordren (`DECLINED`). Butikken kan frigive før og forlænge.
+- **Hændelser:** `preorder.payment_failed` (ny Flow-trigger
+  `preaura-preorder-payment-failed`); en frigivelse udsender den kendte
+  `preorder.cancelled`.
+- **Kræver** scopet `write_order_edits` og aktivt abonnement.
+
 ## Venteliste
 
 «Giv mig besked, når varen kan købes.» Én mekanisme med to udløsere: varen

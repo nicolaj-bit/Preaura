@@ -4,6 +4,7 @@ import {
   createHash,
   createHmac,
   randomBytes,
+  timingSafeEqual,
 } from "node:crypto";
 
 // Kryptering af hemmeligheder og kundeoplysninger i databasen (AES-256-GCM).
@@ -75,4 +76,32 @@ export function hashEmail(email: string) {
 /** Små bogstaver og uden mellemrum. */
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+/**
+ * Signatur til et link (fx kundens annulleringslink): HMAC-SHA256 med en
+ * nøgle afledt af PREAURA_ENCRYPTION_KEY, base64url, 32 tegn (192 bit). Kan
+ * ikke gættes og ikke laves uden nøglen.
+ */
+export function signLink(purpose: string, payload: string) {
+  return createHmac(
+    "sha256",
+    createHash("sha256")
+      .update(`link:${purpose}:${key().toString("hex")}`)
+      .digest(),
+  )
+    .update(payload)
+    .digest("base64url")
+    .slice(0, 32);
+}
+
+/** Stemmer signaturen? Sammenligning i konstant tid. */
+export function verifyLink(
+  purpose: string,
+  payload: string,
+  signature: string,
+) {
+  const expected = Buffer.from(signLink(purpose, payload));
+  const given = Buffer.from(String(signature));
+  return expected.length === given.length && timingSafeEqual(expected, given);
 }

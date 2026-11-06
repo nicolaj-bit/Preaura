@@ -7,6 +7,7 @@ export const EVENT_TYPES = [
   "preorder.delayed",
   "preorder.ready",
   "preorder.cancelled",
+  "preorder.payment_failed",
   "waitlist.available",
 ] as const;
 
@@ -17,6 +18,7 @@ export const EVENT_LABELS: Record<EventType, string> = {
   "preorder.delayed": "Forudbestilling forsinket",
   "preorder.ready": "Forudbestilling klar til afsendelse",
   "preorder.cancelled": "Forudbestilling annulleret",
+  "preorder.payment_failed": "Forudbestilling: betaling afvist",
   "waitlist.available": "Venteliste: varen kan købes",
 };
 
@@ -54,6 +56,11 @@ export type PreauraEvent = {
    * med ledige pladser blev åbnet). Null for forudbestillinger.
    */
   availability: "stock" | "preorder" | null;
+  /**
+   * Kundens link til at annullere forudbestillingen (signeret, kun denne
+   * ordre). Null for annullerede ordrer og ventelisten.
+   */
+  cancelUrl: string | null;
 };
 
 /** Det, appen selv ved om hændelsen, da den skete. */
@@ -98,6 +105,7 @@ export function isEventType(type: string): type is EventType {
 export function buildEvent(
   intent: EventIntent,
   details: OrderDetails | null,
+  cancelUrl: string | null = null,
 ): PreauraEvent {
   if (!isEventType(intent.type)) {
     throw new Error(`Ukendt hændelsestype: ${intent.type}`);
@@ -134,6 +142,7 @@ export function buildEvent(
     previousDeliveryDate: intent.previousDate,
     deliveryId: null,
     availability: null,
+    cancelUrl: intent.type === "preorder.cancelled" ? null : cancelUrl,
   };
 }
 
@@ -175,5 +184,6 @@ export function buildWaitlistEvent(
     previousDeliveryDate: null,
     deliveryId: intent.deliveryId ?? null,
     availability: intent.deliveryId ? "preorder" : "stock",
+    cancelUrl: null,
   };
 }

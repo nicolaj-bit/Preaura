@@ -6,6 +6,7 @@ import { processOutbox } from "../events/outbox.server";
 import { processShopQueue, type QueueDeps } from "./processQueue.server";
 import { purgeOldData } from "../models/compliance.server";
 import { shopsWithWaitlist } from "../models/waitlist.server";
+import { shopsWithReleaseWork } from "../models/release.server";
 import { processWaitlist } from "../waitlist/process.server";
 import { accessFor } from "../billing/access.server";
 
@@ -43,10 +44,23 @@ export async function runQueue(shop: string) {
     const { admin } = await unauthenticated.admin(shop);
     graphql = admin.graphql;
     sync = shopifySync(admin.graphql, shop);
+    const graphqlForAccess = admin.graphql;
     deps = {
       readOrder: sync.readOrder,
       syncVariant: sync.sync,
       syncOrder: sync.syncOrder,
+      cancelOrder: sync.cancelOrder,
+      setOrderLineQuantities: sync.setOrderLineQuantities,
+      hasAccess: async () => {
+        try {
+          return (
+            (await accessFor({ graphql: graphqlForAccess }, shop)).status ===
+            "active"
+          );
+        } catch {
+          return false;
+        }
+      },
     };
   } catch {
     // Ingen adgang til butikken (fx er appen afinstalleret). Compliance-
@@ -127,6 +141,7 @@ export function startQueueSweeper() {
         ...(await shopsWithPendingEvents()),
         ...(await shopsWithOutboxWork()),
         ...(await shopsWithWaitlist()),
+        ...(await shopsWithReleaseWork()),
       ]);
       for (const shop of shops) scheduleQueue(shop, 0);
     } catch (error) {

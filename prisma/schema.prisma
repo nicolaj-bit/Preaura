@@ -87,6 +87,18 @@ model ShopSetting {
   waitlistStableMinutes Int      @default(10)
   waitlistBatchSize     Int      @default(50)
   waitlistBatchMinutes  Int      @default(30)
+  // Annullering og frigivelse. Se app/release/.
+  // Kundens frist: "UNTIL_FULFILLED" (indtil varen er sendt) eller "DAYS"
+  // (cancelDays dage efter bestilling, mindst 1). Annullering kan ikke slås
+  // helt fra — butikken sætter sin politik inden for mekanismen.
+  cancelWindow          String   @default("UNTIL_FULFILLED")
+  cancelDays            Int      @default(14)
+  // "MANUAL" (butikken godkender altid) eller "AUTO" (godkendes automatisk,
+  // hvis kunden annullerer senest cancelAutoDays dage efter bestilling).
+  cancelApproval        String   @default("MANUAL")
+  cancelAutoDays        Int      @default(14)
+  // Afvist betaling: så mange dage, før enheden frigives.
+  paymentGraceDays      Int      @default(7)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -423,4 +435,64 @@ model WaitlistStat {
   lastAt       DateTime @default(now())
 
   @@id([shop, variantId, deliveryId])
+}
+
+// ---------------------------------------------------------------------------
+// Frigivelse af reserverede enheder (annullering og afvist betaling)
+//
+// Der er ÉN frigivelse: ordren ændres i Shopify (annulleres helt eller får
+// nedsat antal), og den eksisterende afstemning (orders.apply) bringer
+// tildelingerne i overensstemmelse. Tabellerne her holder kun styr på,
+// hvad der er bedt om og hvornår. Al adgang går gennem
+// app/models/release.server.ts.
+// ---------------------------------------------------------------------------
+
+// En kundes (eller butikkens) anmodning om at annullere hele eller dele af en
+// forudbestilling. lines er JSON: [{ lineId, quantity }], hvor quantity er
+// det ANTAL, linjen skal ende på — ikke hvor mange der trækkes fra. Så giver
+// en gentagelse samme resultat som én gang.
+// Højst én åben (PENDING/APPROVED) pr. ordre: partielt unikt indeks i
+// migrationen 20261107090000_release.
+model CancellationRequest {
+  id          String    @id @default(cuid())
+  shop        String
+  orderId     String
+  orderName   String    @default("")
+  lines       String
+  // "CUSTOMER" eller "STAFF".
+  source      String    @default("CUSTOMER")
+  // "PENDING" (venter på butikken), "APPROVED" (udføres), "DONE",
+  // "REJECTED" eller "FAILED".
+  status      String    @default("PENDING")
+  lastError   String?
+  attempts    Int       @default(0)
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  doneAt      DateTime?
+
+  @@index([shop, status])
+  @@index([shop, orderId])
+}
+
+// En ordre, hvor betalingen er afvist ved afsendelse. Enheden frigives
+// først, når releaseAt er passeret (eller butikken frigiver manuelt), og
+// kun hvis ordren stadig ikke er betalt.
+// Højst én åben (OPEN/RELEASING) pr. ordre: partielt unikt indeks.
+model PaymentIssue {
+  id         String    @id @default(cuid())
+  shop       String
+  orderId    String
+  orderName  String    @default("")
+  // Tidspunktet for den afviste betaling (fra Shopify).
+  failedAt   DateTime
+  detectedAt DateTime  @default(now())
+  releaseAt  DateTime
+  // "OPEN", "RELEASING" (frigives nu), "RELEASED", "PAID" (kunden har
+  // betalt) eller "CLOSED" (ordren annulleret på anden vis).
+  status     String    @default("OPEN")
+  lastError  String?
+  resolvedAt DateTime?
+
+  @@index([shop, status, releaseAt])
+  @@index([shop, orderId])
 }

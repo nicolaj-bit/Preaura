@@ -20,6 +20,7 @@ export const FLOW_HANDLES: Record<EventType, string> = {
   "preorder.delayed": "preaura-preorder-delayed",
   "preorder.ready": "preaura-preorder-ready",
   "preorder.cancelled": "preaura-preorder-cancelled",
+  "preorder.payment_failed": "preaura-preorder-payment-failed",
   "waitlist.available": "preaura-waitlist-available",
 };
 
@@ -46,6 +47,7 @@ export function toFlowPayload(
     Quantity: event.quantity,
     "Delivery date": event.deliveryDate ?? "",
     "Previous delivery date": event.previousDeliveryDate ?? "",
+    "Cancel url": event.cancelUrl ?? "",
   };
 }
 
@@ -137,6 +139,7 @@ export function toKlaviyoBody(event: PreauraEvent) {
           previous_delivery_date: event.previousDeliveryDate,
           delivery_id: event.deliveryId,
           availability: event.availability,
+          cancel_url: event.cancelUrl,
         },
         metric: {
           data: {

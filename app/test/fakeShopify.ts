@@ -144,6 +144,28 @@ export function createFakeShopify() {
       }
       return result;
     },
+    async cancelOrder(orderId, reason) {
+      write("cancelOrder", [orderId, reason]);
+      const order = orders.get(orderId);
+      if (!order) throw new Error("Ordren findes ikke.");
+      order.snapshot.cancelled = true;
+    },
+    async setOrderLineQuantities(orderId, targets) {
+      write("setOrderLineQuantities", [orderId, targets]);
+      const order = orders.get(orderId);
+      if (!order) throw new Error("Ordren findes ikke.");
+      for (const target of targets) {
+        const line = order.snapshot.lines.find((l) => l.id === target.lineId);
+        if (!line) throw new Error(`Ordrelinjen ${target.lineId} findes ikke.`);
+        if (line.quantity > target.quantity) {
+          const removed = line.quantity - target.quantity;
+          line.quantity = target.quantity;
+          if (line.unfulfilled != null) {
+            line.unfulfilled = Math.max(0, line.unfulfilled - removed);
+          }
+        }
+      }
+    },
     async flowTriggerReceive(handle, payload) {
       write("flowTriggerReceive", [handle, payload]);
       flowTriggers.push({ handle, payload: structuredClone(payload) });

@@ -18,6 +18,27 @@ type AdminGraphql = (
 
 type UserErrors = { field?: string[] | null; message: string }[];
 
+/** Seneste afviste opkrævning (salg/træk), eller null. */
+export function latestFailedCharge(
+  transactions: { kind: string; status: string; createdAt: string }[],
+) {
+  const failed = transactions
+    .filter(
+      (t) =>
+        (t.kind === "SALE" ||
+          t.kind === "CAPTURE" ||
+          t.kind === "AUTHORIZATION") &&
+        (t.status === "FAILURE" || t.status === "ERROR"),
+    )
+    .map((t) => t.createdAt)
+    .sort();
+  return failed.pop() ?? null;
+}
+
+function alreadyCancelled(error: { code: string | null; message: string }) {
+  return /already.*cancel|cancel.*already/i.test(error.message);
+}
+
 async function run<T>(
   graphql: AdminGraphql,
   query: string,
@@ -454,16 +475,22 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           createdAt: string;
           cancelledAt: string | null;
           tags: string[];
+          fullyPaid: boolean;
+          transactions: { kind: string; status: string; createdAt: string }[];
           lineItems: {
             nodes: {
               id: string;
               currentQuantity: number;
+              unfulfilledQuantity: number;
+              title: string;
+              variantTitle: string | null;
               variant: { id: string } | null;
               sellingPlan: { sellingPlanId: string | null } | null;
             }[];
           };
           promisedDate: { value: string } | null;
           allocations: { value: string } | null;
+          cancelUrl: { value: string } | null;
         } | null;
       }>(
         graphql,
@@ -475,10 +502,19 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
               createdAt
               cancelledAt
               tags
+              fullyPaid
+              transactions(first: 50) {
+                kind
+                status
+                createdAt
+              }
               lineItems(first: 250) {
                 nodes {
                   id
                   currentQuantity
+                  unfulfilledQuantity
+                  title
+                  variantTitle
                   variant {
                     id
                   }
@@ -491,6 +527,9 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
                 value
               }
               allocations: metafield(namespace: "preaura", key: "allocations") {
+                value
+              }
+              cancelUrl: metafield(namespace: "preaura", key: "cancel_url") {
                 value
               }
             }
@@ -510,12 +549,20 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
             variantId: line.variant?.id ?? null,
             sellingPlanId: line.sellingPlan?.sellingPlanId ?? null,
             quantity: line.currentQuantity,
+            unfulfilled: line.unfulfilledQuantity,
+            title: line.title,
+            variantTitle: line.variantTitle,
           })),
+          payment: {
+            paid: order.fullyPaid,
+            failedAt: latestFailedCharge(order.transactions),
+          },
         },
         tags: order.tags,
         metafields: {
           promised_date: order.promisedDate?.value ?? null,
           allocations: order.allocations?.value ?? null,
+          cancel_url: order.cancelUrl?.value ?? null,
         },
       };
     },
@@ -709,6 +756,145 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         }
       }
       return result;
+    },
+
+    async cancelOrder(orderId, reason) {
+      const data = await run<{
+        orderCancel: {
+          orderCancelUserErrors: { code: string | null; message: string }[];
+        };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraOrderCancel(
+            $orderId: ID!
+            $reason: OrderCancelReason!
+            $staffNote: String
+          ) {
+            orderCancel(
+              orderId: $orderId
+              reason: $reason
+              restock: false
+              notifyCustomer: false
+              staffNote: $staffNote
+            ) {
+              orderCancelUserErrors {
+                code
+                message
+              }
+            }
+          }`,
+        {
+          orderId,
+          reason,
+          staffNote:
+            "Annulleret af PREAURA. Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+        },
+      );
+      const errors = data.orderCancel.orderCancelUserErrors;
+      // Allerede annulleret: det ønskede er sket.
+      if (errors.length > 0 && !errors.every(alreadyCancelled)) {
+        throw new ShopifyUserError("Annullering af ordren", errors);
+      }
+    },
+
+    async setOrderLineQuantities(orderId, targets) {
+      const begin = await run<{
+        orderEditBegin: {
+          calculatedOrder: {
+            id: string;
+            lineItems: {
+              nodes: {
+                id: string;
+                quantity: number;
+                editableQuantity: number;
+              }[];
+            };
+          } | null;
+          userErrors: UserErrors;
+        };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraOrderEditBegin($id: ID!) {
+            orderEditBegin(id: $id) {
+              calculatedOrder {
+                id
+                lineItems(first: 250) {
+                  nodes {
+                    id
+                    quantity
+                    editableQuantity
+                  }
+                }
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        { id: orderId },
+      );
+      check("Rettelse af ordren", begin.orderEditBegin.userErrors);
+      const calculated = begin.orderEditBegin.calculatedOrder;
+      if (!calculated)
+        throw new Error("Shopify startede ikke en rettelse af ordren.");
+      // En beregnet linje har samme nummer som ordrelinjen.
+      const byNumber = new Map(
+        calculated.lineItems.nodes.map((l) => [l.id.split("/").pop()!, l]),
+      );
+      let changed = false;
+      for (const target of targets) {
+        const line = byNumber.get(target.lineId.split("/").pop()!);
+        if (!line) throw new Error(`Ordrelinjen ${target.lineId} findes ikke.`);
+        if (line.quantity <= target.quantity) continue; // Allerede sket.
+        const set = await run<{
+          orderEditSetQuantity: { userErrors: UserErrors };
+        }>(
+          graphql,
+          `#graphql
+            mutation PreauraOrderEditSetQuantity(
+              $id: ID!
+              $lineItemId: ID!
+              $quantity: Int!
+            ) {
+              orderEditSetQuantity(
+                id: $id
+                lineItemId: $lineItemId
+                quantity: $quantity
+                restock: false
+              ) {
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }`,
+          { id: calculated.id, lineItemId: line.id, quantity: target.quantity },
+        );
+        check("Rettelse af antal", set.orderEditSetQuantity.userErrors);
+        changed = true;
+      }
+      if (!changed) return;
+      const commit = await run<{ orderEditCommit: { userErrors: UserErrors } }>(
+        graphql,
+        `#graphql
+          mutation PreauraOrderEditCommit($id: ID!, $staffNote: String) {
+            orderEditCommit(id: $id, notifyCustomer: false, staffNote: $staffNote) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        {
+          id: calculated.id,
+          staffNote:
+            "Antal nedsat af PREAURA (annullering). Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+        },
+      );
+      check("Rettelse af ordren", commit.orderEditCommit.userErrors);
     },
 
     async flowTriggerReceive(handle, payload) {

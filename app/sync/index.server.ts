@@ -33,6 +33,16 @@ export function shopifySync(graphql: AdminGraphql, shop: string) {
     readVariantAvailability: (variantIds: string[]) =>
       gateway.readVariantAvailability(variantIds),
 
+    /** Annullerer ordren i Shopify — uden refundering, uden at lægge på lager. */
+    cancelOrder: (orderId: string, reason: "CUSTOMER" | "DECLINED" | "STAFF") =>
+      gateway.cancelOrder(orderId, reason),
+
+    /** Nedsætter ordrelinjers antal til målet — uden refundering. */
+    setOrderLineQuantities: (
+      orderId: string,
+      targets: { lineId: string; quantity: number }[],
+    ) => gateway.setOrderLineQuantities(orderId, targets),
+
     /** Starter butikkens Flow-workflows for en af appens triggere. */
     flowTriggerReceive: (handle: string, payload: Record<string, unknown>) =>
       gateway.flowTriggerReceive(handle, payload),

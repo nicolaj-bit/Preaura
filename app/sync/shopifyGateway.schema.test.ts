@@ -288,4 +288,59 @@ describe("forespørgsler mod Shopifys skema", () => {
     );
     expectValid(call!);
   });
+
+  it("frigivelse: annullér ordren og nedsæt antal — uden refundering", async () => {
+    const ORDER = "gid://shopify/Order/1";
+    expectValid(await capture((g) => g.cancelOrder(ORDER, "CUSTOMER")));
+    expectValid(await capture((g) => g.cancelOrder(ORDER, "DECLINED")));
+    expectValid(
+      await capture((g) =>
+        g.setOrderLineQuantities(ORDER, [
+          { lineId: "gid://shopify/LineItem/1", quantity: 3 },
+        ]),
+      ),
+    );
+  });
+
+  it("frigivelse: hele rettelsen (start, antal, gem) er gyldig", async () => {
+    const calls: Call[] = [];
+    const gateway = createShopifyGateway(async (query, options) => {
+      calls.push({ query, variables: options?.variables ?? {} });
+      const body = query.includes("orderEditBegin")
+        ? {
+            data: {
+              orderEditBegin: {
+                calculatedOrder: {
+                  id: "gid://shopify/CalculatedOrder/9",
+                  lineItems: {
+                    nodes: [
+                      {
+                        id: "gid://shopify/CalculatedLineItem/1",
+                        quantity: 5,
+                        editableQuantity: 5,
+                      },
+                    ],
+                  },
+                },
+                userErrors: [],
+              },
+            },
+          }
+        : query.includes("orderEditSetQuantity")
+          ? { data: { orderEditSetQuantity: { userErrors: [] } } }
+          : { data: { orderEditCommit: { userErrors: [] } } };
+      return new Response(JSON.stringify(body));
+    });
+    await gateway.setOrderLineQuantities("gid://shopify/Order/1", [
+      { lineId: "gid://shopify/LineItem/1", quantity: 3 },
+    ]);
+    expect(calls).toHaveLength(3);
+    for (const call of calls) expectValid(call);
+    expect(calls[1].variables).toEqual({
+      id: "gid://shopify/CalculatedOrder/9",
+      lineItemId: "gid://shopify/CalculatedLineItem/1",
+      quantity: 3,
+    });
+  });
 });
+
