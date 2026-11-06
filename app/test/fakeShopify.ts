@@ -144,6 +144,9 @@ export function createFakeShopify() {
       }
       return result;
     },
+    async ensureOrderMetafieldDefinition(input) {
+      write("ensureOrderMetafieldDefinition", [input.key]);
+    },
     async cancelOrder(orderId, reason) {
       write("cancelOrder", [orderId, reason]);
       const order = orders.get(orderId);

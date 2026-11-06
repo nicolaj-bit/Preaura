@@ -73,6 +73,17 @@ export interface ShopifyGateway {
   /** Læser en ordre. Null, hvis den ikke findes. */
   readOrder(orderId: string): Promise<ShopifyOrderState | null>;
 
+  /**
+   * Opretter definitionen for et ordre-metafelt, så Shopify viser feltet på
+   * ordresiden (og det kan bruges i notifikationer). Findes den allerede,
+   * sker der intet.
+   */
+  ensureOrderMetafieldDefinition(input: {
+    key: string;
+    type: string;
+    name: string;
+    description: string;
+  }): Promise<void>;
   /** Sætter appens metafelter (namespace "preaura") på en ordre. */
   setOrderMetafields(orderId: string, fields: OrderMetafield[]): Promise<void>;
   /**

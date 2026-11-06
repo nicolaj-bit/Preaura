@@ -45,8 +45,10 @@ export async function syncOrder({
       order.snapshot.createdAt,
       client,
     );
-    if (link)
+    if (link) {
+      await ensureCancelUrlDefinition(shop, gateway);
       wantedFields.push({ key: "cancel_url", type: "url", value: link });
+    }
   }
   const fields = wantedFields.filter(
     (field) => !metafieldMatches(field, order.metafields[field.key] ?? null),
@@ -77,5 +79,34 @@ async function cancelLinkOrNull(
     return cancelLink(shop, orderId, new Date(createdAt), settings);
   } catch {
     return null;
+  }
+}
+
+/** Butikker, hvor definitionen er på plads i denne proces. */
+const definedShops = new Set<string>();
+
+/**
+ * Uden en definition viser Shopify ikke metafeltet på ordresiden. Oprettes
+ * én gang pr. butik pr. proces; en fejl her må ikke stoppe synkroniseringen.
+ */
+async function ensureCancelUrlDefinition(
+  shop: string,
+  gateway: ShopifyGateway,
+) {
+  if (definedShops.has(shop)) return;
+  try {
+    await gateway.ensureOrderMetafieldDefinition({
+      key: "cancel_url",
+      type: "url",
+      name: "Annulleringslink (PREAURA)",
+      description:
+        "Kundens link til at annullere forudbestillingen. Brug det i dine notifikationer: {{ order.metafields.preaura.cancel_url }}",
+    });
+    definedShops.add(shop);
+  } catch (error) {
+    console.error(
+      `Definitionen af preaura.cancel_url for ${shop} fejlede:`,
+      error,
+    );
   }
 }

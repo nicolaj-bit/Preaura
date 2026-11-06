@@ -758,6 +758,42 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       return result;
     },
 
+    async ensureOrderMetafieldDefinition({ key, type, name, description }) {
+      const data = await run<{
+        metafieldDefinitionCreate: {
+          userErrors: { code: string | null; message: string }[];
+        };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraOrderMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+            metafieldDefinitionCreate(definition: $definition) {
+              userErrors {
+                code
+                message
+              }
+            }
+          }`,
+        {
+          definition: {
+            ownerType: "ORDER",
+            namespace: "preaura",
+            key,
+            type,
+            name,
+            description,
+            pin: true,
+          },
+        },
+      );
+      const errors = data.metafieldDefinitionCreate.userErrors.filter(
+        (e) => e.code !== "TAKEN",
+      );
+      if (errors.length > 0) {
+        throw new ShopifyUserError("Metafelt-definition", errors);
+      }
+    },
+
     async cancelOrder(orderId, reason) {
       const data = await run<{
         orderCancel: {

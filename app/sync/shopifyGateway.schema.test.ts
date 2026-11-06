@@ -342,5 +342,17 @@ describe("forespørgsler mod Shopifys skema", () => {
       quantity: 3,
     });
   });
-});
 
+  it("annulleringslink: definitionen af ordre-metafeltet", async () => {
+    expectValid(
+      await capture((g) =>
+        g.ensureOrderMetafieldDefinition({
+          key: "cancel_url",
+          type: "url",
+          name: "Annulleringslink (PREAURA)",
+          description: "x",
+        }),
+      ),
+    );
+  });
+});
