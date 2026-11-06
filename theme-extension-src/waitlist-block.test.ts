@@ -230,15 +230,33 @@ describe("blokken (Liquid)", () => {
     expect(markup).not.toMatch(/type="checkbox"|type="radio"|\bchecked\b/);
   });
 
-  it("har ingen farver, skrifttyper eller størrelser af sin egen — kun struktur", () => {
-    // Ingen style-attributter, og det eneste stylesheet er tidslinjens linje
-    // og afstand i tekstens egen farve (currentColor).
+  it("har ingen farver eller skrifttyper af sin egen — kun temaets tekstfarve", () => {
     expect(markup).not.toMatch(/style="/);
     const css = [...markup.matchAll(/<style>([\s\S]*?)<\/style>/g)]
       .map((m) => m[1])
       .join("");
-    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|rgb|hsl|font|color:|background/i);
-    expect(css.match(/solid [^;}\s]+/g)).toEqual(["solid currentColor"]);
+    // Ingen faste farver og ingen skrifttyper.
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|font-family/i);
+    // Hver farveværdi er temaets tekstfarve (evt. svagere) eller gennemsigtig.
+    const colorValues = [
+      ...css.matchAll(/(?:^|[;{])\s*((?:border-)?color|background):([^;}]+)/g),
+    ].map((m) => m[2].trim());
+    expect(colorValues.length).toBeGreaterThan(0);
+    for (const value of colorValues) {
+      expect(value).toMatch(
+        /^(currentColor|transparent|inherit|color-mix\(in srgb,currentColor \d+%,transparent\))$/,
+      );
+    }
+    // Tekststørrelser er relative til temaets tekst (kun tynde linjer i px).
+    expect(css).not.toMatch(/font-size:[^;}]*px/);
+  });
+
+  it("butikken vælger selv boks eller ej (standard: boks)", () => {
+    const setting = schema.settings.find((s) => s.id === "boxed");
+    expect(setting).toMatchObject({ type: "checkbox", default: true });
+    expect(markup).toContain(
+      '{% unless block.settings.boxed %} preaura--plain{% endunless %}',
+    );
   });
 
   it("ventelisten er slået fra, til butikken selv slår den til", () => {

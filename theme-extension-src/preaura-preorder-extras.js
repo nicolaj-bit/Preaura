@@ -182,7 +182,8 @@
       var list = el.querySelector("[data-preaura-timeline-list]");
       var heading = el.querySelector("[data-preaura-timeline-heading]");
       var items = live && live.timeline ? live.timeline : [];
-      if (!s.timeline || !list || items.length === 0) {
+      // Én leverance: beskeden over siger allerede det samme.
+      if (!s.timeline || !list || items.length < 2) {
         el.hidden = true;
         if (list) list.textContent = "";
         return;
@@ -194,25 +195,27 @@
       this.setText(heading, label);
       var states = {
         SOLD_OUT: s.timelineSoldOut || "udsolgt",
-        CURRENT: s.timelineCurrent || "du køber ind i denne leverance",
+        CURRENT: s.timelineCurrent || "nuværende",
         UPCOMING: s.timelineUpcoming || "kommende",
       };
       list.textContent = "";
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
         var li = document.createElement("li");
-        var text =
-          formatDate(item.date, this.data.locale) +
-          " – " +
-          (states[item.state] || "");
-        if (item.state === "CURRENT") {
-          var strong = document.createElement("strong");
-          strong.textContent = text;
-          li.appendChild(strong);
-          li.setAttribute("aria-current", "true");
-        } else {
-          li.textContent = text;
-        }
+        var date = document.createElement("span");
+        date.className = "preaura__date";
+        date.textContent = formatDate(item.date, this.data.locale);
+        // Usynlig skilletegn, så en skærmlæser læser «dato – tilstand».
+        var sep = document.createElement("span");
+        sep.className = "preaura__sep";
+        sep.textContent = " – ";
+        var state = document.createElement("span");
+        state.className = "preaura__state";
+        state.textContent = states[item.state] || "";
+        li.appendChild(date);
+        li.appendChild(sep);
+        li.appendChild(state);
+        if (item.state === "CURRENT") li.setAttribute("aria-current", "true");
         li.setAttribute("data-state", item.state);
         list.appendChild(li);
       }

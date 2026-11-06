@@ -218,7 +218,7 @@ describe("tidslinje", () => {
     expect(current?.textContent).toContain("15. januar 2027");
   });
 
-  it("én leverance: stadig «forventet»", async () => {
+  it("én leverance: ingen tidslinje (beskeden siger det samme) — stadig «forventet»", async () => {
     const p = page({
       "1": {
         current: { date: "2026-12-01", sellingPlanId: PLAN_1, remaining: 30 },
@@ -226,7 +226,8 @@ describe("tidslinje", () => {
       },
     });
     await settle();
-    expect(p.timeline().textContent).toContain("Forventet afsendelse");
+    expect(p.timeline().hidden).toBe(true);
+    expect(p.message()).toBe("Forventet afsendelse: 1. december 2026");
   });
 
   it("slået fra i blokken: ingen tidslinje", async () => {
