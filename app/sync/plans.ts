@@ -4,9 +4,16 @@
 /** Det, synkroniseringen ønsker oprettet for én leverance. */
 export type DesiredPlan = {
   deliveryId: string;
-  /** Kundens tekst, fx "Forventet afsendelse: 7. november 2026". */
+  /**
+   * Planens navn, som temaet viser i kurven og Shopify i checkout. Uden dato:
+   * datoen står i linjeegenskaben (se app-blokken), som følger med på
+   * ordren. Stod den også her, stod datoen to gange i kurven.
+   */
   name: string;
-  /** Unik inden for gruppen. Bruges også til at genkende nyoprettede planer. */
+  /**
+   * Unik inden for gruppen, fx "Forventet afsendelse: 7. november 2026".
+   * Bruges også til at genkende nyoprettede planer.
+   */
   option: string;
   /** Leverancens dato som tidspunkt, se fulfillmentTime(). */
   fulfillmentExactTime: string;
@@ -31,6 +38,8 @@ export type ShopifyPlan = {
 };
 
 export const GROUP_NAME = "Forudbestilling";
+/** Hver plans navn. Datoen står i linjeegenskaben, ikke her. */
+export const PLAN_NAME = "Forudbestilling";
 export const GROUP_OPTION = "Leverance";
 
 export function groupMerchantCode(variantId: string) {
@@ -78,14 +87,14 @@ export function desiredPlans(
     const formatted = dateFormat.format(
       new Date(fulfillmentTime(delivery.date)),
     );
-    const name = template.replaceAll("{dato}", formatted);
+    const label = template.replaceAll("{dato}", formatted);
     // To leverancer på samme dato skal stadig kunne skelnes i gruppen.
-    let option = name;
-    if (seen.has(option)) option = `${name} (leverance ${delivery.position})`;
+    let option = label;
+    if (seen.has(option)) option = `${label} (leverance ${delivery.position})`;
     seen.add(option);
     return {
       deliveryId: delivery.id,
-      name,
+      name: PLAN_NAME,
       option,
       fulfillmentExactTime: fulfillmentTime(delivery.date),
     };

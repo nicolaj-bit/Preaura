@@ -11,6 +11,14 @@ const SCRIPT = readFileSync(
   join(__dirname, "../extensions/preaura-preorder/assets/preaura-preorder.js"),
   "utf8",
 );
+// Tillægget (venteliste, resttal, tidslinje), som kernen ellers henter selv.
+const EXTRAS = readFileSync(
+  join(
+    __dirname,
+    "../extensions/preaura-preorder/assets/preaura-preorder-extras.js",
+  ),
+  "utf8",
+);
 const LIQUID = readFileSync(
   join(__dirname, "../extensions/preaura-preorder/blocks/preorder.liquid"),
   "utf8",
@@ -60,6 +68,7 @@ function page({
       </div>
     </div>`;
   new Function(SCRIPT)();
+  new Function(EXTRAS)();
   const root = document.querySelector("[data-preaura-root]") as HTMLElement;
   const box = root.querySelector("[data-preaura-waitlist]") as HTMLElement;
   return {
@@ -221,8 +230,15 @@ describe("blokken (Liquid)", () => {
     expect(markup).not.toMatch(/type="checkbox"|type="radio"|\bchecked\b/);
   });
 
-  it("har ingen styling af sin egen", () => {
-    expect(markup).not.toMatch(/<style|style="/);
+  it("har ingen farver, skrifttyper eller størrelser af sin egen — kun struktur", () => {
+    // Ingen style-attributter, og det eneste stylesheet er tidslinjens linje
+    // og afstand i tekstens egen farve (currentColor).
+    expect(markup).not.toMatch(/style="/);
+    const css = [...markup.matchAll(/<style>([\s\S]*?)<\/style>/g)]
+      .map((m) => m[1])
+      .join("");
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|rgb|hsl|font|color:|background/i);
+    expect(css.match(/solid [^;}\s]+/g)).toEqual(["solid currentColor"]);
   });
 
   it("ventelisten er slået fra, til butikken selv slår den til", () => {
