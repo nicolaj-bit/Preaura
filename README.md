@@ -216,9 +216,12 @@ blok → Apps → Forudbestilling). Ingen app embed og ingen kode i temaet.
   variant på forudbestilling, og de mangler. Andre varianter og andre
   anmodninger røres ikke.
 
-**Ret i `theme-extension-src/preaura-preorder.js`**, ikke i `assets/`. Filen i `assets/` er en
-komprimeret udgave (Shopify anbefaler højst 10 KB gzippet JavaScript pr. app
-block; filen fylder ca. 4 KB gzippet) og
+**Ret i `theme-extension-src/`**, ikke i `assets/`. JavaScript er delt i to:
+`preaura-preorder.js` (kernen: forudbestilling og kurv, hentes altid) og
+`preaura-preorder-extras.js` (venteliste, antal tilbage og tidslinje), som
+kernen kun henter, når siden har forudbestilling eller venteliste. Shopifys
+tjek kræver højst 10 KB pr. fil (ukomprimeret, som CI måler). Filerne i
+`assets/` er komprimerede udgaver og
 bygges med `npm run build:block` (sker også automatisk før `npm test`).
 Kilde og tests ligger uden for extensionen, fordi Shopify kun tillader
 mapperne `assets`, `blocks`, `snippets` og `locales` i en theme app extension.

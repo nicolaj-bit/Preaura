@@ -10,6 +10,14 @@ const SCRIPT = readFileSync(
   join(__dirname, "../extensions/preaura-preorder/assets/preaura-preorder.js"),
   "utf8",
 );
+// Tillægget (venteliste, resttal, tidslinje), som kernen ellers henter selv.
+const EXTRAS = readFileSync(
+  join(
+    __dirname,
+    "../extensions/preaura-preorder/assets/preaura-preorder-extras.js",
+  ),
+  "utf8",
+);
 
 const PLAN_1 = "gid://shopify/SellingPlan/111";
 const PLAN_2 = "gid://shopify/SellingPlan/222";
@@ -75,6 +83,7 @@ function page(live: Live | null, extra: Record<string, unknown> = {}) {
       </div>
     </div>`;
   new Function(SCRIPT)();
+  new Function(EXTRAS)();
   const root = document.querySelector("[data-preaura-root]") as HTMLElement;
   const form = document.querySelector("form") as HTMLFormElement;
   return {

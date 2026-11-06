@@ -76,6 +76,7 @@
       {
         "selected": {{ preaura_product.selected_or_first_available_variant.id | json }},
         "product": {{ preaura_product.id | json }},
+        "extras": {{ 'preaura-preorder-extras.js' | asset_url | json }},
         "locale": {{ request.locale.iso_code | json }},
         "settings": {
           "shippingLabel": {{ block.settings.shipping_label | json }},

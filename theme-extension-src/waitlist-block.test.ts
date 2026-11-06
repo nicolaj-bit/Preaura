@@ -11,6 +11,14 @@ const SCRIPT = readFileSync(
   join(__dirname, "../extensions/preaura-preorder/assets/preaura-preorder.js"),
   "utf8",
 );
+// Tillægget (venteliste, resttal, tidslinje), som kernen ellers henter selv.
+const EXTRAS = readFileSync(
+  join(
+    __dirname,
+    "../extensions/preaura-preorder/assets/preaura-preorder-extras.js",
+  ),
+  "utf8",
+);
 const LIQUID = readFileSync(
   join(__dirname, "../extensions/preaura-preorder/blocks/preorder.liquid"),
   "utf8",
@@ -60,6 +68,7 @@ function page({
       </div>
     </div>`;
   new Function(SCRIPT)();
+  new Function(EXTRAS)();
   const root = document.querySelector("[data-preaura-root]") as HTMLElement;
   const box = root.querySelector("[data-preaura-waitlist]") as HTMLElement;
   return {
