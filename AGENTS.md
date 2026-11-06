@@ -39,3 +39,6 @@ PREAURA har to miljøer, der ikke deler noget:
 6. **Ét abonnement, ingen planer.** Adgang er enten «aktivt abonnement» eller
    «intet». Pris og prøveperiode står kun i Partner Dashboard. Byg ikke
    plannøgler, grænser eller planvælger ind igen uden en ny beslutning.
+7. **Ventelisten giver kun besked om varen.** Ingen afkrydsningsfelter på
+   produktsiden, intet forudkrydset, og tilmeldingen må aldrig bruges til
+   nyhedsbrev eller markedsføring. En tilmelding udløser højst én besked.

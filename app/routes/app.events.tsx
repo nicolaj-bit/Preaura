@@ -47,8 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     id: d.id,
     type: label(d.event.type),
     channel: CHANNEL_LABELS[d.channel as Channel] ?? d.channel,
-    orderName: d.event.orderName || numericId(d.event.orderId),
-    orderNumber: numericId(d.event.orderId),
+    ...reference(d.event),
     at: format.format(d.deliveredAt ?? d.updatedAt),
     status: d.status,
     attempts: d.attempts,
@@ -71,8 +70,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     waiting: waiting.map((e) => ({
       id: e.id,
       type: label(e.type),
-      orderName: e.orderName || numericId(e.orderId),
-      orderNumber: numericId(e.orderId),
+      ...reference(e),
       at: format.format(e.createdAt),
       error: e.lastError,
     })),
@@ -146,6 +144,26 @@ const STATUS: Record<
   FAILED: { tone: "critical", text: "Fejlet" },
   PENDING: { tone: "info", text: "Venter" },
 };
+
+/** Ordren, hændelsen handler om — eller produktet for ventelisten. */
+function reference(event: {
+  orderId: string | null;
+  orderName: string;
+  productId?: string | null;
+}) {
+  if (event.orderId) {
+    return {
+      reference: event.orderName || numericId(event.orderId),
+      href: `shopify://admin/orders/${numericId(event.orderId)}`,
+    };
+  }
+  return {
+    reference: "Venteliste",
+    href: event.productId
+      ? `shopify://admin/products/${numericId(event.productId)}`
+      : "/app/waitlist",
+  };
+}
 
 export default function EventsPage() {
   const { settings, failed, log, waiting, encryptionMissing } =
@@ -364,7 +382,7 @@ export default function EventsPage() {
             <s-table>
               <s-table-header-row>
                 <s-table-header listSlot="primary">Hændelse</s-table-header>
-                <s-table-header>Ordre</s-table-header>
+                <s-table-header>Ordre / produkt</s-table-header>
                 <s-table-header>Oprettet</s-table-header>
                 <s-table-header listSlot="secondary">Fejl</s-table-header>
               </s-table-header-row>
@@ -373,11 +391,7 @@ export default function EventsPage() {
                   <s-table-row key={row.id}>
                     <s-table-cell>{row.type}</s-table-cell>
                     <s-table-cell>
-                      <s-link
-                        href={`shopify://admin/orders/${row.orderNumber}`}
-                      >
-                        {row.orderName}
-                      </s-link>
+                      <s-link href={row.href}>{row.reference}</s-link>
                     </s-table-cell>
                     <s-table-cell>{row.at}</s-table-cell>
                     <s-table-cell>
@@ -466,8 +480,8 @@ type Row = {
   id: string;
   type: string;
   channel: string;
-  orderName: string;
-  orderNumber: string;
+  reference: string;
+  href: string;
   at: string;
   status: string;
   attempts: number;
@@ -486,7 +500,7 @@ function EventTable<T extends Row>({
       <s-table-header-row>
         <s-table-header listSlot="primary">Hændelse</s-table-header>
         <s-table-header>Modtager</s-table-header>
-        <s-table-header>Ordre</s-table-header>
+        <s-table-header>Ordre / produkt</s-table-header>
         <s-table-header>Tidspunkt</s-table-header>
         <s-table-header listSlot="secondary">Status</s-table-header>
         <s-table-header>Besked</s-table-header>
@@ -503,9 +517,7 @@ function EventTable<T extends Row>({
               <s-table-cell>{row.type}</s-table-cell>
               <s-table-cell>{row.channel}</s-table-cell>
               <s-table-cell>
-                <s-link href={`shopify://admin/orders/${row.orderNumber}`}>
-                  {row.orderName}
-                </s-link>
+                <s-link href={row.href}>{row.reference}</s-link>
               </s-table-cell>
               <s-table-cell>{row.at}</s-table-cell>
               <s-table-cell>

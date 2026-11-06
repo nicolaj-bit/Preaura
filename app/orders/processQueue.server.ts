@@ -244,7 +244,7 @@ async function processCompliance(
   for (const event of events) {
     try {
       const payload = JSON.parse(event.payload) as {
-        customer?: { id?: unknown };
+        customer?: { id?: unknown; email_hash?: unknown };
         orders_requested?: unknown[];
         orders_to_redact?: unknown[];
         data_request?: { id?: unknown };
@@ -252,6 +252,11 @@ async function processCompliance(
       const customerId =
         payload.customer?.id != null ? String(payload.customer.id) : null;
       if (!customerId) throw new Error("Hændelsen indeholder ingen kunde.");
+      const emailHash =
+        typeof payload.customer?.email_hash === "string" &&
+        payload.customer.email_hash
+          ? payload.customer.email_hash
+          : null;
       const orderIds = (
         (event.topic === "CUSTOMERS_REDACT"
           ? payload.orders_to_redact
@@ -269,9 +274,10 @@ async function processCompliance(
               : null,
           orderIds,
           data: await compliance.storedForOrders(orderIds),
+          waitlist: await compliance.waitlistForEmailHash(emailHash),
         });
       } else {
-        await compliance.redactCustomer({ customerId, orderIds });
+        await compliance.redactCustomer({ customerId, orderIds, emailHash });
       }
       await queue.markDone([event.id]);
       result.done += 1;

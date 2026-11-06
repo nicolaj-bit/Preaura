@@ -80,6 +80,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       receivedAt: format.format(request.receivedAt),
       answeredAt: request.answeredAt ? format.format(request.answeredAt) : null,
       orderCount: request.orderIds.length,
+      // Kundens tilmeldinger til ventelisten (uden e-mailen selv).
+      waitlist: request.waitlist.map((entry) =>
+        [
+          `Venteliste: variant ${numericId(entry.variantId)} (produkt ${numericId(entry.productId)})`,
+          `tilmeldt ${format.format(new Date(entry.signedUpAt))}`,
+          entry.notifiedAt
+            ? `fik besked ${format.format(new Date(entry.notifiedAt))}`
+            : "venter på besked",
+        ].join(", "),
+      ),
       orders: request.data.map((order) => ({
         name: order.orderName || `Ordre ${numericId(order.orderId)}`,
         lines: order.lines.map((line) =>
@@ -268,6 +278,13 @@ export default function QueuePage() {
                             ? `. Hændelser: ${order.events.join("; ")}`
                             : ""}
                         </s-list-item>
+                      ))}
+                    </s-unordered-list>
+                  )}
+                  {request.waitlist.length > 0 && (
+                    <s-unordered-list>
+                      {request.waitlist.map((line) => (
+                        <s-list-item key={line}>{line}</s-list-item>
                       ))}
                     </s-unordered-list>
                   )}

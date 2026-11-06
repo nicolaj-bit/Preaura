@@ -10,7 +10,13 @@
   produktformular — selling_plan og en synlig linjeegenskab med datoen — og
   holder dem opdateret ved variantskifte. Ellers røres temaet ikke.
 
+  Ventelisten: kan varianten hverken købes på lager eller forudbestilles,
+  vises et felt til e-mail (hvis det er slået til). Tilmeldingen sendes til
+  appen gennem Shopifys app-proxy (/apps/preaura/waitlist). Feltet gælder
+  KUN besked om varen — ingen nyhedsbrev, og ingen afkrydsningsfelter.
+
   Ingen skrifttyper, størrelser eller farver: alt arver temaets udseende.
+  Knappen får temaets almindelige knap-klasse («button»), hvis temaet har en.
 {%- endcomment -%}
 {%- liquid
   assign preaura_product = closest.product | default: product
@@ -20,6 +26,33 @@
     <p data-preaura-message></p>
     {%- if block.settings.note != blank -%}
       <p data-preaura-note>{{ block.settings.note | escape }}</p>
+    {%- endif -%}
+    {%- if block.settings.waitlist_enabled -%}
+      {%- assign preaura_field_id = 'preaura-waitlist-email-' | append: block.id -%}
+      <div data-preaura-waitlist hidden>
+        {%- if block.settings.waitlist_heading != blank -%}
+          <p>{{ block.settings.waitlist_heading | escape }}</p>
+        {%- endif -%}
+        <label for="{{ preaura_field_id }}">{{ block.settings.waitlist_email_label | escape }}</label>
+        <input
+          id="{{ preaura_field_id }}"
+          type="email"
+          name="email"
+          autocomplete="email"
+          inputmode="email"
+          maxlength="254"
+          required
+          data-preaura-waitlist-email
+        >
+        <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" hidden data-preaura-waitlist-trap>
+        <button type="button" class="button" data-preaura-waitlist-submit>
+          {{- block.settings.waitlist_button | escape -}}
+        </button>
+        <p role="status" aria-live="polite" data-preaura-waitlist-status></p>
+        {%- if block.settings.waitlist_privacy != blank -%}
+          <p>{{ block.settings.waitlist_privacy | escape }}</p>
+        {%- endif -%}
+      </div>
     {%- endif -%}
     <script type="application/json" data-preaura-data>
       {
@@ -31,7 +64,16 @@
           "message": {{ block.settings.message | json }},
           "soldOutMessage": {{ block.settings.sold_out_message | json }},
           "changeButtonText": {{ block.settings.change_button_text | json }},
-          "buttonText": {{ block.settings.button_text | json }}
+          "buttonText": {{ block.settings.button_text | json }},
+          "waitlist": {{ block.settings.waitlist_enabled | json }},
+          "waitlistSuccess": {{ block.settings.waitlist_success | json }},
+          "waitlistError": {{ block.settings.waitlist_error | json }},
+          "waitlistInvalid": {{ block.settings.waitlist_invalid | json }}
+        },
+        "available": {
+          {%- for variant in preaura_product.variants -%}
+            "{{ variant.id }}": {{ variant.available | json }}{% unless forloop.last %},{% endunless %}
+          {%- endfor -%}
         },
         "variants": {
           {%- for variant in preaura_product.variants -%}
@@ -102,6 +144,63 @@
       "id": "button_text",
       "label": "Tekst på købsknappen",
       "default": "Forudbestil"
+    },
+    {
+      "type": "header",
+      "content": "Venteliste"
+    },
+    {
+      "type": "paragraph",
+      "content": "Kan varianten hverken købes på lager eller forudbestilles, kan kunden skrive sig op og få besked, når den kan købes. Beskeden sendes som hændelse til Shopify Flow, Klaviyo eller din webhook. Den må kun handle om varen — tilbud, andre varer og rabatkoder kræver samtykke."
+    },
+    {
+      "type": "checkbox",
+      "id": "waitlist_enabled",
+      "label": "Vis tilmelding til venteliste",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "waitlist_heading",
+      "label": "Overskrift",
+      "default": "Få besked, når varen kan købes"
+    },
+    {
+      "type": "text",
+      "id": "waitlist_email_label",
+      "label": "Navn på feltet",
+      "default": "Din e-mail"
+    },
+    {
+      "type": "text",
+      "id": "waitlist_button",
+      "label": "Tekst på knappen",
+      "default": "Giv mig besked"
+    },
+    {
+      "type": "text",
+      "id": "waitlist_success",
+      "label": "Svar efter tilmelding",
+      "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen.",
+      "default": "Tak. Vi giver dig besked, når varen kan købes."
+    },
+    {
+      "type": "text",
+      "id": "waitlist_invalid",
+      "label": "Svar ved ugyldig e-mail",
+      "default": "Skriv en gyldig e-mail."
+    },
+    {
+      "type": "text",
+      "id": "waitlist_error",
+      "label": "Svar ved fejl",
+      "default": "Det lykkedes ikke. Prøv igen om lidt."
+    },
+    {
+      "type": "textarea",
+      "id": "waitlist_privacy",
+      "label": "Oplysning om brug af e-mail",
+      "default": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev."
     }
   ]
 }

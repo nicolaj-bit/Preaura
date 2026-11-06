@@ -201,6 +201,14 @@ export function outboxFor(shop: string, client: PrismaClient = db) {
         ]);
       },
 
+      /** Kan aldrig bygges (fx er kundens data slettet). Prøves ikke igen. */
+      async markFailed(id: string, error: string) {
+        await client.outboxEvent.updateMany({
+          where: { shop, id, status: "NEW" },
+          data: { status: "FAILED", lastError: error },
+        });
+      },
+
       async recordBuildError(id: string, error: string) {
         await client.outboxEvent.updateMany({
           where: { shop, id },
@@ -272,6 +280,7 @@ export function outboxFor(shop: string, client: PrismaClient = db) {
                 type: true,
                 orderName: true,
                 orderId: true,
+                productId: true,
                 createdAt: true,
                 payloadEnc: true,
               },
@@ -301,6 +310,7 @@ export function outboxFor(shop: string, client: PrismaClient = db) {
                 type: true,
                 orderName: true,
                 orderId: true,
+                productId: true,
                 createdAt: true,
               },
             },

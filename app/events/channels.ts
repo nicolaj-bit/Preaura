@@ -20,6 +20,7 @@ export const FLOW_HANDLES: Record<EventType, string> = {
   "preorder.delayed": "preaura-preorder-delayed",
   "preorder.ready": "preaura-preorder-ready",
   "preorder.cancelled": "preaura-preorder-cancelled",
+  "waitlist.available": "preaura-waitlist-available",
 };
 
 const numeric = (gid: string | null) =>
@@ -30,11 +31,14 @@ const numeric = (gid: string | null) =>
  * shopify.extension.toml. Flow kræver alle felter, så tomme værdier sendes
  * som tom tekst.
  */
-export function toFlowPayload(event: PreauraEvent) {
+export function toFlowPayload(
+  event: PreauraEvent,
+): Record<string, string | number | null> {
+  if (event.type === "waitlist.available") return toFlowWaitlistPayload(event);
   return {
-    order_id: numeric(event.order.id),
+    order_id: numeric(event.order?.id ?? null),
     "Event id": event.id,
-    "Order name": event.order.name,
+    "Order name": event.order?.name ?? "",
     "Customer email": event.customer.email ?? "",
     "Customer name": event.customer.name ?? "",
     "Product title": event.product.title ?? "",
@@ -42,6 +46,22 @@ export function toFlowPayload(event: PreauraEvent) {
     Quantity: event.quantity,
     "Delivery date": event.deliveryDate ?? "",
     "Previous delivery date": event.previousDeliveryDate ?? "",
+  };
+}
+
+/** Felterne i extensions/preaura-flow-waitlist/shopify.extension.toml. */
+function toFlowWaitlistPayload(event: PreauraEvent) {
+  return {
+    product_id: numeric(event.product.id),
+    "Event id": event.id,
+    "Customer email": event.customer.email ?? "",
+    "Product title": event.product.title ?? "",
+    "Variant title": event.variant.title ?? "",
+    "Variant id": event.variant.id,
+    Availability: event.availability ?? "",
+    "Available quantity": event.quantity,
+    "Delivery id": event.deliveryId ?? "",
+    "Delivery date": event.deliveryDate ?? "",
   };
 }
 
@@ -105,8 +125,8 @@ export function toKlaviyoBody(event: PreauraEvent) {
           event_id: event.id,
           event_type: event.type,
           shop: event.shop,
-          order_id: event.order.id,
-          order_name: event.order.name,
+          order_id: event.order?.id ?? null,
+          order_name: event.order?.name ?? null,
           product_id: event.product.id,
           product_title: event.product.title,
           variant_id: event.variant.id,
@@ -115,6 +135,8 @@ export function toKlaviyoBody(event: PreauraEvent) {
           quantity: event.quantity,
           delivery_date: event.deliveryDate,
           previous_delivery_date: event.previousDeliveryDate,
+          delivery_id: event.deliveryId,
+          availability: event.availability,
         },
         metric: {
           data: {

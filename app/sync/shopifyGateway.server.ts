@@ -630,6 +630,87 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       };
     },
 
+    async readVariantDetails(variantId) {
+      const data = await run<{
+        productVariant: {
+          title: string | null;
+          sku: string | null;
+          product: { id: string; title: string };
+        } | null;
+      }>(
+        graphql,
+        `#graphql
+          query PreauraVariantDetails($id: ID!) {
+            productVariant(id: $id) {
+              title
+              sku
+              product {
+                id
+                title
+              }
+            }
+          }`,
+        { id: variantId },
+      );
+      const variant = data.productVariant;
+      if (!variant) return null;
+      return {
+        productId: variant.product.id,
+        productTitle: variant.product.title,
+        variantTitle: variant.title,
+        sku: variant.sku,
+      };
+    },
+
+    async readVariantAvailability(variantIds) {
+      const result = new Map<
+        string,
+        { available: boolean; quantity: number | null; productId: string }
+      >();
+      for (let i = 0; i < variantIds.length; i += 250) {
+        const data = await run<{
+          nodes: ({
+            id: string;
+            availableForSale: boolean;
+            inventoryQuantity: number | null;
+            inventoryItem: { tracked: boolean } | null;
+            product: { id: string };
+          } | null)[];
+        }>(
+          graphql,
+          `#graphql
+            query PreauraVariantAvailability($ids: [ID!]!) {
+              nodes(ids: $ids) {
+                ... on ProductVariant {
+                  id
+                  availableForSale
+                  inventoryQuantity
+                  inventoryItem {
+                    tracked
+                  }
+                  product {
+                    id
+                  }
+                }
+              }
+            }`,
+          { ids: variantIds.slice(i, i + 250) },
+        );
+        for (const node of data.nodes) {
+          if (!node?.id) continue;
+          result.set(node.id, {
+            available: node.availableForSale,
+            quantity:
+              node.inventoryItem?.tracked === false
+                ? null
+                : node.inventoryQuantity,
+            productId: node.product.id,
+          });
+        }
+      }
+      return result;
+    },
+
     async flowTriggerReceive(handle, payload) {
       const data = await run<{
         flowTriggerReceive: { userErrors: UserErrors };

@@ -60,6 +60,7 @@ export default function App() {
       <s-app-nav>
         <s-link href="/app">Produkter</s-link>
         <s-link href="/app/queue">Ordrebehandling</s-link>
+        <s-link href="/app/waitlist">Venteliste</s-link>
         <s-link href="/app/events">Hændelser</s-link>
         <s-link href="/app/settings">Indstillinger</s-link>
         <s-link href="/app/subscription">Abonnement</s-link>

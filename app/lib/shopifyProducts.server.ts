@@ -139,4 +139,53 @@ export async function fetchShopTimeZone(graphql: AdminGraphql) {
   return timeZone;
 }
 
+/** Produkt- og variantnavne for en række varianter. Manglende er udeladt. */
+export async function fetchVariantNames(
+  graphql: AdminGraphql,
+  variantIds: string[],
+) {
+  const names = new Map<
+    string,
+    { productId: string; productTitle: string; variantTitle: string }
+  >();
+  for (let i = 0; i < variantIds.length; i += 250) {
+    const response = await graphql(
+      `
+        #graphql
+        query PreauraVariantNames($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on ProductVariant {
+              id
+              title
+              product {
+                id
+                title
+              }
+            }
+          }
+        }
+      `,
+      { variables: { ids: variantIds.slice(i, i + 250) } },
+    );
+    const json = (await response.json()) as {
+      data?: {
+        nodes: ({
+          id?: string;
+          title?: string;
+          product?: { id: string; title: string };
+        } | null)[];
+      };
+    };
+    for (const node of json.data?.nodes ?? []) {
+      if (!node?.id || !node.product) continue;
+      names.set(node.id, {
+        productId: node.product.id,
+        productTitle: node.product.title,
+        variantTitle: node.title ?? "",
+      });
+    }
+  }
+  return names;
+}
+
 export { numericId } from "./ids";

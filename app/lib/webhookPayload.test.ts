@@ -65,4 +65,18 @@ describe("kun det nødvendige gemmes", () => {
     expect(minimalPayload("SHOP_REDACT", { shop_id: 1 })).toEqual({});
     expect(minimalPayload("ORDERS_CREATE", null)).toEqual({});
   });
+
+  it("compliance: e-mailen gemmes kun som envejs-nøgle (til ventelisten)", () => {
+    const hash = (email: string) => `hash(${email})`;
+    expect(
+      minimalPayload(
+        "CUSTOMERS_REDACT",
+        { customer, orders_to_redact: [1] },
+        hash,
+      ),
+    ).toEqual({
+      customer: { id: 7, email_hash: `hash(${customer.email})` },
+      orders_to_redact: [1],
+    });
+  });
 });

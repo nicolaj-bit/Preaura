@@ -21,6 +21,13 @@
  * de på. Andre varianter og andre anmodninger røres ikke, og der laves ingen
  * ekstra netværkskald.
  *
+ * Ventelisten: kan varianten hverken købes på lager eller forudbestilles
+ * (Liquids variant.available er falsk), vises blokkens e-mailfelt, hvis det
+ * er slået til. Tilmeldingen sendes til appen gennem Shopifys app-proxy
+ * (/apps/preaura/waitlist). Det er det eneste netværkskald, og det sker kun,
+ * når kunden selv trykker på knappen. Svaret er det samme, uanset om
+ * e-mailen stod på listen i forvejen.
+ *
  * Variantskifte opdages på to måder:
  *   1. Hændelser, som nyere temaer udsender (og change på formularen).
  *   2. En reserve, der jævnligt læser formularens skjulte felt name="id".
@@ -30,6 +37,7 @@
   "use strict";
 
   var POLL_MS = 250;
+  var WAITLIST_URL = "/apps/preaura/waitlist";
   var FIELD_ATTR = "data-preaura-field";
   var VARIANT_EVENTS = [
     "variant:change",
@@ -113,6 +121,8 @@
     this.registerPlans();
     this.messageEl = root.querySelector("[data-preaura-message]");
     this.noteEl = root.querySelector("[data-preaura-note]");
+    this.waitlistEl = root.querySelector("[data-preaura-waitlist]");
+    this.available = this.data.available || {};
     this.current = null; // { sellingPlan, label, date } når forudbestilling gælder
     this.variantId = null;
     this.form = null;
@@ -138,6 +148,7 @@
 
   Controller.prototype.start = function () {
     var self = this;
+    this.bindWaitlist();
     this.attach(findForm(this.root));
     this.render(readVariantId(this.form) || numericId(this.data.selected));
 
@@ -181,19 +192,28 @@
   };
 
   Controller.prototype.render = function (variantId) {
+    if (variantId !== this.variantId) this.setWaitlistStatus("");
     this.variantId = variantId;
     var variant = this.variants[variantId];
     var s = this.settings;
+    // Kan varianten hverken købes på lager eller forudbestilles?
+    var waitlist = Boolean(
+      s.waitlist && this.waitlistEl && this.available[variantId] === false,
+    );
+    if (this.waitlistEl) this.waitlistEl.hidden = !waitlist;
 
     if (!variant || !variant.active) {
       this.current = null;
       this.removeFields();
       this.restoreButton();
-      this.root.hidden = true;
+      if (this.messageEl) this.messageEl.hidden = true;
+      if (this.noteEl) this.noteEl.hidden = true;
+      this.root.hidden = !waitlist;
       return;
     }
 
     this.root.hidden = false;
+    if (this.messageEl) this.messageEl.hidden = false;
     var label = variant.mode === "DELIVERY" ? s.deliveryLabel : s.shippingLabel;
 
     if (variant.soldOut || !variant.sellingPlanId || !variant.date) {
@@ -223,6 +243,87 @@
     );
     if (this.noteEl) this.noteEl.hidden = false;
     this.applyButton();
+  };
+
+  // --- Venteliste ------------------------------------------------------------
+
+  Controller.prototype.bindWaitlist = function () {
+    var el = this.waitlistEl;
+    if (!el) return;
+    var self = this;
+    this.emailEl = el.querySelector("[data-preaura-waitlist-email]");
+    this.trapEl = el.querySelector("[data-preaura-waitlist-trap]");
+    this.submitEl = el.querySelector("[data-preaura-waitlist-submit]");
+    this.statusEl = el.querySelector("[data-preaura-waitlist-status]");
+    if (this.submitEl) {
+      this.submitEl.addEventListener("click", function () {
+        self.submitWaitlist();
+      });
+    }
+    if (this.emailEl) {
+      // Feltet ligger ikke i sin egen formular (blokken kan ligge inde i
+      // temaets produktformular). Enter må ikke lægge varen i kurven.
+      this.emailEl.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        event.stopPropagation();
+        self.submitWaitlist();
+      });
+    }
+  };
+
+  Controller.prototype.setWaitlistStatus = function (text) {
+    this.setText(this.statusEl, text);
+  };
+
+  Controller.prototype.submitWaitlist = function () {
+    var s = this.settings;
+    var self = this;
+    if (this.sending || !this.emailEl || !this.variantId) return;
+    var email = String(this.emailEl.value || "").trim();
+    if (
+      !email ||
+      (this.emailEl.checkValidity && !this.emailEl.checkValidity())
+    ) {
+      this.setWaitlistStatus(s.waitlistInvalid);
+      return;
+    }
+    var body = new URLSearchParams();
+    body.set("email", email);
+    body.set("variant_id", this.variantId);
+    body.set("website", this.trapEl ? this.trapEl.value : "");
+    this.sending = true;
+    if (this.submitEl) this.submitEl.disabled = true;
+    fetch(WAITLIST_URL, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: body,
+      credentials: "same-origin",
+    })
+      .then(function (response) {
+        return response
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (json) {
+            if (response.ok && json && json.ok) {
+              self.emailEl.value = "";
+              self.setWaitlistStatus(s.waitlistSuccess);
+            } else if (json && json.error === "invalid_email") {
+              self.setWaitlistStatus(s.waitlistInvalid);
+            } else {
+              self.setWaitlistStatus(s.waitlistError);
+            }
+          });
+      })
+      .catch(function () {
+        self.setWaitlistStatus(s.waitlistError);
+      })
+      .then(function () {
+        self.sending = false;
+        if (self.submitEl) self.submitEl.disabled = false;
+      });
   };
 
   Controller.prototype.setText = function (el, text) {

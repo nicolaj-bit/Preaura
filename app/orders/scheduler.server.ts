@@ -5,6 +5,9 @@ import { shopsWithOutboxWork } from "../models/outbox.server";
 import { processOutbox } from "../events/outbox.server";
 import { processShopQueue, type QueueDeps } from "./processQueue.server";
 import { purgeOldData } from "../models/compliance.server";
+import { shopsWithWaitlist } from "../models/waitlist.server";
+import { processWaitlist } from "../waitlist/process.server";
+import { accessFor } from "../billing/access.server";
 
 // Starter behandlingen af en butiks kø.
 //
@@ -35,8 +38,10 @@ export function scheduleQueue(shop: string, delay = DEBOUNCE_MS) {
 export async function runQueue(shop: string) {
   let deps: QueueDeps | null = null;
   let sync: ReturnType<typeof shopifySync> | null = null;
+  let graphql: Parameters<typeof shopifySync>[0] | null = null;
   try {
     const { admin } = await unauthenticated.admin(shop);
+    graphql = admin.graphql;
     sync = shopifySync(admin.graphql, shop);
     deps = {
       readOrder: sync.readOrder,
@@ -55,6 +60,30 @@ export async function runQueue(shop: string) {
     console.error(`Køen for ${shop} kunne ikke behandles:`, error);
     result = { ran: false as const };
   }
+  // Ventelisten — efter køen, så lageret er opdateret, og før udbakken, så
+  // en udløst portion sendes med det samme.
+  if (sync && graphql) {
+    const shopify = sync;
+    const admin = { graphql };
+    try {
+      await processWaitlist({
+        shop,
+        deps: {
+          hasAccess: async () => {
+            try {
+              return (await accessFor(admin, shop)).status === "active";
+            } catch {
+              // Abonnementet kunne ikke tjekkes: prøv igen næste gang.
+              return false;
+            }
+          },
+          readAvailability: (ids) => shopify.readVariantAvailability(ids),
+        },
+      });
+    } catch (error) {
+      console.error(`Ventelisten for ${shop} fejlede:`, error);
+    }
+  }
   // Udgående hændelser (Flow, webhook, Klaviyo) — efter køen, så hændelser
   // fra ordrerne i denne omgang sendes med det samme.
   if (sync) {
@@ -63,6 +92,7 @@ export async function runQueue(shop: string) {
         shop,
         deps: {
           readOrderDetails: sync.readOrderDetails,
+          readVariantDetails: sync.readVariantDetails,
           flowTriggerReceive: sync.flowTriggerReceive,
           fetch,
         },
@@ -96,6 +126,7 @@ export function startQueueSweeper() {
       const shops = new Set([
         ...(await shopsWithPendingEvents()),
         ...(await shopsWithOutboxWork()),
+        ...(await shopsWithWaitlist()),
       ]);
       for (const shop of shops) scheduleQueue(shop, 0);
     } catch (error) {

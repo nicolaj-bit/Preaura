@@ -73,16 +73,22 @@ model QueueLock {
 
 // Butiksindstilling. Én række pr. butik.
 model ShopSetting {
-  id               String   @id @default(cuid())
-  shop             String   @unique
+  id                    String   @id @default(cuid())
+  shop                  String   @unique
   // "SHIPPING" = vis som forventet afsendelse, "DELIVERY" = forventet levering.
-  dateMode         String   @default("SHIPPING")
-  buttonLabel      String   @default("Forudbestil")
-  shippingDateText String   @default("Forventet afsendelse: {dato}")
-  deliveryDateText String   @default("Forventet levering: {dato}")
-  preorderNote     String   @default("Varen er på forudbestilling og sendes, når den er på lager.")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  dateMode              String   @default("SHIPPING")
+  buttonLabel           String   @default("Forudbestil")
+  shippingDateText      String   @default("Forventet afsendelse: {dato}")
+  deliveryDateText      String   @default("Forventet levering: {dato}")
+  preorderNote          String   @default("Varen er på forudbestilling og sendes, når den er på lager.")
+  // Venteliste: varen skal have kunnet købes i så mange minutter, før der
+  // udløses (så et glimt i lageret ikke sender beskeder), og der udløses
+  // højst waitlistBatchSize tilmeldinger hvert waitlistBatchMinutes minut.
+  waitlistStableMinutes Int      @default(10)
+  waitlistBatchSize     Int      @default(50)
+  waitlistBatchMinutes  Int      @default(30)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 // Variantplan. Én række pr. variant. Et produkt er slået til, hvis mindst én
@@ -250,6 +256,8 @@ model DataRequest {
   orderIds         String
   // JSON: det, PREAURA gemmer om de ordrer, da anmodningen kom.
   data             String
+  // JSON: kundens tilmeldinger til ventelisten (produkt, variant, tidspunkt).
+  waitlist         String    @default("[]")
   receivedAt       DateTime  @default(now())
   answeredAt       DateTime?
 
@@ -291,35 +299,44 @@ model IntegrationSetting {
 // (status NEW), og bygges bagefter med kundens navn og e-mail fra Shopify
 // (status BUILT). id er hændelsens entydige id — også unique_id hos Klaviyo.
 model OutboxEvent {
-  id           String           @id
-  shop         String
-  // "preorder.created", "preorder.delayed", "preorder.ready" eller
-  // "preorder.cancelled".
-  type         String
+  id              String           @id
+  shop            String
+  // "preorder.created", "preorder.delayed", "preorder.ready",
+  // "preorder.cancelled" eller "waitlist.available".
+  type            String
   // Sikrer, at samme ændring kun giver én hændelse, uanset hvor mange gange
   // ordren eller leverancen behandles.
-  dedupeKey    String
-  orderId      String
-  orderName    String           @default("")
-  orderLineId  String
-  variantId    String
-  quantity     Int
-  deliveryDate String?
-  previousDate String?
+  dedupeKey       String
+  // Tom for hændelser fra ventelisten, som ikke hører til en ordre.
+  orderId         String?
+  orderName       String           @default("")
+  orderLineId     String?
+  variantId       String
+  quantity        Int
+  deliveryDate    String?
+  previousDate    String?
+  // Venteliste: tilmeldingen, produktet og leverancen, der blev åbnet (tom,
+  // når varen kom på lager). emailHash er en envejs-nøgle til kundens
+  // e-mail, så hændelsen kan slettes på kundens anmodning.
+  waitlistEntryId String?
+  productId       String?
+  deliveryId      String?
+  emailHash       String?
   // "NEW", "BUILT" eller "FAILED" (kunne ikke bygges).
-  status       String           @default("NEW")
-  lastError    String?
+  status          String           @default("NEW")
+  lastError       String?
   // Den byggede hændelse som krypteret JSON. Indeholder kundens navn og
   // e-mail. Slettes efter 30 dage og ved customers/redact.
-  payloadEnc   String?
-  createdAt    DateTime         @default(now())
-  builtAt      DateTime?
-  deliveries   OutboxDelivery[]
+  payloadEnc      String?
+  createdAt       DateTime         @default(now())
+  builtAt         DateTime?
+  deliveries      OutboxDelivery[]
 
   @@unique([shop, dedupeKey])
   @@index([shop, status])
   @@index([shop, orderId])
   @@index([shop, createdAt])
+  @@index([shop, emailHash])
 }
 
 // Én levering af en hændelse til én modtager. Genforsøg med voksende
@@ -344,4 +361,66 @@ model OutboxDelivery {
   @@unique([eventId, channel])
   @@index([shop, status, nextAttemptAt])
   @@index([shop, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Venteliste («giv mig besked, når varen kan købes»)
+//
+// Én mekanisme med to udløsere: varen kommer på lager, eller en leverance med
+// ledige pladser åbnes. Begge dele betyder, at varianten kan købes i Shopify.
+// Al adgang går gennem app/models/waitlist.server.ts.
+// ---------------------------------------------------------------------------
+
+// Én tilmelding. Kun e-mail (krypteret), produkt, variant, butik og
+// tidspunkt. emailHash er en envejs-nøgle (HMAC), så samme e-mail ikke står
+// to gange på samme variant, og så kundens tilmeldinger kan findes og slettes
+// på kundens anmodning — uden at e-mailen skal kunne læses.
+//
+// En udløst tilmelding (notifiedAt sat) er lukket og udløses aldrig igen.
+// Højst én ÅBEN tilmelding pr. e-mail og variant: partielt unikt indeks i
+// migrationen 20261106100000_waitlist.
+//
+// Slettes af sig selv: åbne efter 180 dage, udløste 7 dage efter udløsning.
+model WaitlistEntry {
+  id         String    @id @default(cuid())
+  shop       String
+  productId  String
+  variantId  String
+  emailEnc   String
+  emailHash  String
+  createdAt  DateTime  @default(now())
+  notifiedAt DateTime?
+
+  @@index([shop, variantId, notifiedAt, createdAt])
+  @@index([shop, emailHash])
+  @@index([notifiedAt])
+  @@index([createdAt])
+}
+
+// Tilstand pr. variant med ventende tilmeldinger. Ingen persondata.
+// availableSince: hvornår varianten sidst blev købbar (null = kan ikke
+// købes). lastBatchAt: hvornår sidste portion blev udløst.
+model WaitlistWatch {
+  shop           String
+  variantId      String
+  availableSince DateTime?
+  lastBatchAt    DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  @@id([shop, variantId])
+}
+
+// Hvor mange der har fået besked pr. variant og leverance. Kun tal, ingen
+// persondata — bliver stående, når tilmeldingerne slettes, så butikken kan
+// se efterspørgslen. deliveryId er tom, når varen kom på lager.
+model WaitlistStat {
+  shop         String
+  variantId    String
+  productId    String
+  deliveryId   String   @default("")
+  deliveryDate String?
+  notified     Int      @default(0)
+  lastAt       DateTime @default(now())
+
+  @@id([shop, variantId, deliveryId])
 }
