@@ -15,7 +15,13 @@
   appen gennem Shopifys app-proxy (/apps/preaura/waitlist). Feltet gælder
   KUN besked om varen — ingen nyhedsbrev, og ingen afkrydsningsfelter.
 
+  Resttal og tidslinje: hentes EFTER sideindlæsning fra appen gennem
+  app-proxyen (/apps/preaura/availability) i ét lille kald, så tallet er
+  friskt, selv om produktsiden er cachet, og siden ikke venter på det. Uden
+  svar vises hverken tal eller tidslinje.
+
   Ingen skrifttyper, størrelser eller farver: alt arver temaets udseende.
+  Tidslinjen har kun struktur (en linje i tekstens egen farve og afstand).
   Knappen får temaets almindelige knap-klasse («button»), hvis temaet har en.
 {%- endcomment -%}
 {%- liquid
@@ -24,8 +30,20 @@
 {%- if preaura_product -%}
   <div data-preaura-root hidden {{ block.shopify_attributes }}>
     <p data-preaura-message></p>
+    <p data-preaura-remaining hidden></p>
     {%- if block.settings.note != blank -%}
       <p data-preaura-note>{{ block.settings.note | escape }}</p>
+    {%- endif -%}
+    {%- if block.settings.show_timeline -%}
+      {%- assign preaura_timeline_id = 'preaura-timeline-' | append: block.id -%}
+      <style>
+        [data-preaura-timeline] ol { list-style: none; margin: 0; padding: 0 0 0 1em; border-left: 1px solid currentColor; }
+        [data-preaura-timeline] li { margin: 0 0 0.5em; }
+      </style>
+      <div data-preaura-timeline hidden>
+        <p id="{{ preaura_timeline_id }}" data-preaura-timeline-heading></p>
+        <ol aria-labelledby="{{ preaura_timeline_id }}" data-preaura-timeline-list></ol>
+      </div>
     {%- endif -%}
     {%- if block.settings.waitlist_enabled -%}
       {%- assign preaura_field_id = 'preaura-waitlist-email-' | append: block.id -%}
@@ -57,6 +75,7 @@
     <script type="application/json" data-preaura-data>
       {
         "selected": {{ preaura_product.selected_or_first_available_variant.id | json }},
+        "product": {{ preaura_product.id | json }},
         "locale": {{ request.locale.iso_code | json }},
         "settings": {
           "shippingLabel": {{ block.settings.shipping_label | json }},
@@ -65,6 +84,13 @@
           "soldOutMessage": {{ block.settings.sold_out_message | json }},
           "changeButtonText": {{ block.settings.change_button_text | json }},
           "buttonText": {{ block.settings.button_text | json }},
+          "showRemaining": {{ block.settings.show_remaining | json }},
+          "remainingThreshold": {{ block.settings.remaining_threshold | json }},
+          "remainingText": {{ block.settings.remaining_text | json }},
+          "timeline": {{ block.settings.show_timeline | json }},
+          "timelineSoldOut": {{ block.settings.timeline_sold_out | json }},
+          "timelineCurrent": {{ block.settings.timeline_current | json }},
+          "timelineUpcoming": {{ block.settings.timeline_upcoming | json }},
           "waitlist": {{ block.settings.waitlist_enabled | json }},
           "waitlistSuccess": {{ block.settings.waitlist_success | json }},
           "waitlistError": {{ block.settings.waitlist_error | json }},
@@ -144,6 +170,60 @@
       "id": "button_text",
       "label": "Tekst på købsknappen",
       "default": "Forudbestil"
+    },
+    {
+      "type": "header",
+      "content": "Antal tilbage"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_remaining",
+      "label": "Vis antal tilbage i den aktuelle leverance",
+      "info": "Tallet hentes frisk fra appen, når siden er indlæst. Det er altid antallet i den leverance, kunden køber ind i nu.",
+      "default": true
+    },
+    {
+      "type": "number",
+      "id": "remaining_threshold",
+      "label": "Vis først tallet, når der er højst",
+      "info": "Fx 25: «Kun 480 tilbage» skaber ingen hast — det er bare støj.",
+      "default": 25
+    },
+    {
+      "type": "text",
+      "id": "remaining_text",
+      "label": "Tekst",
+      "info": "{antal} bliver til antallet.",
+      "default": "Kun {antal} tilbage i denne leverance."
+    },
+    {
+      "type": "header",
+      "content": "Tidslinje"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_timeline",
+      "label": "Vis tidslinje over leverancerne",
+      "info": "Viser den aktuelle plan med forventede datoer og om hver leverance er udsolgt, den man køber ind i nu, eller kommende. Ingen antal pr. leverance.",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "timeline_sold_out",
+      "label": "Udsolgt leverance",
+      "default": "udsolgt"
+    },
+    {
+      "type": "text",
+      "id": "timeline_current",
+      "label": "Leverancen, kunden køber ind i nu",
+      "default": "du køber ind i denne leverance"
+    },
+    {
+      "type": "text",
+      "id": "timeline_upcoming",
+      "label": "Kommende leverance",
+      "default": "kommende"
     },
     {
       "type": "header",

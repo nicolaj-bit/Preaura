@@ -73,7 +73,11 @@ overensstemmelse med appens data:
 - **Én selling plan pr. åben leverance**: kategori `PRE_ORDER`, betaling
   ved afsendelse (0 % ved bestilling, resten `ON_FULFILLMENT`), afsendelse på leverancens dato
   (`EXACT_TIME`, kl. 12:00 UTC), og lageret bindes ved salg (`ON_SALE`).
-  Planens id gemmes på leverancen.
+  Planens id gemmes på leverancen. Planens **navn** er «Forudbestilling»
+  uden dato — datoen står i linjeegenskaben (se Produktsiden). Med datoen
+  begge steder stod den to gange i kurven. Valgmuligheden (`option`) har
+  stadig datoen, så leverancerne kan skelnes i gruppen. Planer, der blev
+  oprettet før, beholder deres gamle navn (en plan ændres aldrig).
 - **Lager:** lagersporing slået til, inventory policy `DENY`, og tilgængeligt
   antal = det resterende i den aktive leverance. Shopify stopper selv salget
   ved 0.
@@ -190,6 +194,19 @@ blok → Apps → Forudbestilling). Ingen app embed og ingen kode i temaet.
   variantvælger og købsknap røres ikke. Knappens tekst ændres kun, hvis
   indstillingen er slået til (standard: fra).
 - **Udsolgt:** tydelig besked, og hverken plan eller linjeegenskab.
+- **Antal tilbage og tidslinje** hentes EFTER sideindlæsning i ét kald for
+  hele produktet gennem app-proxyen (`/apps/preaura/availability`,
+  `app/routes/proxy.availability.tsx`, `app/storefront/live.ts`). Produktsider
+  caches, så tallet i metafeltet bruges aldrig til visning. Tallet er det
+  mindste af appens regnskab og Shopifys lager (som falder med det samme ved
+  køb); kan Shopify ikke læses, vises intet tal. Vises kun i den leverance,
+  kunden køber ind i, og kun når det er højst grænsen (standard 25).
+  Tidslinjen viser forventede datoer og tilstand (udsolgt / køber ind i nu /
+  kommende) — aldrig antal pr. kommende leverance — som en almindelig liste,
+  en skærmlæser kan læse. Den viser den aktuelle plan; ordrer beholder den
+  dato, de fik lovet. Svaret huskes 10 sekunder pr. produkt og hentes igen
+  hvert minut, mens siden er synlig. Bliver leverancen udsolgt imens, følger
+  plan, dato, besked og købsknap med. Kun med aktivt abonnement.
 - Alle kundevendte tekster er indstillinger på blokken. Datoen formateres
   på butikkens sprog.
 
@@ -200,7 +217,8 @@ blok → Apps → Forudbestilling). Ingen app embed og ingen kode i temaet.
   anmodninger røres ikke.
 
 **Ret i `theme-extension-src/preaura-preorder.js`**, ikke i `assets/`. Filen i `assets/` er en
-komprimeret udgave (Shopify tillader højst 10 KB JavaScript pr. app block) og
+komprimeret udgave (Shopify anbefaler højst 10 KB gzippet JavaScript pr. app
+block; filen fylder ca. 4 KB gzippet) og
 bygges med `npm run build:block` (sker også automatisk før `npm test`).
 Kilde og tests ligger uden for extensionen, fordi Shopify kun tillader
 mapperne `assets`, `blocks`, `snippets` og `locales` i en theme app extension.
