@@ -257,3 +257,57 @@ describe("datoer", () => {
     expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
   });
 });
+
+describe("konkrete fejlbeskeder", () => {
+  const today = "2026-11-07";
+  it("dato i fortiden, antal 0: siger hvad der er galt og hvad man skal gøre", () => {
+    const result = validateDelivery(
+      { date: "2026-11-01", quantity: "0" },
+      { today, allocated: 0 },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.date).toMatch(/passeret.*Vælg en dato fra i morgen/);
+    expect(result.errors.quantity).toMatch(/mindst 1.*annullér leverancen/);
+  });
+
+  it("overlap: samme dato som en anden leverance", () => {
+    const result = validateDelivery(
+      { date: "2026-12-01", quantity: "10" },
+      { today, allocated: 0, others: [{ position: 1, date: "2026-12-01" }] },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.date).toBe(
+      "Leverance 1 har allerede datoen 1. december 2026. Ret antallet på leverance 1 i stedet, eller vælg en anden dato.",
+    );
+  });
+
+  it("en ny leverance skal ligge efter de eksisterende", () => {
+    const result = validateDelivery(
+      { date: "2026-12-01", quantity: "10" },
+      {
+        today,
+        allocated: 0,
+        newDelivery: true,
+        others: [
+          { position: 1, date: "2026-11-20" },
+          { position: 2, date: "2027-01-15" },
+        ],
+      },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.date).toMatch(
+      /efter 15\. januar 2027 \(leverance 2\)/,
+    );
+  });
+
+  it("en eksisterende leverance må gerne flyttes mellem de andre", () => {
+    const result = validateDelivery(
+      { date: "2026-12-01", quantity: "10" },
+      { today, allocated: 0, others: [{ position: 2, date: "2027-01-15" }] },
+    );
+    expect(result.ok).toBe(true);
+  });
+});
