@@ -182,4 +182,14 @@ module.exports = {
   globals: {
     shopify: "readonly",
   },
+  rules: {
+    // Browserens gamle escape()/unescape() URL-koder tekst. Har en fil
+    // glemt at importere sin egen escape, skal det fejle — ikke stille vise
+    // «%20» til kunden.
+    "no-restricted-globals": [
+      "error",
+      { name: "escape", message: "Importér escape fra app/release/cancel.ts." },
+      { name: "unescape", message: "Brug ikke den globale unescape()." },
+    ],
+  },
 };

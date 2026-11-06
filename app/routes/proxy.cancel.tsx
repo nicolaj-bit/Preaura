@@ -6,6 +6,7 @@ import { releaseFor } from "../models/release.server";
 import { readCancelLink } from "../release/link.server";
 import {
   cancelState,
+  escape,
   targetsFromSelection,
   type CancelLine,
 } from "../release/cancel";
