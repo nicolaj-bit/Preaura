@@ -28,31 +28,60 @@
   assign preaura_product = closest.product | default: product
 -%}
 {%- if preaura_product -%}
-  <div data-preaura-root hidden {{ block.shopify_attributes }}>
-    <p data-preaura-message></p>
-    <p data-preaura-remaining hidden></p>
-    {%- if block.settings.note != blank -%}
-      <p data-preaura-note>{{ block.settings.note | escape }}</p>
-    {%- endif -%}
+  <style>
+    .preaura{display:flex;flex-direction:column;gap:.75em;margin:1.25em 0;padding:1.1em 1.25em;border:1px solid;border-color:color-mix(in srgb,currentColor 18%,transparent);border-radius:.6em}
+    .preaura[hidden],.preaura [hidden]{display:none!important}
+    .preaura p{margin:0}
+    .preaura__message{font-weight:600}
+    .preaura__remaining{display:flex;align-items:center;gap:.5em}
+    .preaura__remaining::before{content:"";flex:none;width:.5em;height:.5em;border-radius:50%;background:currentColor}
+    .preaura__note{font-size:.875em;opacity:.75}
+    .preaura__timeline{padding-top:.85em;border-top:1px solid;border-color:color-mix(in srgb,currentColor 12%,transparent)}
+    .preaura__timeline-heading{margin-bottom:.7em!important;font-size:.75em;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+    .preaura__timeline ol{list-style:none;margin:0;padding:0}
+    .preaura__timeline li{position:relative;display:flex;justify-content:space-between;gap:1em;padding:0 0 .75em 1.6em}
+    .preaura__timeline li:last-child{padding-bottom:0}
+    .preaura__timeline li::before{content:"";position:absolute;left:0;top:.4em;width:.65em;height:.65em;box-sizing:border-box;border:1.5px solid currentColor;border-radius:50%}
+    .preaura__timeline li::after{content:"";position:absolute;left:.3em;top:1.25em;bottom:.15em;width:1px;background:currentColor;opacity:.25}
+    .preaura__timeline li:last-child::after{display:none}
+    .preaura__timeline li[data-state=CURRENT]{font-weight:600}
+    .preaura__timeline li[data-state=CURRENT]::before{background:currentColor}
+    .preaura__timeline li[data-state=SOLD_OUT]{opacity:.5}
+    .preaura__timeline li[data-state=SOLD_OUT] .preaura__date{text-decoration:line-through}
+    .preaura__date{white-space:nowrap}
+    .preaura__state{text-align:right;opacity:.8}
+    .preaura__sep{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    .preaura__waitlist{display:flex;flex-direction:column;gap:.6em}
+    .preaura__waitlist-heading{font-weight:600}
+    .preaura__label{font-size:.875em;opacity:.8}
+    .preaura__input{box-sizing:border-box;width:100%;padding:.75em 1em;font:inherit;color:inherit;background:transparent;border:1px solid;border-color:color-mix(in srgb,currentColor 35%,transparent);border-radius:.4em}
+    .preaura__input:focus{outline:2px solid currentColor;outline-offset:1px}
+    .preaura__submit{width:100%}
+    .preaura__status:empty{display:none}
+    .preaura__privacy{font-size:.8em;opacity:.7}
+  </style>
+  <div class="preaura" data-preaura-root hidden {{ block.shopify_attributes }}>
+    <p class="preaura__message" data-preaura-message></p>
+    <p class="preaura__remaining" data-preaura-remaining hidden></p>
     {%- if block.settings.show_timeline -%}
       {%- assign preaura_timeline_id = 'preaura-timeline-' | append: block.id -%}
-      <style>
-        [data-preaura-timeline] ol { list-style: none; margin: 0; padding: 0 0 0 1em; border-left: 1px solid currentColor; }
-        [data-preaura-timeline] li { margin: 0 0 0.5em; }
-      </style>
-      <div data-preaura-timeline hidden>
-        <p id="{{ preaura_timeline_id }}" data-preaura-timeline-heading></p>
+      <div class="preaura__timeline" data-preaura-timeline hidden>
+        <p class="preaura__timeline-heading" id="{{ preaura_timeline_id }}" data-preaura-timeline-heading></p>
         <ol aria-labelledby="{{ preaura_timeline_id }}" data-preaura-timeline-list></ol>
       </div>
     {%- endif -%}
+    {%- if block.settings.note != blank -%}
+      <p class="preaura__note" data-preaura-note>{{ block.settings.note | escape }}</p>
+    {%- endif -%}
     {%- if block.settings.waitlist_enabled -%}
       {%- assign preaura_field_id = 'preaura-waitlist-email-' | append: block.id -%}
-      <div data-preaura-waitlist hidden>
+      <div class="preaura__waitlist" data-preaura-waitlist hidden>
         {%- if block.settings.waitlist_heading != blank -%}
-          <p>{{ block.settings.waitlist_heading | escape }}</p>
+          <p class="preaura__waitlist-heading">{{ block.settings.waitlist_heading | escape }}</p>
         {%- endif -%}
-        <label for="{{ preaura_field_id }}">{{ block.settings.waitlist_email_label | escape }}</label>
+        <label class="preaura__label" for="{{ preaura_field_id }}">{{ block.settings.waitlist_email_label | escape }}</label>
         <input
+          class="preaura__input"
           id="{{ preaura_field_id }}"
           type="email"
           name="email"
@@ -63,12 +92,12 @@
           data-preaura-waitlist-email
         >
         <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" hidden data-preaura-waitlist-trap>
-        <button type="button" class="button" data-preaura-waitlist-submit>
+        <button type="button" class="button preaura__submit" data-preaura-waitlist-submit>
           {{- block.settings.waitlist_button | escape -}}
         </button>
-        <p role="status" aria-live="polite" data-preaura-waitlist-status></p>
+        <p class="preaura__status" role="status" aria-live="polite" data-preaura-waitlist-status></p>
         {%- if block.settings.waitlist_privacy != blank -%}
-          <p>{{ block.settings.waitlist_privacy | escape }}</p>
+          <p class="preaura__privacy">{{ block.settings.waitlist_privacy | escape }}</p>
         {%- endif -%}
       </div>
     {%- endif -%}
@@ -218,7 +247,8 @@
       "type": "text",
       "id": "timeline_current",
       "label": "Leverancen, kunden køber ind i nu",
-      "default": "du køber ind i denne leverance"
+      "info": "Kort tekst står pænest, fx «nuværende» eller «køb nu».",
+      "default": "nuværende"
     },
     {
       "type": "text",
