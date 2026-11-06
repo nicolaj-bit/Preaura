@@ -30,6 +30,7 @@
 {%- if preaura_product -%}
   <style>
     .preaura{display:flex;flex-direction:column;gap:.75em;margin:1.25em 0;padding:1.1em 1.25em;border:1px solid;border-color:color-mix(in srgb,currentColor 18%,transparent);border-radius:.6em}
+    .preaura--plain{padding:0;border:0;border-radius:0}
     .preaura[hidden],.preaura [hidden]{display:none!important}
     .preaura p{margin:0}
     .preaura__message{font-weight:600}
@@ -60,7 +61,7 @@
     .preaura__status:empty{display:none}
     .preaura__privacy{font-size:.8em;opacity:.7}
   </style>
-  <div class="preaura" data-preaura-root hidden {{ block.shopify_attributes }}>
+  <div class="preaura{% unless block.settings.boxed %} preaura--plain{% endunless %}" data-preaura-root hidden {{ block.shopify_attributes }}>
     <p class="preaura__message" data-preaura-message></p>
     <p class="preaura__remaining" data-preaura-remaining hidden></p>
     {%- if block.settings.show_timeline -%}
@@ -153,6 +154,13 @@
     {
       "type": "paragraph",
       "content": "Placér blokken i produktsektionen, gerne lige over købsknappen. Datoen og teksterne vises kun for varianter på forudbestilling."
+    },
+    {
+      "type": "checkbox",
+      "id": "boxed",
+      "label": "Vis i en boks",
+      "info": "En tynd ramme i temaets tekstfarve rundt om dato, antal, tidslinje og venteliste. Slået fra: samme indhold uden ramme.",
+      "default": true
     },
     {
       "type": "text",

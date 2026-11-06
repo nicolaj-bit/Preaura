@@ -251,6 +251,14 @@ describe("blokken (Liquid)", () => {
     expect(css).not.toMatch(/font-size:[^;}]*px/);
   });
 
+  it("butikken vælger selv boks eller ej (standard: boks)", () => {
+    const setting = schema.settings.find((s) => s.id === "boxed");
+    expect(setting).toMatchObject({ type: "checkbox", default: true });
+    expect(markup).toContain(
+      '{% unless block.settings.boxed %} preaura--plain{% endunless %}',
+    );
+  });
+
   it("ventelisten er slået fra, til butikken selv slår den til", () => {
     const setting = schema.settings.find((s) => s.id === "waitlist_enabled");
     expect(setting).toMatchObject({ type: "checkbox", default: false });
