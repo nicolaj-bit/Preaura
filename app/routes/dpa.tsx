@@ -16,7 +16,7 @@ const PROCESSOR = {
   email: "nicolaj@lalatoto.dk",
 };
 
-const UPDATED = "6. november 2026";
+const UPDATED = "7. november 2026";
 
 export const meta: MetaFunction = () => [
   { title: "Databehandleraftale – PREAURA" },
@@ -300,6 +300,12 @@ export default function Dpa() {
           sendes til en modtager, webshoppen har slået til.
         </li>
         <li>
+          Annullering: kunden kan annullere via et signeret link uden login.
+          PREAURA retter eller annullerer ordren i Shopify uden refundering;
+          webshoppen refunderer selv. Ved afvist betaling ved afsendelse
+          frigives enhederne efter webshoppens frist.
+        </li>
+        <li>
           Ventelisten: kunden skriver selv sin e-mail på produktsiden. Den
           bruges kun til én besked om, at netop den vare kan købes. Der er ingen
           afkrydsningsfelter, og tilmeldingen er ikke en tilmelding til
@@ -321,6 +327,11 @@ export default function Dpa() {
         </li>
         <li>Logbog over sendte hændelser (uden kundeoplysninger): 90 dage.</li>
         <li>Besvarede indsigtsanmodninger: 30 dage.</li>
+        <li>
+          Annulleringer og afviste betalinger (ordrens id og nummer, linjer,
+          antal og tidspunkter — ingen betalingsoplysninger): 90 dage efter,
+          sagen er afsluttet.
+        </li>
         <li>Alt om webshoppen: 48 timer efter afinstallation.</li>
       </ul>
       <h3>Sikkerhed</h3>

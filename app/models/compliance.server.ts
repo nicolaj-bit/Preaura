@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { purgeWaitlist, waitlistFor } from "./waitlist.server";
+import { purgeReleaseHistory } from "./release.server";
 
 // Databeskyttelse: kunders dataanmodninger og sletning.
 //
@@ -19,6 +20,7 @@ const ORDER_TOPICS = [
   "ORDERS_UPDATED",
   "ORDERS_CANCELLED",
   "REFUNDS_CREATE",
+  "ORDER_TRANSACTIONS_CREATE",
 ];
 
 const RETENTION_DAYS = 30;
@@ -203,7 +205,7 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         })
         .map((event) => event.id);
 
-      const [requests, removed, outbox, waitlist, waitlistEvents] =
+      const [requests, removed, outbox, , , waitlist, waitlistEvents] =
         await client.$transaction([
           client.dataRequest.deleteMany({
             where: { shop, customerId: input.customerId },
@@ -216,6 +218,13 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
           client.outboxEvent.updateMany({
             where: { shop, orderId: { in: input.orderIds } },
             data: { payloadEnc: null },
+          }),
+          // Annulleringer og afviste betalinger for kundens ordrer.
+          client.cancellationRequest.deleteMany({
+            where: { shop, orderId: { in: input.orderIds } },
+          }),
+          client.paymentIssue.deleteMany({
+            where: { shop, orderId: { in: input.orderIds } },
           }),
           // Ventelisten: tilmeldingerne slettes, og e-mailen i hændelser, der
           // allerede er bygget.
@@ -256,6 +265,8 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
         client.outboxEvent.deleteMany(where),
         client.integrationSetting.deleteMany(where),
         client.waitlistEntry.deleteMany(where),
+        client.cancellationRequest.deleteMany(where),
+        client.paymentIssue.deleteMany(where),
         client.waitlistWatch.deleteMany(where),
         client.waitlistStat.deleteMany(where),
         client.queueLock.deleteMany({
@@ -298,6 +309,7 @@ export async function purgeOldData(
     client.outboxEvent.deleteMany({ where: { createdAt: { lt: logBefore } } }),
   ]);
   const waitlist = await purgeWaitlist(client, now);
+  const release = await purgeReleaseHistory(client, now);
   return {
     events: events.count,
     dataRequests: requests.count,
@@ -305,5 +317,7 @@ export async function purgeOldData(
     outboxLog: log.count,
     waitlistOpen: waitlist.open,
     waitlistNotified: waitlist.notified,
+    releaseRequests: release.requests,
+    releaseIssues: release.issues,
   };
 }

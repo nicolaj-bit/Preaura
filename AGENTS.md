@@ -42,3 +42,7 @@ PREAURA har to miljøer, der ikke deler noget:
 7. **Ventelisten giver kun besked om varen.** Ingen afkrydsningsfelter på
    produktsiden, intet forudkrydset, og tilmeldingen må aldrig bruges til
    nyhedsbrev eller markedsføring. En tilmelding udløser højst én besked.
+8. **Én frigivelse.** En reserveret enhed frigives kun ved at ændre ordren i
+   Shopify (annullere eller nedsætte antal) og lade `orders.apply` afstemme.
+   Byg aldrig en anden vej, der frigiver i appens eget regnskab. Appen
+   udbetaler aldrig penge.

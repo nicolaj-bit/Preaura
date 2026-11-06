@@ -70,7 +70,17 @@ export type OrderSnapshot = {
     sellingPlanId: string | null;
     /** Nuværende antal efter rettelser og refunderinger. */
     quantity: number;
+    /** Antal, der endnu ikke er sendt. Kun når Shopify har oplyst det. */
+    unfulfilled?: number;
+    /** Produkt og variant, til kundens annulleringsside. */
+    title?: string;
+    variantTitle?: string | null;
   }[];
+  /**
+   * Betaling. paid: ordren er betalt fuldt ud. failedAt: seneste afviste
+   * betalingsforsøg (opkrævning ved afsendelse), eller null.
+   */
+  payment?: { paid: boolean; failedAt: string | null };
 };
 
 export type DeliveryView = {

@@ -29,7 +29,8 @@ redirect_urls = [ "https://preaura-test.onrender.com/auth/callback" ]
 # write_purchase_options er påkrævet af sellingPlanGroupCreate (selling plans
 # til forudbestilling) — write_products alene er ikke nok. write_app_proxy
 # kræves af ventelisten på produktsiden (se [app_proxy] nederst).
-scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy"
+# write_order_edits kræves for at nedsætte antal ved delvis annullering.
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits"
 
 [webhooks]
 api_version = "2026-10"
@@ -43,7 +44,7 @@ api_version = "2026-10"
   # Ordrer. Håndteres af: /app/routes/webhooks.orders.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/orders"
-  topics = ["orders/create", "orders/updated", "orders/cancelled", "refunds/create"]
+  topics = ["orders/create", "orders/updated", "orders/cancelled", "refunds/create", "order_transactions/create"]
 
   # Lagerændringer, også uden for appen. Skift mellem lager og forudbestilling.
   # Håndteres af: /app/routes/webhooks.inventory.tsx

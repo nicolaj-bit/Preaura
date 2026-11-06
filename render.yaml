@@ -64,7 +64,7 @@ services:
       - key: PREAURA_ENCRYPTION_KEY
         generateValue: true
       - key: SCOPES
-        value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy
+        value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits
       # Abonnementstjek (Shopify App Pricing). "off" indtil abonnementet er
       # oprettet på produktionsappen; derefter "shopify" sammen med SHOPIFY_PARTNER_ORG_ID,
       # SHOPIFY_PARTNER_API_ACCESS_TOKEN, SHOPIFY_APP_GID og
@@ -104,7 +104,7 @@ services:
       - key: PREAURA_ENCRYPTION_KEY
         generateValue: true
       - key: SCOPES
-        value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy
+        value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits
       # Abonnementstjekket er slået til i testmiljøet. Partner API-nøglen,
       # SHOPIFY_PARTNER_ORG_ID og SHOPIFY_APP_GID sættes direkte i Render.
       - key: PREAURA_BILLING

@@ -49,6 +49,9 @@ export function minimalPayload(
   switch (topic) {
     case "REFUNDS_CREATE":
       return pick(payload, ["order_id"]);
+    case "ORDER_TRANSACTIONS_CREATE":
+      // Kun ordren og om forsøget lykkedes — ingen kort- eller kundedata.
+      return pick(payload, ["order_id", "kind", "status"]);
     case "INVENTORY_LEVELS_UPDATE":
       return pick(payload, ["inventory_item_id", "location_id"]);
     case "CUSTOMERS_DATA_REQUEST":

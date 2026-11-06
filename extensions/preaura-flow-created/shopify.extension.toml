@@ -55,3 +55,8 @@ description = "Når en kunde har forudbestilt en vare, og ordren har fået plads
   type = "single_line_text_field"
   key = "Previous delivery date"
   description = "Den tidligere dato, hvis datoen er ændret. Ellers tom."
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Cancel url"
+  description = "Kundens link til at annullere forudbestillingen. Tom for annullerede ordrer."
