@@ -353,10 +353,18 @@ export default function Releases() {
                 <s-badge tone={REQUEST_STATUS[r.status]?.tone ?? "info"}>
                   {REQUEST_STATUS[r.status]?.text ?? r.status}
                 </s-badge>
+                {r.error && r.status !== "DONE" && (
+                  <>
+                    {" "}
+                    <s-text tone="critical">
+                      {r.status === "APPROVED" ? "Forsøger igen: " : ""}
+                      {r.error}
+                    </s-text>
+                  </>
+                )}
                 {r.status === "FAILED" && (
                   <>
                     {" "}
-                    <s-text tone="critical">{r.error}</s-text>{" "}
                     <s-button onClick={() => send("retry", r.id)}>
                       Prøv igen
                     </s-button>
