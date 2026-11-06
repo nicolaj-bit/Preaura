@@ -11,9 +11,9 @@
 export const PARTNER_API_VERSION = "2026-10";
 
 export type ActiveSubscription = {
-  /** Plan-handles i abonnementet (fx «basis»). */
-  handles: string[];
+  /** Sand, når butikken har opsagt, og abonnementet stopper ved periodens udgang. */
   cancelAtEndOfCycle: boolean;
+  /** Hvornår prøveperioden slutter (ISO). Kan ligge i fortiden. */
   trialEndsAt: string | null;
 };
 
@@ -50,9 +50,6 @@ const QUERY = `query PreauraActiveSubscription($appId: ID!, $shopId: ID!) {
   activeSubscription(appId: $appId, shopId: $shopId) {
     cancelAtEndOfCycle
     trialEndsAt
-    items {
-      handle
-    }
   }
 }`;
 
@@ -106,7 +103,6 @@ export async function fetchActiveSubscription(
       activeSubscription: {
         cancelAtEndOfCycle: boolean;
         trialEndsAt: string | null;
-        items: { handle: string | null }[];
       } | null;
     };
     errors?: unknown;
@@ -122,9 +118,6 @@ export async function fetchActiveSubscription(
   const subscription = json.data.activeSubscription;
   if (!subscription) return null;
   return {
-    handles: subscription.items
-      .map((item) => item.handle)
-      .filter((h): h is string => !!h),
     cancelAtEndOfCycle: subscription.cancelAtEndOfCycle,
     trialEndsAt: subscription.trialEndsAt,
   };

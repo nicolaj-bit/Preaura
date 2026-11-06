@@ -1,48 +1,45 @@
 import {
-  can,
-  entitlementFor,
-  loadPlansConfig,
-  planForHandles,
-  unrestricted,
-  type Entitlement,
-  type Feature,
-  type PlansConfig,
-} from "./plans";
-import {
   fetchActiveSubscription,
   type ActiveSubscription,
 } from "./partnerApi.server";
 
-// Hvad butikken har adgang til lige nu.
+// Har butikken adgang til PREAURA lige nu?
+//
+// PREAURA har ét abonnement, der dækker alt. Der er derfor kun to tilstande:
+// butikken har et aktivt abonnement (også i prøveperioden), eller den har
+// ikke. Pris og prøveperiode står kun i Partner Dashboard.
 //
 // Sandheden er butikkens aktive abonnement i Shopify (Partner API). Vi gemmer
-// INTET om planen i databasen. Svaret caches kortvarigt i hukommelsen (5 min,
-// PREAURA_ENTITLEMENT_TTL_SECONDS), udløber af sig selv og kan tømmes med
-// clearEntitlementCache — det sker, når butikken kommer tilbage fra Shopifys
-// prisvalgsside. Kun et bekræftet abonnement caches; «intet abonnement» tjekkes
-// igen hver gang, så en butik, der lige har valgt plan, kommer ind med det samme.
+// INTET om abonnementet i databasen. Svaret caches kortvarigt i hukommelsen
+// (5 min, PREAURA_ENTITLEMENT_TTL_SECONDS), udløber af sig selv og kan tømmes
+// med clearAccessCache — det sker, når butikken kommer tilbage fra Shopifys
+// prisvalgsside. Kun et bekræftet abonnement caches; «intet abonnement»
+// tjekkes igen hver gang, så en butik, der lige har tegnet abonnement, kommer
+// ind med det samme.
 //
-// PREAURA_BILLING=off slår tjekket fra (alle funktioner). Bruges, indtil
-// planerne er oprettet i Partner Dashboard.
+// Mangler adgangen, lukkes funktionerne — intet data slettes eller nulstilles.
+// Derfor må intet i app/billing/ røre databasen (håndhæves af lint og test).
+//
+// PREAURA_BILLING=off slår tjekket helt fra (alle har adgang). Bruges, indtil
+// abonnementet er oprettet på produktionsappen i Partner Dashboard.
 
 export type Access =
   | {
       status: "active";
-      entitlement: Entitlement;
+      /** Null, når tjekket er slået fra. */
       subscription: ActiveSubscription | null;
     }
   | { status: "none" };
 
-type CacheEntry = {
-  access: Extract<Access, { status: "active" }>;
-  expiresAt: number;
-};
+type ActiveAccess = Extract<Access, { status: "active" }>;
+
+type CacheEntry = { access: ActiveAccess; expiresAt: number };
 
 const cache = new Map<string, CacheEntry>();
 const shopGids = new Map<string, string>();
 
 /** Tømmer cachen for én butik, eller for alle. */
-export function clearEntitlementCache(shop?: string) {
+export function clearAccessCache(shop?: string) {
   if (shop) cache.delete(shop);
   else cache.clear();
 }
@@ -62,7 +59,6 @@ export type ResolveDeps = {
   /** Butikkens gid (gid://shopify/Shop/…), som Partner API kræver. */
   shopGid: () => Promise<string>;
   fetchSubscription?: (shopGid: string) => Promise<ActiveSubscription | null>;
-  config?: PlansConfig;
   env?: Record<string, string | undefined>;
   now?: () => number;
 };
@@ -72,18 +68,12 @@ export async function resolveAccess(
   {
     shopGid,
     fetchSubscription = (gid) => fetchActiveSubscription(gid),
-    config = loadPlansConfig(),
     env = process.env,
     now = Date.now,
   }: ResolveDeps,
 ): Promise<Access> {
-  if (!billingEnabled(env)) {
-    return {
-      status: "active",
-      entitlement: unrestricted(),
-      subscription: null,
-    };
-  }
+  if (!billingEnabled(env)) return { status: "active", subscription: null };
+
   const cached = cache.get(shop);
   if (cached && cached.expiresAt > now()) return cached.access;
 
@@ -109,14 +99,7 @@ export async function resolveAccess(
     cache.delete(shop);
     return { status: "none" };
   }
-  const access = {
-    status: "active" as const,
-    entitlement: entitlementFor(
-      config,
-      planForHandles(config, subscription.handles),
-    ),
-    subscription,
-  };
+  const access: ActiveAccess = { status: "active", subscription };
   cache.set(shop, { access, expiresAt: now() + ttlMs(env) });
   return access;
 }
@@ -138,26 +121,6 @@ export function pricingPageUrl(
   return `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
 }
 
-export class FeatureNotIncludedError extends Response {
-  constructor(feature: Feature) {
-    super(`Din plan giver ikke adgang til «${feature}».`, { status: 403 });
-  }
-}
-
-/**
- * ÉN kontrol pr. funktion. Kaldes i en loader eller action:
- *
- *   const access = await accessFor(admin, session.shop);
- *   requireFeature(access, "events.klaviyo");
- *
- * Kaster et 403-svar, hvis planen ikke giver adgang. Rører aldrig data.
- */
-export function requireFeature(access: Access, feature: Feature) {
-  if (access.status !== "active" || !can(access.entitlement, feature)) {
-    throw new FeatureNotIncludedError(feature);
-  }
-}
-
 type AdminGraphql = (query: string) => Promise<Response>;
 
 /** Adgangen for en butik ud fra en godkendt admin-session. */
@@ -176,4 +139,40 @@ export function accessFor(admin: { graphql: AdminGraphql }, shop: string) {
       return json.data.shop.id;
     },
   });
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Det, siden «Abonnement» viser. Ren funktion — ingen priser. */
+export type SubscriptionStatus =
+  | { kind: "off" }
+  | { kind: "none" }
+  | {
+      kind: "trial";
+      /** Hele dage tilbage, rundet op (1 = sidste dag). */
+      daysLeft: number;
+      trialEndsAt: string;
+      endsAtPeriodEnd: boolean;
+    }
+  | { kind: "active"; endsAtPeriodEnd: boolean };
+
+export function subscriptionStatus(
+  access: Access,
+  billingOn: boolean,
+  now: number = Date.now(),
+): SubscriptionStatus {
+  if (!billingOn) return { kind: "off" };
+  if (access.status !== "active") return { kind: "none" };
+  const sub = access.subscription;
+  const endsAtPeriodEnd = sub?.cancelAtEndOfCycle ?? false;
+  const trialEnd = sub?.trialEndsAt ? Date.parse(sub.trialEndsAt) : NaN;
+  if (Number.isFinite(trialEnd) && trialEnd > now) {
+    return {
+      kind: "trial",
+      daysLeft: Math.ceil((trialEnd - now) / DAY),
+      trialEndsAt: sub!.trialEndsAt!,
+      endsAtPeriodEnd,
+    };
+  }
+  return { kind: "active", endsAtPeriodEnd };
 }

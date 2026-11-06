@@ -2,127 +2,58 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  can,
-  limitOf,
-  loadPlansConfig,
-  parsePlansConfig,
-  planForHandles,
-  PlansConfigError,
-} from "./plans";
-import {
   fetchActiveSubscription,
   PartnerApiError,
   redactSecrets,
+  type ActiveSubscription,
 } from "./partnerApi.server";
-import { FEATURE_LABELS, subscriptionView } from "./view";
 import {
-  clearEntitlementCache,
-  FeatureNotIncludedError,
+  clearAccessCache,
   pricingPageUrl,
-  requireFeature,
   resolveAccess,
-} from "./entitlements.server";
+  subscriptionStatus,
+} from "./access.server";
 
 const SHOP = "butik.myshopify.com";
 const ON = { PREAURA_BILLING: "shopify" };
+const DAY = 24 * 60 * 60 * 1000;
 
-const config = parsePlansConfig({
-  plans: {
-    gratis: { features: ["preorders"], limits: { preorderVariants: 5 } },
-    basis: {
-      features: ["preorders", "events.flow"],
-      limits: { preorderVariants: 50 },
-    },
-    pro: {
-      features: [
-        "preorders",
-        "events.flow",
-        "events.webhook",
-        "events.klaviyo",
-      ],
-      limits: { preorderVariants: null },
-    },
-  },
-  shopifyHandles: { gratis: "gratis", "basis-maaned": "basis", pro: "pro" },
-  unknownHandlePlan: "pro",
+const sub = (over: Partial<ActiveSubscription> = {}): ActiveSubscription => ({
+  cancelAtEndOfCycle: false,
+  trialEndsAt: null,
+  ...over,
 });
 
-beforeEach(() => clearEntitlementCache());
+beforeEach(() => clearAccessCache());
 
-describe("plankonfigurationen", () => {
-  it("filen i config/plans.json er gyldig og har gratis, basis og pro", () => {
-    const loaded = loadPlansConfig({});
-    expect(Object.keys(loaded.plans).sort()).toEqual([
-      "basis",
-      "gratis",
-      "pro",
-    ]);
-  });
-
-  it("kan overstyres med PREAURA_PLANS_JSON — uden at røre koden", () => {
-    const loaded = loadPlansConfig({
-      PREAURA_PLANS_JSON: JSON.stringify({
-        plans: { solo: { features: ["preorders"], limits: {} } },
-        shopifyHandles: { solo: "solo" },
-        unknownHandlePlan: "solo",
-      }),
-    });
-    expect(Object.keys(loaded.plans)).toEqual(["solo"]);
-  });
-
-  it("afviser stavefejl i funktioner og handles, der peger på ukendte planer", () => {
-    expect(() =>
-      parsePlansConfig({
-        plans: { gratis: { features: ["preorder"] } },
-        shopifyHandles: {},
-        unknownHandlePlan: "gratis",
-      }),
-    ).toThrow(PlansConfigError);
-    expect(() =>
-      parsePlansConfig({
-        plans: { gratis: { features: [] } },
-        shopifyHandles: { x: "guld" },
-        unknownHandlePlan: "gratis",
-      }),
-    ).toThrow(PlansConfigError);
-  });
-
-  it("arbejder med plannøgler via handles — ikke navne eller priser", () => {
-    expect(planForHandles(config, ["basis-maaned"])).toBe("basis");
-    // En handle, vi ikke kender: til fordel for butikken.
-    expect(planForHandles(config, ["noget-nyt"])).toBe("pro");
-  });
-});
-
-describe("adgang læses fra Shopify", () => {
+describe("ét abonnement — kun to tilstande", () => {
   const deps = (
-    fetchSubscription: (gid: string) => Promise<{ handles: string[] } | null>,
+    fetchSubscription: (gid: string) => Promise<ActiveSubscription | null>,
     now = () => 1_000,
   ) => ({
     shopGid: async () => "gid://shopify/Shop/1",
-    fetchSubscription: async (gid: string) => {
-      const sub = await fetchSubscription(gid);
-      return sub && { ...sub, cancelAtEndOfCycle: false, trialEndsAt: null };
-    },
-    config,
+    fetchSubscription,
     env: ON,
     now,
   });
 
-  it("aktiv plan giver dens funktioner og grænser", async () => {
+  it("aktivt abonnement → aktiv", async () => {
     const access = await resolveAccess(
       SHOP,
-      deps(async () => ({ handles: ["basis-maaned"] })),
+      deps(async () => sub()),
     );
     expect(access.status).toBe("active");
-    if (access.status !== "active") return;
-    expect(access.entitlement.plan).toBe("basis");
-    expect(can(access.entitlement, "events.flow")).toBe(true);
-    expect(can(access.entitlement, "events.klaviyo")).toBe(false);
-    expect(limitOf(access.entitlement, "preorderVariants")).toBe(50);
   });
 
-  it("intet abonnement → status «none» (og det caches ikke)", async () => {
+  it("i prøveperioden tæller butikken som aktiv", async () => {
+    const access = await resolveAccess(
+      SHOP,
+      deps(async () => sub({ trialEndsAt: "2030-01-01T00:00:00Z" })),
+    );
+    expect(access.status).toBe("active");
+  });
+
+  it("intet abonnement (udløbet prøveperiode eller opsagt) → «none», og det caches ikke", async () => {
     const fetchSub = vi.fn(async () => null);
     expect(await resolveAccess(SHOP, deps(fetchSub))).toEqual({
       status: "none",
@@ -133,7 +64,7 @@ describe("adgang læses fra Shopify", () => {
 
   it("caches kortvarigt, udløber af sig selv og kan tømmes", async () => {
     let clock = 1_000;
-    const fetchSub = vi.fn(async () => ({ handles: ["pro"] }));
+    const fetchSub = vi.fn(async () => sub());
     const d = deps(fetchSub, () => clock);
     await resolveAccess(SHOP, d);
     await resolveAccess(SHOP, d);
@@ -143,21 +74,18 @@ describe("adgang læses fra Shopify", () => {
     await resolveAccess(SHOP, d);
     expect(fetchSub).toHaveBeenCalledTimes(2);
 
-    clearEntitlementCache(SHOP);
+    clearAccessCache(SHOP);
     await resolveAccess(SHOP, d);
     expect(fetchSub).toHaveBeenCalledTimes(3);
   });
 
-  it("nedgradering slår igennem, når cachen udløber eller tømmes", async () => {
-    let handles = ["pro"];
-    const d = deps(async () => ({ handles }));
-    await resolveAccess(SHOP, d);
-    handles = ["gratis"];
-    clearEntitlementCache(SHOP);
-    const access = await resolveAccess(SHOP, d);
-    expect(access.status === "active" && access.entitlement.plan).toBe(
-      "gratis",
-    );
+  it("opsigelse slår igennem, når cachen udløber eller tømmes", async () => {
+    let current: ActiveSubscription | null = sub();
+    const d = deps(async () => current);
+    expect((await resolveAccess(SHOP, d)).status).toBe("active");
+    current = null;
+    clearAccessCache(SHOP);
+    expect((await resolveAccess(SHOP, d)).status).toBe("none");
   });
 
   it("fejler Shopify, beholder en kendt butik sin adgang — den sendes ikke til prisvalg", async () => {
@@ -166,7 +94,7 @@ describe("adgang læses fra Shopify", () => {
     const d = deps(
       async () => {
         if (fail) throw new PartnerApiError("nede");
-        return { handles: ["pro"] };
+        return sub();
       },
       () => clock,
     );
@@ -188,36 +116,11 @@ describe("adgang læses fra Shopify", () => {
     ).rejects.toThrow(PartnerApiError);
   });
 
-  it("PREAURA_BILLING=off: alle funktioner, intet kald til Shopify", async () => {
+  it("PREAURA_BILLING=off: adgang, intet kald til Shopify", async () => {
     const fetchSub = vi.fn(async () => null);
     const access = await resolveAccess(SHOP, { ...deps(fetchSub), env: {} });
     expect(access.status).toBe("active");
     expect(fetchSub).not.toHaveBeenCalled();
-  });
-});
-
-describe("én kontrol pr. funktion", () => {
-  it("requireFeature kaster 403, når planen ikke giver adgang", async () => {
-    const access = await resolveAccess(SHOP, {
-      shopGid: async () => "gid://shopify/Shop/1",
-      fetchSubscription: async () => ({
-        handles: ["gratis"],
-        cancelAtEndOfCycle: false,
-        trialEndsAt: null,
-      }),
-      config,
-      env: ON,
-    });
-    expect(() => requireFeature(access, "preorders")).not.toThrow();
-    let thrown: unknown;
-    try {
-      requireFeature(access, "events.klaviyo");
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toBeInstanceOf(FeatureNotIncludedError);
-    expect((thrown as Response).status).toBe(403);
-    expect(() => requireFeature({ status: "none" }, "preorders")).toThrow();
   });
 });
 
@@ -236,7 +139,7 @@ describe("Partner API", () => {
     SHOPIFY_APP_GID: "gid://shopify/App/9",
   };
 
-  it("spørger på butikkens abonnement for netop denne app og læser handles", async () => {
+  it("spørger på butikkens abonnement for netop denne app og læser prøveperiode og opsigelse", async () => {
     let request: { url: string; init: RequestInit } | undefined;
     const fetchFn = (async (url: string, init: RequestInit) => {
       request = { url, init };
@@ -245,8 +148,7 @@ describe("Partner API", () => {
           data: {
             activeSubscription: {
               cancelAtEndOfCycle: true,
-              trialEndsAt: null,
-              items: [{ handle: "basis-maaned" }],
+              trialEndsAt: "2026-11-20T00:00:00Z",
             },
           },
         }),
@@ -257,9 +159,8 @@ describe("Partner API", () => {
       env,
     });
     expect(sub).toEqual({
-      handles: ["basis-maaned"],
       cancelAtEndOfCycle: true,
-      trialEndsAt: null,
+      trialEndsAt: "2026-11-20T00:00:00Z",
     });
     expect(request!.url).toBe(
       "https://partners.shopify.com/123/api/2026-10/graphql.json",
@@ -338,50 +239,80 @@ describe("nedgradering og opsigelse rører aldrig data", () => {
   });
 });
 
+describe("nedgradering og opsigelse rører aldrig data", () => {
+  it("intet i app/billing/ henter databasen eller datalaget", () => {
+    const dir = __dirname;
+    const sources = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+      .map((f) => readFileSync(join(dir, f), "utf8"));
+    for (const source of sources) {
+      expect(source).not.toMatch(
+        /db\.server|\/models\/|@prisma\/client|\/sync\/|\/orders\/|\/events\//,
+      );
+      // Ingen databaseklient (db, client, tx, prisma) bruges.
+      expect(source).not.toMatch(/\b(db|client|tx|prisma)\.\w+/);
+    }
+  });
+
+  it("der er ingen planer tilbage — hverken nøgler, konfiguration eller grænser", () => {
+    const dir = __dirname;
+    const files = readdirSync(dir);
+    expect(files).not.toContain("plans.ts");
+    for (const f of files.filter((f) => !f.endsWith(".test.ts"))) {
+      const source = readFileSync(join(dir, f), "utf8");
+      expect(source).not.toMatch(
+        /gratis|basis|\bpro\b|PREAURA_PLANS_JSON|requireFeature/,
+      );
+    }
+  });
+});
+
 describe("siden Abonnement", () => {
-  const active = (handles: string[], cancelAtEndOfCycle = false) =>
-    resolveAccess(SHOP, {
-      shopGid: async () => "gid://shopify/Shop/1",
-      fetchSubscription: async () => ({
-        handles,
-        cancelAtEndOfCycle,
-        trialEndsAt: null,
-      }),
-      config,
-      env: ON,
-    });
+  const NOW = Date.parse("2026-11-06T12:00:00Z");
+  const active = (s: ActiveSubscription) =>
+    ({ status: "active", subscription: s }) as const;
 
-  it("viser planens navn og hvad den giver adgang til — ingen priser", async () => {
-    const view = subscriptionView(await active(["basis-maaned"]), config, true);
-    expect(view).toMatchObject({
-      kind: "active",
-      planLabel: "Basis",
-      included: [FEATURE_LABELS.preorders, FEATURE_LABELS["events.flow"]],
-      notIncluded: [
-        FEATURE_LABELS["events.webhook"],
-        FEATURE_LABELS["events.klaviyo"],
-      ],
-      endsAtPeriodEnd: false,
-    });
-    expect(JSON.stringify(view)).not.toMatch(/kr|\$|USD|DKK/);
+  it("prøveperiode: viser dage tilbage, rundet op", () => {
+    const status = subscriptionStatus(
+      active(sub({ trialEndsAt: new Date(NOW + 13.5 * DAY).toISOString() })),
+      true,
+      NOW,
+    );
+    expect(status).toMatchObject({ kind: "trial", daysLeft: 14 });
+    const last = subscriptionStatus(
+      active(
+        sub({ trialEndsAt: new Date(NOW + 2 * 60 * 60 * 1000).toISOString() }),
+      ),
+      true,
+      NOW,
+    );
+    expect(last).toMatchObject({ kind: "trial", daysLeft: 1 });
   });
 
-  it("viser, når abonnementet stopper ved periodens udgang", async () => {
-    clearEntitlementCache();
-    const view = subscriptionView(await active(["pro"], true), config, true);
-    expect(view).toMatchObject({
-      kind: "active",
-      planLabel: "Pro",
-      endsAtPeriodEnd: true,
-    });
+  it("efter prøveperioden: aktiv", () => {
+    const status = subscriptionStatus(
+      active(sub({ trialEndsAt: new Date(NOW - DAY).toISOString() })),
+      true,
+      NOW,
+    );
+    expect(status).toEqual({ kind: "active", endsAtPeriodEnd: false });
   });
 
-  it("slået fra, eller intet abonnement", () => {
-    expect(subscriptionView({ status: "none" }, config, false)).toEqual({
+  it("viser, når abonnementet er opsagt og stopper ved periodens udgang", () => {
+    expect(
+      subscriptionStatus(active(sub({ cancelAtEndOfCycle: true })), true, NOW),
+    ).toEqual({ kind: "active", endsAtPeriodEnd: true });
+  });
+
+  it("slået fra, eller intet abonnement — og aldrig en pris", () => {
+    expect(subscriptionStatus({ status: "none" }, false, NOW)).toEqual({
       kind: "off",
     });
-    expect(subscriptionView({ status: "none" }, config, true)).toEqual({
+    expect(subscriptionStatus({ status: "none" }, true, NOW)).toEqual({
       kind: "none",
     });
+    expect(
+      JSON.stringify(subscriptionStatus(active(sub()), true, NOW)),
+    ).not.toMatch(/kr|\$|USD|DKK|39/);
   });
 });

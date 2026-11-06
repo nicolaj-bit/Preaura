@@ -6,23 +6,25 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
 import {
   accessFor,
-  clearEntitlementCache,
+  clearAccessCache,
   pricingPageUrl,
-} from "../billing/entitlements.server";
+} from "../billing/access.server";
 import { PartnerApiError } from "../billing/partnerApi.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session, redirect } = await authenticate.admin(request);
 
-  // Kommer butikken tilbage fra Shopifys prisvalgsside, står plan_handle i
-  // adressen. Den bruges kun som signal om at tømme cachen — adgangen læses
-  // altid fra Shopify, aldrig fra adressen.
+  // Kommer butikken tilbage fra Shopifys prisvalgsside, sætter Shopify
+  // plan_handle i adressen. Den bruges kun som signal om at tømme cachen —
+  // adgangen læses altid fra Shopify, aldrig fra adressen.
   if (new URL(request.url).searchParams.has("plan_handle")) {
-    clearEntitlementCache(session.shop);
+    clearAccessCache(session.shop);
   }
 
-  // Intet aktivt abonnement: til Shopifys prisvalgsside. target "_top" er
-  // nødvendig — siden ligger uden for app-rammen (iframen).
+  // Intet aktivt abonnement (prøveperioden er udløbet, eller abonnementet er
+  // opsagt): hele appen lukkes, og butikken sendes til Shopifys
+  // prisvalgsside. target "_top" er nødvendig — siden ligger uden for
+  // app-rammen (iframen). Intet data røres.
   // eslint-disable-next-line no-undef
   const apiKey = process.env.SHOPIFY_API_KEY || "";
   let access;
@@ -37,7 +39,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
     return {
       apiKey,
-      plan: null,
       billingError:
         error instanceof PartnerApiError
           ? error.message
@@ -48,7 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(pricingPageUrl(session.shop), { target: "_top" });
   }
 
-  return { apiKey, plan: access.entitlement.plan, billingError: null };
+  return { apiKey, billingError: null };
 };
 
 export default function App() {
