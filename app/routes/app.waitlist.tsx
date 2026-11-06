@@ -91,11 +91,12 @@ export default function WaitlistPage() {
     if (fetcher.data?.ok) shopify.toast.show("Indstillinger gemt");
   }, [fetcher.data, shopify]);
 
-  const set = (field: keyof typeof values) => (event: Event) =>
-    setValues((current) => ({
-      ...current,
-      [field]: (event.currentTarget as HTMLInputElement).value,
-    }));
+  // Værdien læses med det samme: når React kører opdateringen, er
+  // event.currentTarget allerede nulstillet.
+  const set = (field: keyof typeof values) => (event: Event) => {
+    const value = (event.currentTarget as HTMLInputElement).value;
+    setValues((current) => ({ ...current, [field]: value }));
+  };
 
   return (
     <s-page heading="Venteliste">
