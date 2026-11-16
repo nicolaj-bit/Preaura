@@ -102,8 +102,14 @@ describe("dobbelt dato i kurven", () => {
         deliveryDateText: "Forventet levering: {dato}",
       },
     );
-    expect(plans.map((p) => p.name)).toEqual([PLAN_NAME, PLAN_NAME]);
-    expect(PLAN_NAME).not.toMatch(/\d/);
+    // Shopify kræver forskellige navne i en gruppe — men uden dato.
+    expect(plans.map((p) => p.name)).toEqual([
+      PLAN_NAME,
+      `${PLAN_NAME} (leverance 2)`,
+    ]);
+    for (const plan of plans) {
+      expect(plan.name).not.toMatch(/2026|december/);
+    }
     // Valgmuligheden skal stadig kunne skelnes i gruppen.
     expect(plans.map((p) => p.option)).toEqual([
       "Forventet afsendelse: 1. december 2026",

@@ -2,7 +2,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GROUP_OPTION, PLAN_LANGUAGES, PLAN_NAME } from "../app/sync/plans";
+import {
+  GROUP_OPTION,
+  PLAN_LANGUAGES,
+  PLAN_NAME,
+  planName,
+  type PlanLanguage,
+} from "../app/sync/plans";
 
 // Tester kurvens app embed i en rigtig DOM med den samme fil, som Shopify
 // serverer. Kurvene er forenklede udgaver af Dawns og Horizons.
@@ -217,14 +223,19 @@ describe("hvilke planer tæller med", () => {
 
   it("genkender planerne på alle sprog, appen opretter dem på", async () => {
     await page("", cartJson([]), { count: 0 });
-    for (const t of Object.values(PLAN_LANGUAGES)) {
-      const line = preorderLine(45000);
-      line.selling_plan_allocation.selling_plan.name = t.planName;
-      line.selling_plan_allocation.selling_plan.options[0].name = t.groupOption;
-      expect(summarize()(cartJson([line])), t.planName).toMatchObject({
-        later: 45000,
-        today: 0,
-      });
+    for (const [language, t] of Object.entries(PLAN_LANGUAGES)) {
+      // Også de nummererede: «Forudbestilling (leverance 2)».
+      for (const position of [1, 2, 12]) {
+        const name = planName(language as PlanLanguage, position);
+        const line = preorderLine(45000);
+        line.selling_plan_allocation.selling_plan.name = name;
+        line.selling_plan_allocation.selling_plan.options[0].name =
+          t.groupOption;
+        expect(summarize()(cartJson([line])), name).toMatchObject({
+          later: 45000,
+          today: 0,
+        });
+      }
     }
   });
 
