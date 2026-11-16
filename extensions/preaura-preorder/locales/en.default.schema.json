@@ -1,0 +1,131 @@
+{
+  "preorder": {
+    "name": "Pre-order",
+    "settings": {
+      "intro": {
+        "content": "Place the block in the product section, ideally just above the buy button. The date and texts are only shown for variants on pre-order."
+      },
+      "boxed": {
+        "label": "Show in a box",
+        "info": "A thin border in the theme's text colour around date, count, timeline and waitlist. Off: the same content without a border."
+      },
+      "shipping_label": {
+        "label": "Name for expected shipping",
+        "info": "Shown in the message and as a line item property in cart, checkout, order confirmation and on the order. Leave empty to use the default text in the customer's language."
+      },
+      "delivery_label": {
+        "label": "Name for expected delivery",
+        "info": "Used when the app is set to expected delivery. Leave empty to use the default text in the customer's language."
+      },
+      "message": {
+        "label": "Message",
+        "info": "{label} becomes the name above, {date} the delivery date. Leave empty to use the default text in the customer's language."
+      },
+      "show_note": {
+        "label": "Show explanation"
+      },
+      "note": {
+        "label": "Explanation",
+        "info": "Makes the terms clear before purchase. Leave empty to use the default text in the customer's language."
+      },
+      "sold_out_message": {
+        "label": "Message when everything is sold out",
+        "info": "Leave empty to use the default text in the customer's language."
+      },
+      "change_button_text": {
+        "label": "Change the buy button text",
+        "info": "Off: the block shows its own message above the button, and the theme's button is left alone."
+      },
+      "button_text": {
+        "label": "Buy button text",
+        "info": "Leave empty to use the default text in the customer's language."
+      },
+      "remaining_header": {
+        "content": "Remaining"
+      },
+      "show_remaining": {
+        "label": "Show remaining in the current delivery",
+        "info": "The number is fetched fresh from the app after the page loads. It is always the count in the delivery the customer is buying into now."
+      },
+      "remaining_threshold": {
+        "label": "Only show the number at or below",
+        "info": "E.g. 25: «Only 480 left» creates no urgency — it's just noise."
+      },
+      "remaining_text": {
+        "label": "Text",
+        "info": "{count} becomes the number. Leave empty to use the default text in the customer's language."
+      },
+      "timeline_header": {
+        "content": "Timeline"
+      },
+      "show_timeline": {
+        "label": "Show a timeline of the deliveries",
+        "info": "Shows the current plan with expected dates and whether each delivery is sold out, the one being bought into now, or upcoming. No counts per delivery."
+      },
+      "timeline_sold_out": {
+        "label": "Sold-out delivery"
+      },
+      "timeline_current": {
+        "label": "The delivery being bought into now",
+        "info": "Short text looks best. Leave empty to use the default text in the customer's language."
+      },
+      "timeline_upcoming": {
+        "label": "Upcoming delivery"
+      },
+      "waitlist_header": {
+        "content": "Waitlist"
+      },
+      "waitlist_intro": {
+        "content": "If the variant can neither be bought from stock nor pre-ordered, the customer can sign up to be notified when it can be bought. The notification is sent as an event to Shopify Flow, Klaviyo or your webhook. It may only be about the item — offers, other products and discount codes require consent."
+      },
+      "waitlist_enabled": {
+        "label": "Show waitlist sign-up"
+      },
+      "waitlist_heading": {
+        "label": "Heading"
+      },
+      "waitlist_email_label": {
+        "label": "Field name"
+      },
+      "waitlist_button": {
+        "label": "Button text"
+      },
+      "waitlist_success": {
+        "label": "Reply after sign-up",
+        "info": "Always shown after a sign-up — also if the email was already on the list. Leave empty to use the default text in the customer's language."
+      },
+      "waitlist_invalid": {
+        "label": "Reply for an invalid email"
+      },
+      "waitlist_error": {
+        "label": "Reply on error"
+      },
+      "waitlist_privacy": {
+        "label": "How the email is used"
+      },
+      "texts_info": {
+        "content": "Text fields left empty use PREAURA's standard text in the customer's language (Danish and English for now)."
+      }
+    }
+  },
+  "cart": {
+    "name": "PREAURA cart",
+    "settings": {
+      "intro": {
+        "content": "Shows in the cart that pre-ordered items cost nothing today. Only shown when there is a pre-order in the cart. Text fields left empty use the standard text in the customer's language."
+      },
+      "line_note": {
+        "label": "Text under the item"
+      },
+      "show_totals": {
+        "label": "Show amounts above the checkout button"
+      },
+      "later_label": {
+        "label": "Amount charged later"
+      },
+      "today_label": {
+        "label": "Amount today"
+      }
+    }
+  }
+}

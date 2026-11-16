@@ -266,10 +266,13 @@
     this.writeFields();
     this.setText(
       this.messageEl,
-      String(s.message || "{label}: {dato}")
+      // {date} og det ældre danske {dato} betyder det samme.
+      String(s.message || "{label}: {date}")
         .split("{label}")
         .join(label)
         .split("{dato}")
+        .join(date)
+        .split("{date}")
         .join(date),
     );
     if (this.noteEl) this.noteEl.hidden = false;
