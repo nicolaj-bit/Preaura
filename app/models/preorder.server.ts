@@ -134,6 +134,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
           update: input,
         });
       },
+
+      /** Opsætningsguiden på forsiden foldes sammen eller åbnes igen. */
+      async setSetupGuideHidden(hidden: boolean) {
+        await client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, setupGuideHidden: hidden },
+          update: { setupGuideHidden: hidden },
+        });
+      },
     },
 
     dashboard: {
@@ -332,10 +341,19 @@ export function forShop(shop: string, client: PrismaClient = db) {
 
       /** Opretter en leverance bagerst i rækkefølgen for varianten. */
       async create(variantId: string, input: DeliveryInput, today: string) {
-        const result = validateDelivery(input, { today, allocated: 0 });
-        if (!result.ok) throw new DeliveryValidationError(result.errors);
-
         return client.$transaction(async (tx) => {
+          const others = await tx.delivery.findMany({
+            where: { shop, variantId, status: "OPEN" },
+            select: { position: true, date: true },
+          });
+          const result = validateDelivery(input, {
+            today,
+            allocated: 0,
+            others,
+            newDelivery: true,
+          });
+          if (!result.ok) throw new DeliveryValidationError(result.errors);
+
           const plan = await tx.variantPlan.findFirst({
             where: { shop, variantId },
           });
@@ -367,10 +385,20 @@ export function forShop(shop: string, client: PrismaClient = db) {
           }
           // Tildelt antal læses i samme transaktion som opdateringen.
           const { allocated } = await activeAllocated(tx, id);
+          const others = await tx.delivery.findMany({
+            where: {
+              shop,
+              variantId: delivery.variantId,
+              status: "OPEN",
+              id: { not: id },
+            },
+            select: { position: true, date: true },
+          });
           const result = validateDelivery(input, {
             today,
             allocated,
             currentDate: delivery.date,
+            others,
           });
           if (!result.ok) throw new DeliveryValidationError(result.errors);
 

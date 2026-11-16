@@ -13,6 +13,9 @@ import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
 import { queueFor } from "../models/queue.server";
 import { complianceFor } from "../models/compliance.server";
 import { dashboardStats, progressPct } from "../lib/dashboard";
+import { setupSteps, themeBlockUrl } from "../onboarding/setup";
+import { ThemeBlockBanner, useBlockStatus } from "../components/ThemeBlock";
+import { SUPPORT_EMAIL } from "../onboarding/support";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
 // produktvælger. Et produkt står som slået til, hvis mindst én variant er.
@@ -21,7 +24,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const data = forShop(session.shop);
 
-  const summaries = await data.variantPlans.listProducts();
+  const [summaries, settings] = await Promise.all([
+    data.variantPlans.listProducts(),
+    data.settings.get(),
+  ]);
   const products = await fetchProducts(
     admin.graphql,
     summaries.map((summary) => summary.productId),
@@ -102,9 +108,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       hasProducts: summaries.length > 0,
       hasDelivery: allViews.length > 0,
       hasEnabled: enabledVariants.length > 0,
+      hidden: settings.setupGuideHidden,
+      // Det første produkt — der oprettes den første leverance.
+      firstProduct: summaries[0] ? numericId(summaries[0].productId) : null,
       // Åbner temaeditoren med PREAURA-blokken klar til at blive tilføjet.
-      themeBlockUrl: `shopify://admin/themes/current/editor?template=product&addAppBlockId=${process.env.SHOPIFY_API_KEY}/preorder&target=mainSection`,
+      themeBlockUrl: themeBlockUrl(process.env.SHOPIFY_API_KEY ?? ""),
     },
+    supportEmail: SUPPORT_EMAIL,
 
     failedEvents: counts.FAILED ?? 0,
     dataRequests,
@@ -134,6 +144,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const form = await request.formData();
 
+  if (form.get("intent") === "guide") {
+    await forShop(session.shop).settings.setSetupGuideHidden(
+      form.get("hidden") === "true",
+    );
+    return { guide: true };
+  }
   if (form.get("intent") !== "addProducts") {
     return { error: "Ukendt handling." };
   }
@@ -169,9 +185,22 @@ export default function Index() {
     stats,
     deliveries,
     setup,
+    supportEmail,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
+  const guide = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const block = useBlockStatus();
+  // Vis det nye valg med det samme, mens det gemmes.
+  const guideHidden =
+    guide.formData != null
+      ? guide.formData.get("hidden") === "true"
+      : setup.hidden;
+  const toggleGuide = (hidden: boolean) =>
+    guide.submit(
+      { intent: "guide", hidden: String(hidden) },
+      { method: "POST" },
+    );
   const busy = fetcher.state !== "idle";
 
   useEffect(() => {
@@ -204,6 +233,12 @@ export default function Index() {
       >
         Vælg produkter
       </s-button>
+
+      <ThemeBlockBanner
+        status={block}
+        url={setup.themeBlockUrl}
+        preorderOn={setup.hasEnabled}
+      />
 
       {unresolvedOrders > 0 && (
         <s-banner tone="critical" heading="Ordrer uden plads i en leverance">
@@ -257,39 +292,29 @@ export default function Index() {
         </s-banner>
       )}
 
-      {!(setup.hasProducts && setup.hasDelivery && setup.hasEnabled) && (
-        <s-section heading="Kom i gang">
+      <SetupGuide
+        state={{ ...setup, block }}
+        hidden={guideHidden}
+        onToggle={toggleGuide}
+        onSelectProducts={selectProducts}
+        themeBlockUrl={setup.themeBlockUrl}
+        firstProduct={setup.firstProduct}
+      />
+
+      {!setup.hasProducts && (
+        <s-section heading="Produkter">
           <s-stack gap="base">
             <s-paragraph>
-              Fire trin, så kan dine kunder forudbestille. Det tager et par
-              minutter.
+              Du har ikke valgt nogen produkter endnu. Vælg de produkter, der
+              skal kunne forudbestilles, når de er udsolgt — fx en vare, du
+              venter en ny forsendelse af. Produkterne bliver solgt almindeligt
+              fra lageret, indtil lageret rammer 0.
             </s-paragraph>
-            <SetupStep
-              done={setup.hasProducts}
-              title="1. Vælg produkter"
-              text="Vælg de produkter, der skal kunne forudbestilles."
-            >
-              <s-button onClick={selectProducts}>Vælg produkter</s-button>
-            </SetupStep>
-            <SetupStep
-              done={setup.hasDelivery}
-              title="2. Opret en leverance"
-              text="Åbn et produkt, og angiv dato og antal for den næste leverance."
-            />
-            <SetupStep
-              done={setup.hasEnabled}
-              title="3. Slå forudbestilling til"
-              text="Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv, når lageret rammer 0."
-            />
-            <SetupStep
-              done={false}
-              title="4. Vis forudbestillingen på produktsiden"
-              text="Tilføj PREAURA-blokken i dit tema, så kunderne ser datoen."
-            >
-              <s-button href={setup.themeBlockUrl} target="_top">
-                Tilføj blokken
+            <s-stack direction="inline">
+              <s-button variant="primary" onClick={selectProducts}>
+                Vælg produkter
               </s-button>
-            </SetupStep>
+            </s-stack>
           </s-stack>
         </s-section>
       )}
@@ -323,6 +348,27 @@ export default function Index() {
             note={stats.nextDelivery?.product}
           />
         </s-grid>
+      )}
+
+      {setup.hasProducts && deliveries.length === 0 && (
+        <s-section heading="Leverancer">
+          <s-stack gap="base">
+            <s-paragraph>
+              Ingen leverancer endnu. En leverance er en forsendelse af varer,
+              du venter hjem: en forventet dato og et antal. Kunderne
+              forudbestiller i den første leverance med ledige pladser og får
+              dens dato lovet. Når den er udsolgt, fortsætter salget i den
+              næste.
+            </s-paragraph>
+            {setup.firstProduct && (
+              <s-stack direction="inline">
+                <s-button href={`/app/products/${setup.firstProduct}`}>
+                  Opret den første leverance
+                </s-button>
+              </s-stack>
+            )}
+          </s-stack>
+        </s-section>
       )}
 
       {deliveries.length > 0 && (
@@ -422,23 +468,143 @@ export default function Index() {
           </s-table>
         </s-section>
       )}
+
+      <s-section heading="Brug for hjælp?">
+        <s-paragraph>
+          Skriv til{" "}
+          <s-link href={`mailto:${supportEmail}`}>{supportEmail}</s-link>. Vi
+          svarer på hverdage, som regel samme dag. Skriv gerne butikkens navn
+          og, hvis det handler om en ordre, ordrenummeret.
+        </s-paragraph>
+      </s-section>
     </s-page>
+  );
+}
+
+const STEP_TEXT: Record<
+  "products" | "delivery" | "enable" | "block",
+  { title: string; text: string }
+> = {
+  products: {
+    title: "Vælg de produkter, der skal kunne forudbestilles",
+    text: "Fx en vare, du venter en ny forsendelse af. Produkterne sælges som normalt fra lageret, indtil det er tomt.",
+  },
+  delivery: {
+    title: "Opret den første leverance",
+    text: "Åbn produktet, og skriv hvornår du forventer at sende varerne, og hvor mange du vil sælge på forudbestilling. Datoen er den, kunderne får lovet.",
+  },
+  enable: {
+    title: "Slå forudbestilling til",
+    text: "Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv til forudbestilling, når lageret rammer 0. Har varen stadig lager, ser kunderne ingen forudbestilling endnu — vil du se den med det samme, så slå «Tving forudbestilling» til på produktet.",
+  },
+  block: {
+    title: "Vis forudbestillingen på produktsiden",
+    text: "Tilføj PREAURA-blokken i dit tema. Knappen åbner temaeditoren med blokken klar — du skal kun trykke Gem.",
+  },
+};
+
+/**
+ * Opsætningsguiden: få trin, der kan foldes sammen og åbnes igen. Den
+ * spærrer ikke for noget — alt i appen kan bruges, uanset hvor langt
+ * butikken er.
+ */
+function SetupGuide({
+  state,
+  hidden,
+  onToggle,
+  onSelectProducts,
+  themeBlockUrl,
+  firstProduct,
+}: {
+  state: Parameters<typeof setupSteps>[0];
+  hidden: boolean;
+  onToggle: (hidden: boolean) => void;
+  onSelectProducts: () => void;
+  themeBlockUrl: string;
+  firstProduct: string | null;
+}) {
+  const guide = setupSteps(state);
+  const action = (id: keyof typeof STEP_TEXT) => {
+    switch (id) {
+      case "products":
+        return <s-button onClick={onSelectProducts}>Vælg produkter</s-button>;
+      case "delivery":
+      case "enable":
+        return firstProduct ? (
+          <s-button href={`/app/products/${firstProduct}`}>
+            Åbn produktet
+          </s-button>
+        ) : null;
+      case "block":
+        return (
+          <s-button href={themeBlockUrl} target="_top">
+            Tilføj blokken
+          </s-button>
+        );
+    }
+  };
+  return (
+    <s-section>
+      <s-stack gap="base">
+        <s-stack
+          direction="inline"
+          justifyContent="space-between"
+          alignItems="center"
+          gap="base"
+        >
+          <s-stack gap="small-300">
+            <s-heading>
+              {guide.complete ? "PREAURA er sat op" : "Kom i gang med PREAURA"}
+            </s-heading>
+            <s-text color="subdued">
+              {guide.done} af {guide.total} trin gjort
+              {guide.complete
+                ? " — dine kunder kan nu forudbestille."
+                : state.block === "unknown"
+                  ? " (blokken i temaet kan ikke tjekkes herfra)"
+                  : ""}
+            </s-text>
+          </s-stack>
+          <s-button variant="tertiary" onClick={() => onToggle(!hidden)}>
+            {hidden ? "Vis trin" : "Skjul"}
+          </s-button>
+        </s-stack>
+        {!hidden &&
+          guide.steps.map((step, i) => (
+            <SetupStep
+              key={step.id}
+              done={step.done}
+              highlighted={step.id === guide.next}
+              title={`${i + 1}. ${STEP_TEXT[step.id].title}`}
+              text={STEP_TEXT[step.id].text}
+            >
+              {action(step.id)}
+            </SetupStep>
+          ))}
+      </s-stack>
+    </s-section>
   );
 }
 
 function SetupStep({
   done,
+  highlighted = false,
   title,
   text,
   children,
 }: {
   done: boolean;
+  highlighted?: boolean;
   title: string;
   text: string;
   children?: React.ReactNode;
 }) {
   return (
-    <s-box padding="base" borderWidth="base" borderRadius="base">
+    <s-box
+      padding="base"
+      borderWidth={highlighted ? "large" : "base"}
+      borderRadius="base"
+    >
       <s-stack
         direction="inline"
         gap="base"

@@ -217,7 +217,7 @@ export function releaseFor(shop: string, client: PrismaClient = db) {
       async retry(id: string) {
         const result = await client.cancellationRequest.updateMany({
           where: { shop, id, status: "FAILED" },
-          data: { status: "APPROVED", attempts: 0 },
+          data: { status: "APPROVED", attempts: 0, lastError: null },
         });
         return result.count;
       },

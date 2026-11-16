@@ -185,6 +185,30 @@ describe("leverancer", () => {
     expect(error.errors.quantity).toBe(MESSAGES.quantityBelowAllocated(6));
   });
 
+  it("afviser en leverance, der overlapper en anden — en annulleret tæller ikke", async () => {
+    await addVariant(A);
+    const data = forShop(A, client);
+    const first = await data.deliveries.create(
+      VARIANT,
+      { date: "2026-12-01", quantity: "10" },
+      TODAY,
+    );
+    const error = await data.deliveries
+      .create(VARIANT, { date: "2026-12-01", quantity: "5" }, TODAY)
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(DeliveryValidationError);
+    expect(error.errors.date).toBe(MESSAGES.dateOverlaps(1, "2026-12-01"));
+
+    await data.deliveries.cancel(first.id);
+    await expect(
+      data.deliveries.create(
+        VARIANT,
+        { date: "2026-12-01", quantity: "5" },
+        TODAY,
+      ),
+    ).resolves.toBeTruthy();
+  });
+
   it("afviser sletning med tildelinger, men tillader annullering", async () => {
     await addVariant(A);
     const data = forShop(A, client);

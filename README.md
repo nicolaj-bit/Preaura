@@ -314,6 +314,32 @@ npm run deploy:prod     # udrul til produktionsappen
 `npm run deploy` alene nægter at køre, så man ikke kommer til at udrulle til
 det forkerte miljø.
 
+## Onboarding
+
+Målet: en ny butik kan installere appen og oprette sin første
+forudbestilling uden hjælp og uden manual.
+
+- **Opsætningsguide** på forsiden (`app/routes/app._index.tsx`): fire trin
+  (produkter, leverance, slå til, blok i temaet), der tjekkes af selv. Kan
+  foldes sammen og åbnes igen (`ShopSetting.setupGuideHidden`); spærrer
+  aldrig for resten af appen.
+- **Blokken i temaet:** dybt link (`app/onboarding/setup.ts`) åbner
+  produktskabelonen i temaeditoren med blokken klar i produktsektionen.
+  Appen ser selv, om blokken er aktiv i det udgivne tema, via App Bridge's
+  `app.extensions()` (ingen ekstra adgangsret), og viser ellers et banner på
+  forsiden og produktsiden, der forklarer følgen
+  (`app/components/ThemeBlock.tsx`).
+- **Tomme tilstande** forklarer, hvad et produkt og en leverance er, og
+  hvordan man opretter den første.
+- **Fejlbeskeder** (`app/lib/deliveries.ts`) siger, hvad der er galt, og hvad
+  butikken skal gøre — også ved en dato i fortiden, antal 0 og en leverance,
+  der overlapper en anden (samme dato, eller en ny leverance før de
+  eksisterende).
+- **Begrænsninger** ved udskudt betaling står på produktsiden, indtil
+  produktet har forudbestilling slået til.
+- **Support:** adressen står på forsiden (`PREAURA_SUPPORT_EMAIL`, ellers
+  virksomhedens adresse).
+
 ## Annullering og afvist betaling (frigivelse)
 
 En reserveret enhed kommer tilbage i leverancen gennem ÉN mekanisme:

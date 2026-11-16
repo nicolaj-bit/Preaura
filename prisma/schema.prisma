@@ -99,6 +99,8 @@ model ShopSetting {
   cancelAutoDays        Int      @default(14)
   // Afvist betaling: så mange dage, før enheden frigives.
   paymentGraceDays      Int      @default(7)
+  // Opsætningsguiden på forsiden er foldet sammen (kan åbnes igen).
+  setupGuideHidden      Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

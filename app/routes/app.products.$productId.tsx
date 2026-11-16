@@ -7,6 +7,8 @@ import type {
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { themeBlockUrl } from "../onboarding/setup";
+import { ThemeBlockBanner, useBlockStatus } from "../components/ThemeBlock";
 import { authenticate } from "../shopify.server";
 import {
   DeliveryValidationError,
@@ -85,6 +87,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     today: todayInTimeZone(timeZone),
+    themeBlockUrl: themeBlockUrl(process.env.SHOPIFY_API_KEY ?? ""),
     product: {
       title: product?.title ?? "Produktet findes ikke længere i Shopify",
       imageUrl: product?.imageUrl ?? null,
@@ -272,13 +275,22 @@ function useSuccessToast(result: ActionResult | undefined) {
 }
 
 export default function ProductPage() {
-  const { product, variants, today } = useLoaderData<typeof loader>();
+  const { product, variants, today, themeBlockUrl } =
+    useLoaderData<typeof loader>();
+  const block = useBlockStatus();
+  const anyEnabled = variants.some((v) => v.enabled);
 
   return (
     <s-page heading={product.title}>
       <s-link slot="breadcrumb-actions" href="/app">
         Produkter
       </s-link>
+      <ThemeBlockBanner
+        status={block}
+        url={themeBlockUrl}
+        preorderOn={anyEnabled}
+      />
+      {!anyEnabled && <PreorderLimitations />}
       <ProductModeBanner
         mode={product.mode}
         requiresSellingPlan={product.requiresSellingPlan}
@@ -292,6 +304,51 @@ export default function ProductPage() {
         />
       ))}
     </s-page>
+  );
+}
+
+/**
+ * Det, der ikke virker sammen med udskudt betaling på forudbestillinger
+ * (Shopifys egne begrænsninger). Står der, hvor butikken opretter sin første
+ * forudbestilling — ikke på en hjælpeside.
+ */
+function PreorderLimitations() {
+  return (
+    <s-banner tone="info" heading="Før du sælger på forudbestilling">
+      <s-stack gap="small-200">
+        <s-paragraph>
+          Kunden betaler først, når du sender varen. Shopify gemmer kortet ved
+          bestilling og trækker beløbet ved afsendelse. Det virker kun sammen
+          med visse betalingsløsninger og funktioner:
+        </s-paragraph>
+        <s-unordered-list>
+          <s-list-item>
+            Kun disse betalingsløsninger understøtter det: Shopify Payments,
+            PayPal Express, Adyen og Stripe (kun for nogle butikker). Bruger du
+            en anden, kan kunderne ikke gennemføre en forudbestilling.
+          </s-list-item>
+          <s-list-item>
+            Lokale betalingsmetoder (fx MobilePay og bankoverførsel) kan ikke
+            bruges til forudbestillinger.
+          </s-list-item>
+          <s-list-item>
+            Forudbestillinger kan ikke sælges i Shopify POS, på kladdeordrer
+            eller til B2B-kunder.
+          </s-list-item>
+          <s-list-item>
+            Rabatter af typen «Køb X, få Y» virker ikke på forudbestilte varer.
+          </s-list-item>
+          <s-list-item>
+            Links direkte til kurven (cart permalinks) og en checkout, der er
+            tilpasset med checkout.liquid, understøtter ikke forudbestilling.
+          </s-list-item>
+          <s-list-item>
+            Er kortet udløbet eller uden dækning, når du sender, står ordren som
+            ubetalt. Se «Annulleringer» for afviste betalinger.
+          </s-list-item>
+        </s-unordered-list>
+      </s-stack>
+    </s-banner>
   );
 }
 
@@ -398,6 +455,15 @@ function VariantSection({
           </s-banner>
         )}
 
+        {variant.deliveries.length === 0 && (
+          <s-paragraph>
+            Ingen leverancer endnu. En leverance er en forsendelse, du venter
+            hjem: hvornår du forventer at sende varerne, og hvor mange du vil
+            sælge på forudbestilling. Kunderne forudbestiller i den første
+            leverance med ledige pladser og får dens dato lovet. Opret den
+            første nedenfor.
+          </s-paragraph>
+        )}
         {variant.deliveries.length > 0 && (
           <DeliveryTable
             deliveries={variant.deliveries}

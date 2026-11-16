@@ -85,17 +85,44 @@ export type ValidationContext = {
    * antallet på en leverance, hvis dato er passeret.
    */
   currentDate?: string;
+  /**
+   * Variantens andre åbne leverancer. Ingen to leverancer må have samme
+   * dato, og en ny leverance (newDelivery) skal ligge efter dem alle, fordi
+   * den sælges sidst.
+   */
+  others?: { position: number; date: string }[];
+  newDelivery?: boolean;
 };
 
+// Fejlbeskeder siger, hvad der er galt, OG hvad butikken skal gøre.
 export const MESSAGES = {
-  dateMissing: "Vælg en dato.",
-  dateInvalid: "Datoen er ugyldig. Brug formatet ÅÅÅÅ-MM-DD.",
-  dateNotFuture: "Datoen skal ligge i fremtiden.",
-  quantityInvalid: "Antal skal være et helt tal.",
-  quantityNotPositive: "Antal skal være større end nul.",
+  dateMissing:
+    "Vælg den dato, du forventer at sende varerne. Det er den dato, kunderne får lovet.",
+  dateInvalid:
+    "Datoen kan ikke læses. Vælg den i kalenderen, eller skriv den som ÅÅÅÅ-MM-DD, fx 2027-01-15.",
+  dateNotFuture:
+    "Datoen er i dag eller er passeret. Vælg en dato fra i morgen og frem — det er den dato, kunderne får lovet.",
+  quantityInvalid:
+    "Skriv antallet som et helt tal, fx 50 — uden komma, mellemrum eller «stk.».",
+  quantityNotPositive:
+    "Antallet skal være mindst 1: det er, hvor mange du kan sælge på forudbestilling i leverancen. Vil du stoppe salget, så annullér leverancen i stedet.",
   quantityBelowAllocated: (allocated: number) =>
-    `Antal kan ikke være lavere end de ${allocated} stk., der allerede er tildelt kunder.`,
+    `${allocated} stk. er allerede solgt i leverancen, så antallet skal være mindst ${allocated}. Vil du sælge færre, må du annullere ordrer i Shopify først.`,
+  dateOverlaps: (position: number, date: string) =>
+    `Leverance ${position} har allerede datoen ${formatDanish(date)}. Ret antallet på leverance ${position} i stedet, eller vælg en anden dato.`,
+  dateBeforeExisting: (position: number, date: string) =>
+    `Nye leverancer sælges efter de eksisterende, så datoen skal ligge efter ${formatDanish(date)} (leverance ${position}). Kommer der varer før, så ret datoen på leverance ${position} i stedet.`,
 } as const;
+
+const danish = new Intl.DateTimeFormat("da-DK", {
+  dateStyle: "long",
+  timeZone: "UTC",
+});
+function formatDanish(date: string) {
+  return isValidDateString(date)
+    ? danish.format(new Date(`${date}T12:00:00Z`))
+    : date;
+}
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -142,6 +169,18 @@ export function validateDelivery(
   } else if (date !== context.currentDate && date <= context.today) {
     // Datoerne er YYYY-MM-DD, så tekst-sammenligning er dato-sammenligning.
     errors.date = MESSAGES.dateNotFuture;
+  } else if (context.others?.length) {
+    const same = context.others.find((o) => o.date === date);
+    if (same) {
+      errors.date = MESSAGES.dateOverlaps(same.position, same.date);
+    } else if (context.newDelivery) {
+      const latest = [...context.others].sort((a, b) =>
+        b.date.localeCompare(a.date),
+      )[0];
+      if (latest && latest.date > date) {
+        errors.date = MESSAGES.dateBeforeExisting(latest.position, latest.date);
+      }
+    }
   }
 
   const quantity = parseQuantity(input.quantity);
