@@ -1,6 +1,7 @@
 import { authenticate } from "../shopify.server";
 import { accessFor, pricingPageUrl } from "./access.server";
 import { subscriptionRequired } from "./subscriptionRequired";
+import { localeFromHeaders } from "../i18n/headers";
 
 /**
  * Adgangskontrollen for en funktion. Bruges i stedet for
@@ -16,7 +17,10 @@ export async function requireSubscription(request: Request) {
   const context = await authenticate.admin(request);
   const access = await accessFor(context.admin, context.session.shop);
   if (access.status === "none") {
-    throw subscriptionRequired(pricingPageUrl(context.session.shop));
+    throw subscriptionRequired(
+      pricingPageUrl(context.session.shop),
+      localeFromHeaders(request) ?? "en",
+    );
   }
   return context;
 }

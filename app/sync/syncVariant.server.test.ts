@@ -1,3 +1,4 @@
+import { localizeStored } from "../i18n";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { forShop } from "../models/preorder.server";
 import { createTestDb } from "../test/testDb";
@@ -437,7 +438,7 @@ describe("fejl", () => {
     const result = await sync();
     expect(result).toEqual({
       ok: false,
-      error: expect.stringContaining("ikke på noget lager"),
+      error: expect.stringContaining("stored.sync.noLocation"),
     });
   });
 });
@@ -722,7 +723,7 @@ describe("lagermode og forudbestillingsmode", () => {
 
     const plan = await modeOf();
     expect(plan).toMatchObject({ mode: "PREORDER", modeForced: false });
-    expect(plan.modeChangeReason).toContain("ramte 0");
+    expect(localizeStored("da", plan.modeChangeReason)).toContain("ramte 0");
     expect(onlyGroup(shopify).variantIds.has(VARIANT)).toBe(true);
     expect(shopify.variants.get(VARIANT)).toMatchObject({
       available: 10,
@@ -759,7 +760,9 @@ describe("lagermode og forudbestillingsmode", () => {
 
     const plan = await modeOf();
     expect(plan.mode).toBe("STOCK");
-    expect(plan.modeChangeReason).toContain("4 går til forudbestillinger");
+    expect(localizeStored("da", plan.modeChangeReason)).toContain(
+      "4 går til forudbestillinger",
+    );
     // 20 modtaget − 4 lovet = 16 til almindeligt salg.
     expect(shopify.variants.get(VARIANT)?.available).toBe(16);
     // Gruppen tages ud af brug — men hverken gruppen eller planerne slettes.
@@ -831,7 +834,7 @@ describe("lagermode og forudbestillingsmode", () => {
       modeForced: true,
       stockBeforeForce: 3,
     });
-    expect(plan.modeChangeReason).toContain("Tvunget");
+    expect(localizeStored("da", plan.modeChangeReason)).toContain("Tvunget");
     expect(shopify.variants.get(VARIANT)?.available).toBe(10);
     const history = await data().variantPlans.modeHistory(VARIANT);
     expect(history[0]).toMatchObject({ mode: "PREORDER", forced: true });

@@ -1,3 +1,5 @@
+import { forShop } from "../models/preorder.server";
+import { resolveLocale, translate } from "../i18n";
 import { createShopifyGateway } from "./shopifyGateway.server";
 import { syncVariant } from "./syncVariant.server";
 import { syncOrder } from "./syncOrder.server";
@@ -10,6 +12,11 @@ type AdminGraphql = Parameters<typeof createShopifyGateway>[0];
 
 export function shopifySync(graphql: AdminGraphql, shop: string) {
   const gateway = createShopifyGateway(graphql);
+  /** Noter på ordren skrives på butiksejerens sprog. */
+  const note = async (key: "orderNote.cancelled" | "orderNote.reduced") => {
+    const saved = (await forShop(shop).settings.get()).adminLocale;
+    return translate(resolveLocale(saved) ?? "en", key);
+  };
   return {
     /** Bringer Shopify i overensstemmelse med appen for én variant. */
     sync: (variantId: string) => syncVariant({ shop, variantId, gateway }),
@@ -34,14 +41,22 @@ export function shopifySync(graphql: AdminGraphql, shop: string) {
       gateway.readVariantAvailability(variantIds),
 
     /** Annullerer ordren i Shopify — uden refundering, uden at lægge på lager. */
-    cancelOrder: (orderId: string, reason: "CUSTOMER" | "DECLINED" | "STAFF") =>
-      gateway.cancelOrder(orderId, reason),
+    cancelOrder: async (
+      orderId: string,
+      reason: "CUSTOMER" | "DECLINED" | "STAFF",
+    ) =>
+      gateway.cancelOrder(orderId, reason, await note("orderNote.cancelled")),
 
     /** Nedsætter ordrelinjers antal til målet — uden refundering. */
-    setOrderLineQuantities: (
+    setOrderLineQuantities: async (
       orderId: string,
       targets: { lineId: string; quantity: number }[],
-    ) => gateway.setOrderLineQuantities(orderId, targets),
+    ) =>
+      gateway.setOrderLineQuantities(
+        orderId,
+        targets,
+        await note("orderNote.reduced"),
+      ),
 
     /** Starter butikkens Flow-workflows for en af appens triggere. */
     flowTriggerReceive: (handle: string, payload: Record<string, unknown>) =>

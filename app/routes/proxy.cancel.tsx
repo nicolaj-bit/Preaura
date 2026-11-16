@@ -11,6 +11,7 @@ import {
   type CancelLine,
 } from "../release/cancel";
 import { scheduleQueue } from "../orders/scheduler.server";
+import { formatDate, translate, type Locale, type MessageKey } from "../i18n";
 
 // Kundens annulleringsside: /apps/preaura/cancel?o=…&x=…&s=… i butikken.
 //
@@ -18,7 +19,8 @@ import { scheduleQueue } from "../orders/scheduler.server";
 // - Siden viser kun det, der skal til for at bekræfte, at det er den rigtige
 //   ordre: ordrenummer, de forudbestilte varer, antal og lovet dato. Ingen
 //   navne, adresser, priser eller betaling.
-// - Siden vises i butikkens tema (Liquid via app-proxyen).
+// - Siden vises i butikkens tema (Liquid via app-proxyen), på kundens sprog
+//   i butikken: dansk eller engelsk, valgt i Liquid ud fra request.locale.
 // - Annulleringen bliver en anmodning. Godkendt (automatisk eller af
 //   butikken) frigives enhederne gennem den samme frigivelse som alt andet.
 
@@ -49,21 +51,25 @@ async function render(
 ) {
   // Altid 200: ellers kan Shopify vise sin egen fejlside i stedet for
   // forklaringen til kunden.
-  const page = (body: string) =>
-    liquid(layout(body), {
-      layout: true,
-      headers: { "Cache-Control": "no-store" },
-    });
-  const message = (text: string) => page(`<p>${escape(text)}</p>`);
+  const page = (body: (locale: Locale) => string) =>
+    liquid(
+      bilingual((locale) => layout(locale, body(locale))),
+      {
+        layout: true,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
+  const message = (key: MessageKey) =>
+    page((locale) => `<p>${escape(translate(locale, key))}</p>`);
 
-  if (!session || !admin) return message(TEXT.unavailable);
+  if (!session || !admin) return message("cancelPage.unavailable");
   const shop = session.shop;
   const orderId = readCancelLink(shop, {
     o: params.o,
     x: params.x,
     s: params.s,
   });
-  if (!orderId) return message(TEXT.invalid);
+  if (!orderId) return message("cancelPage.invalid");
 
   let access = false;
   try {
@@ -71,14 +77,14 @@ async function render(
   } catch {
     access = false;
   }
-  if (!access) return message(TEXT.unavailable);
+  if (!access) return message("cancelPage.unavailable");
 
   const release = releaseFor(shop);
   const open = await release.cancellations.open(orderId);
-  if (open) return message(TEXT.alreadyRequested);
+  if (open) return message("cancelPage.alreadyRequested");
 
   const order = await shopifySync(admin.graphql, shop).readOrder(orderId);
-  if (!order) return message(TEXT.invalid);
+  if (!order) return message("cancelPage.invalid");
   const settings = await release.settings();
   const state = cancelState(
     order,
@@ -88,10 +94,10 @@ async function render(
   if (!state.ok) {
     return message(
       state.reason === "cancelled"
-        ? TEXT.alreadyCancelled
+        ? "cancelPage.alreadyCancelled"
         : state.reason === "window_closed"
-          ? TEXT.windowClosed
-          : TEXT.nothing,
+          ? "cancelPage.windowClosed"
+          : "cancelPage.nothing",
     );
   }
 
@@ -102,8 +108,14 @@ async function render(
     }
     const targets = targetsFromSelection(state.lines, selection);
     if (targets.length === 0)
-      return page(
-        formHtml(order.name, state.lines, params, TEXT.chooseSomething),
+      return page((locale) =>
+        formHtml(
+          locale,
+          order.name,
+          state.lines,
+          params,
+          "cancelPage.chooseSomething",
+        ),
       );
     const created = await release.cancellations.request({
       orderId,
@@ -114,37 +126,33 @@ async function render(
     });
     if (created?.status === "APPROVED") scheduleQueue(shop, 0);
     return message(
-      created?.status === "APPROVED" ? TEXT.approved : TEXT.requested,
+      created?.status === "APPROVED"
+        ? "cancelPage.approved"
+        : "cancelPage.requested",
     );
   }
-  return page(formHtml(order.name, state.lines, params, null));
+  return page((locale) =>
+    formHtml(locale, order.name, state.lines, params, null),
+  );
 }
 
-const TEXT = {
-  heading: "Annullér forudbestilling",
-  invalid:
-    "Linket er ugyldigt eller udløbet. Kontakt butikken, hvis du vil annullere din forudbestilling.",
-  unavailable:
-    "Annullering via link er ikke tilgængelig lige nu. Kontakt butikken, hvis du vil annullere din forudbestilling.",
-  alreadyRequested:
-    "Vi har allerede modtaget din anmodning om at annullere. Du hører fra butikken.",
-  alreadyCancelled: "Forudbestillingen er allerede annulleret.",
-  windowClosed:
-    "Fristen for at annullere via linket er udløbet, eller varen er sendt. Kontakt butikken.",
-  nothing: "Der er ingen forudbestilte varer at annullere på ordren.",
-  chooseSomething: "Vælg hvor mange du vil annullere.",
-  approved:
-    "Din annullering er godkendt og gennemføres nu. Har du betalt noget, refunderer butikken det.",
-  requested:
-    "Tak. Din anmodning om at annullere er sendt til butikken, som vender tilbage.",
-};
+/**
+ * Siden på begge sprog; Liquid vælger ud fra kundens sprog i butikken.
+ * Dansk ved «da», ellers engelsk.
+ */
+function bilingual(make: (locale: Locale) => string) {
+  return `{% assign preaura_lang = request.locale.iso_code | slice: 0, 2 %}{% if preaura_lang == 'da' %}${make("da")}{% else %}${make("en")}{% endif %}`;
+}
 
 function formHtml(
+  locale: Locale,
   orderName: string,
   lines: CancelLine[],
   params: Record<string, unknown>,
-  error: string | null,
+  error: MessageKey | null,
 ) {
+  const t = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const rows = lines
     .map((line) => {
       const name = [line.title, line.variantTitle].filter(Boolean).join(" – ");
@@ -156,36 +164,29 @@ function formHtml(
       const id = `q_${numeric(line.lineId)}`;
       return `<li>
         <p><strong>${escape(name)}</strong></p>
-        ${line.promisedDate ? `<p>Forventet: ${escape(formatDate(line.promisedDate))}</p>` : ""}
-        <p><label for="${id}">Antal at annullere (af ${line.cancellable})</label>
+        ${line.promisedDate ? `<p>${escape(t("cancelPage.expected", { date: formatDate(locale, line.promisedDate) }))}</p>` : ""}
+        <p><label for="${id}">${escape(t("cancelPage.quantity", { count: line.cancellable }))}</label>
         <select id="${id}" name="${id}">${options}</select></p>
       </li>`;
     })
     .join("");
   return `
-    <p>Ordre ${escape(orderName)}</p>
-    ${error ? `<p role="alert"><strong>${escape(error)}</strong></p>` : ""}
+    <p>${escape(t("cancelPage.order", { name: orderName }))}</p>
+    ${error ? `<p role="alert"><strong>${escape(t(error))}</strong></p>` : ""}
     <form method="post">
       <input type="hidden" name="o" value="${escape(String(params.o ?? ""))}">
       <input type="hidden" name="x" value="${escape(String(params.x ?? ""))}">
       <input type="hidden" name="s" value="${escape(String(params.s ?? ""))}">
       <ul style="list-style:none;padding:0">${rows}</ul>
-      <p><button type="submit" class="button">Annullér</button></p>
+      <p><button type="submit" class="button">${escape(t("cancelPage.submit"))}</button></p>
     </form>`;
 }
 
-function layout(body: string) {
+function layout(locale: Locale, body: string) {
   return `<div class="page-width" style="max-width:40rem;margin:3rem auto;padding:0 1.5rem">
-    <h1>${escape(TEXT.heading)}</h1>
+    <h1>${escape(translate(locale, "cancelPage.heading"))}</h1>
     ${body}
   </div>`;
 }
 
 const numeric = (gid: string) => gid.split("/").pop() ?? gid;
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T12:00:00Z`));
-}

@@ -1,3 +1,4 @@
+import { localizeStored } from "../i18n";
 import { describe, expect, it } from "vitest";
 import { decideMode, type ModeInput } from "./variantMode";
 
@@ -59,12 +60,15 @@ describe("forudbestilling → lagermode", () => {
   });
 
   it("skifter, når der kommer rigtige varer ind", () => {
-    expect(decideMode({ ...preorder, available: 60 })).toEqual({
+    const decision = decideMode({ ...preorder, available: 60 });
+    expect(decision).toMatchObject({
       mode: "STOCK",
       changed: true,
-      reason: "Der kom 20 stk. på lager.",
       stockAvailable: 20,
     });
+    expect(localizeStored("da", decision.reason)).toBe(
+      "Der kom 20 stk. på lager.",
+    );
   });
 
   it("varerne går først til forudbestillingerne; kun resten sælges", () => {
@@ -94,10 +98,13 @@ describe("forudbestilling → lagermode", () => {
 
 describe("tvunget forudbestilling", () => {
   it("tvinger forudbestilling, selvom der er lager", () => {
-    expect(decideMode({ ...base, forced: true, available: 3 })).toMatchObject({
+    const decision = decideMode({ ...base, forced: true, available: 3 });
+    expect(localizeStored("da", decision.reason)).toBe(
+      "Tvunget i forudbestilling af webshopejeren.",
+    );
+    expect(decision).toMatchObject({
       mode: "PREORDER",
       changed: true,
-      reason: "Tvunget i forudbestilling af webshopejeren.",
     });
   });
 

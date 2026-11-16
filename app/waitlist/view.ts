@@ -1,3 +1,4 @@
+import { translate, type Locale } from "../i18n";
 // Det, siden «Venteliste» viser, og kontrol af indstillingerne. Ren kode —
 // ingen database, intet netværk — så det kan testes.
 
@@ -12,7 +13,10 @@ export type WaitlistSettingsInput = Record<
   unknown
 >;
 
-export function parseWaitlistSettings(input: WaitlistSettingsInput) {
+export function parseWaitlistSettings(
+  input: WaitlistSettingsInput,
+  locale: Locale = "da",
+) {
   const errors: Partial<Record<keyof typeof WAITLIST_SETTING_LIMITS, string>> =
     {};
   const values = {} as Record<keyof typeof WAITLIST_SETTING_LIMITS, number>;
@@ -23,7 +27,7 @@ export function parseWaitlistSettings(input: WaitlistSettingsInput) {
     const text = String(input[key] ?? "").trim();
     const value = Number(text);
     if (!/^\d+$/.test(text) || value < min || value > max) {
-      errors[key] = `Skriv et helt tal fra ${min} til ${max}.`;
+      errors[key] = translate(locale, "releases.error.number", { min, max });
     } else {
       values[key] = value;
     }

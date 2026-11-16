@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 // Opsætning: hvor langt butikken er, og om PREAURA-blokken er aktiv i det
 // udgivne tema. Ren kode — ingen database, intet netværk — så det kan testes.
 
@@ -48,7 +49,7 @@ export function describeBlock(
   reason: string | null;
 } {
   if (!Array.isArray(extensions)) {
-    return { status: "unknown", reason: "intet svar fra Shopify" };
+    return { status: "unknown", reason: coded("setupReason.noAnswer") };
   }
   const themeExtensions = (extensions as ExtensionInfoLike[]).filter(
     (e) => e && e.type === "theme_app_extension",
@@ -56,7 +57,9 @@ export function describeBlock(
   if (themeExtensions.length === 0) {
     return {
       status: "unknown",
-      reason: `ingen temaudvidelse i svaret (${extensions.length} udvidelser)`,
+      reason: coded("setupReason.noThemeExtension", {
+        count: extensions.length,
+      }),
     };
   }
   const ours =
@@ -67,7 +70,9 @@ export function describeBlock(
   if (!ours) {
     return {
       status: "unknown",
-      reason: `temaudvidelsen hedder ${themeExtensions.map((e) => e.handle).join(", ")}`,
+      reason: coded("setupReason.otherName", {
+        names: themeExtensions.map((e) => e.handle).join(", "),
+      }),
     };
   }
   const block = (ours.activations ?? []).find((a) => a?.handle === handle);
@@ -121,7 +126,8 @@ export type SetupStepId = "products" | "delivery" | "enable" | "block" | "cart";
 
 /** Shopify har det sidste ord; butikkens bekræftelse tæller kun ved «ukendt». */
 const isOn = (status: BlockStatus | undefined, confirmed?: boolean) =>
-  status === "active" || ((status ?? "unknown") === "unknown" && Boolean(confirmed));
+  status === "active" ||
+  ((status ?? "unknown") === "unknown" && Boolean(confirmed));
 
 /** Trinnene i rækkefølge, og om hvert er gjort. */
 export function setupSteps(state: SetupState) {

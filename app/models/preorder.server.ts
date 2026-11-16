@@ -1,3 +1,5 @@
+import { coded } from "../i18n";
+import type { Locale } from "../i18n";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import db from "../db.server";
@@ -105,7 +107,8 @@ export function forShop(shop: string, client: PrismaClient = db) {
 
   async function findDelivery(tx: Tx, id: string) {
     const delivery = await tx.delivery.findFirst({ where: { id, shop } });
-    if (!delivery) throw new PreorderActionError("Leverancen findes ikke.");
+    if (!delivery)
+      throw new PreorderActionError(coded("action.deliveryMissing"));
     return delivery;
   }
 
@@ -141,6 +144,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
           where: { shop },
           create: { shop, themeBlockConfirmed: confirmed },
           update: { themeBlockConfirmed: confirmed },
+        });
+      },
+
+      /** Sproget i butiksejerens Shopify Admin (app/i18n/locale.server.ts). */
+      async setAdminLocale(locale: string) {
+        await client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, adminLocale: locale },
+          update: { adminLocale: locale },
         });
       },
 
@@ -275,7 +287,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           data: { modeForced: forced },
         });
         if (result.count === 0) {
-          throw new PreorderActionError("Varianten findes ikke i appen.");
+          throw new PreorderActionError(coded("action.variantMissing"));
         }
       },
 
@@ -308,7 +320,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           data: { preorderEnabled: enabled },
         });
         if (result.count === 0) {
-          throw new PreorderActionError("Varianten findes ikke i appen.");
+          throw new PreorderActionError(coded("action.variantMissing"));
         }
       },
     },
@@ -358,7 +370,12 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
 
       /** Opretter en leverance bagerst i rækkefølgen for varianten. */
-      async create(variantId: string, input: DeliveryInput, today: string) {
+      async create(
+        variantId: string,
+        input: DeliveryInput,
+        today: string,
+        locale?: Locale,
+      ) {
         return client.$transaction(async (tx) => {
           const others = await tx.delivery.findMany({
             where: { shop, variantId, status: "OPEN" },
@@ -366,6 +383,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           });
           const result = validateDelivery(input, {
             today,
+            locale,
             allocated: 0,
             others,
             newDelivery: true,
@@ -376,7 +394,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
             where: { shop, variantId },
           });
           if (!plan) {
-            throw new PreorderActionError("Varianten findes ikke i appen.");
+            throw new PreorderActionError(coded("action.variantMissing"));
           }
           const last = await tx.delivery.aggregate({
             where: { shop, variantId },
@@ -393,13 +411,16 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
-      async update(id: string, input: DeliveryInput, today: string) {
+      async update(
+        id: string,
+        input: DeliveryInput,
+        today: string,
+        locale?: Locale,
+      ) {
         return client.$transaction(async (tx) => {
           const delivery = await findDelivery(tx, id);
           if (delivery.status === "CANCELLED") {
-            throw new PreorderActionError(
-              "En annulleret leverance kan ikke rettes.",
-            );
+            throw new PreorderActionError(coded("action.cancelledNoEdit"));
           }
           // Tildelt antal læses i samme transaktion som opdateringen.
           const { allocated } = await activeAllocated(tx, id);
@@ -414,6 +435,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           });
           const result = validateDelivery(input, {
             today,
+            locale,
             allocated,
             currentDate: delivery.date,
             others,
@@ -482,9 +504,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
             where: { shop, deliveryId: id },
           });
           if (allocations > 0) {
-            throw new PreorderActionError(
-              "Leverancen har tildelte ordrer og kan ikke slettes. Annullér den i stedet — så kan du se, hvilke ordrer der er berørt.",
-            );
+            throw new PreorderActionError(coded("action.hasOrders"));
           }
           await tx.delivery.deleteMany({ where: { id, shop } });
           return { variantId: delivery.variantId };

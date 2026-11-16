@@ -16,12 +16,18 @@ export type SubscriptionRequiredData = {
   reason: "subscription_required";
   pricingUrl: string;
   apiKey: string;
+  /** Sproget, siden «Vælg abonnement» vises på. */
+  locale: "da" | "en";
 };
 
-export function subscriptionRequired(pricingUrl: string) {
+export function subscriptionRequired(
+  pricingUrl: string,
+  locale: "da" | "en" = "en",
+) {
   const body: SubscriptionRequiredData = {
     reason: "subscription_required",
     pricingUrl,
+    locale,
     // eslint-disable-next-line no-undef
     apiKey: process.env.SHOPIFY_API_KEY || "",
   };
@@ -41,5 +47,6 @@ export function subscriptionRequiredFrom(
     reason: "subscription_required",
     pricingUrl: body.pricingUrl,
     apiKey: body.apiKey ?? "",
+    locale: body.locale === "da" ? "da" : "en",
   };
 }

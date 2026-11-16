@@ -16,6 +16,8 @@ import {
   waitlistRows,
   WAITLIST_SETTING_LIMITS,
 } from "../waitlist/view";
+import { formatDate, translate, useT } from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 
 // Venteliste: hvor mange der venter på besked pr. variant, hvor mange der
 // har fået besked pr. leverance, og hvordan beskederne fordeles.
@@ -35,18 +37,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ]),
   ];
   const names = await fetchVariantNames(admin.graphql, variantIds);
-  const format = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  });
+  const locale = await localeFor(request, session.shop);
   const rows = waitlistRows(overview.waiting, overview.notified, names).map(
     (row) => ({
       ...row,
+      productTitle:
+        row.productTitle === "Ukendt produkt"
+          ? translate(locale, "common.unknownProduct")
+          : row.productTitle,
       productNumber: numericId(row.productId),
       notified: row.notified.map((n) => ({
         label: n.deliveryDate
-          ? `Leverance ${format.format(new Date(`${n.deliveryDate}T12:00:00Z`))}`
-          : "På lager",
+          ? translate(locale, "waitlist.delivery", {
+              date: formatDate(locale, n.deliveryDate),
+            })
+          : translate(locale, "waitlist.inStock"),
         count: n.count,
       })),
     }),
@@ -64,11 +69,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await requireSubscription(request);
   const form = await request.formData();
-  const parsed = parseWaitlistSettings({
-    stableMinutes: form.get("stableMinutes"),
-    batchSize: form.get("batchSize"),
-    batchMinutes: form.get("batchMinutes"),
-  });
+  const locale = await localeFor(request, session.shop);
+  const parsed = parseWaitlistSettings(
+    {
+      stableMinutes: form.get("stableMinutes"),
+      batchSize: form.get("batchSize"),
+      batchMinutes: form.get("batchMinutes"),
+    },
+    locale,
+  );
   if (!parsed.ok) return parsed;
   await waitlistFor(session.shop).updateSettings(parsed.values);
   return { ok: true as const };
@@ -79,6 +88,7 @@ export default function WaitlistPage() {
     useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const { t } = useT();
   const [values, setValues] = useState({
     stableMinutes: String(settings.stableMinutes),
     batchSize: String(settings.batchSize),
@@ -88,7 +98,8 @@ export default function WaitlistPage() {
   const busy = fetcher.state !== "idle";
 
   useEffect(() => {
-    if (fetcher.data?.ok) shopify.toast.show("Indstillinger gemt");
+    if (fetcher.data?.ok) shopify.toast.show(t("waitlist.saved"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data, shopify]);
 
   // Værdien læses med det samme: når React kører opdateringen, er
@@ -99,32 +110,33 @@ export default function WaitlistPage() {
   };
 
   return (
-    <s-page heading="Venteliste">
+    <s-page heading={t("waitlist.heading")}>
       {!hasRecipients && (
-        <s-banner tone="warning" heading="Ingen modtagere er slået til">
+        <s-banner tone="warning" heading={t("waitlist.noRecipients.heading")}>
           <s-paragraph>
-            Tilmeldinger samles, men der udløses ingen beskeder, før mindst én
-            modtager er slået til under{" "}
-            <s-link href="/app/events">Hændelser</s-link>.
+            {t("waitlist.noRecipients.text")}{" "}
+            <s-link href="/app/events">{t("nav.events")}</s-link>.
           </s-paragraph>
         </s-banner>
       )}
 
-      <s-section heading={`Venter på besked (${totalWaiting})`}>
+      <s-section
+        heading={t("waitlist.waiting.heading", { count: totalWaiting })}
+      >
         {rows.length === 0 ? (
-          <s-paragraph>
-            Ingen har skrevet sig op endnu. Feltet vises på produktsiden, når en
-            variant hverken kan købes på lager eller forudbestilles — slå det
-            til i blokken «Forudbestilling» i temaeditoren.
-          </s-paragraph>
+          <s-paragraph>{t("waitlist.empty")}</s-paragraph>
         ) : (
           <s-table>
             <s-table-header-row>
-              <s-table-header listSlot="primary">Produkt</s-table-header>
-              <s-table-header>Variant</s-table-header>
-              <s-table-header format="numeric">Venter nu</s-table-header>
+              <s-table-header listSlot="primary">
+                {t("waitlist.col.product")}
+              </s-table-header>
+              <s-table-header>{t("waitlist.col.variant")}</s-table-header>
+              <s-table-header format="numeric">
+                {t("waitlist.col.waiting")}
+              </s-table-header>
               <s-table-header listSlot="secondary">
-                Har fået besked
+                {t("waitlist.col.notified")}
               </s-table-header>
             </s-table-header-row>
             <s-table-body>
@@ -151,18 +163,12 @@ export default function WaitlistPage() {
         )}
       </s-section>
 
-      <s-section heading="Sådan sendes beskederne">
+      <s-section heading={t("waitlist.how.heading")}>
         <s-stack gap="base">
-          <s-paragraph>
-            Når en variant kan købes igen — fordi den er kommet på lager, eller
-            fordi en leverance med ledige pladser er åbnet — får de tilmeldte
-            besked i den rækkefølge, de skrev sig op. Hver tilmelding får én
-            besked og lukkes derefter. Selve beskeden sender du via Shopify Flow
-            eller Klaviyo.
-          </s-paragraph>
+          <s-paragraph>{t("waitlist.how.text")}</s-paragraph>
           <s-number-field
-            label="Ventetid (minutter)"
-            details="Varen skal have kunnet købes så længe, før der sendes. Så giver et kort udsving i lageret ingen beskeder."
+            label={t("waitlist.stable.label")}
+            details={t("waitlist.stable.details")}
             value={values.stableMinutes}
             min={WAITLIST_SETTING_LIMITS.stableMinutes.min}
             max={WAITLIST_SETTING_LIMITS.stableMinutes.max}
@@ -170,8 +176,8 @@ export default function WaitlistPage() {
             onChange={set("stableMinutes")}
           />
           <s-number-field
-            label="Portion (antal pr. gang)"
-            details="Så mange får besked ad gangen. Sæt den gerne omkring det antal, der er til salg."
+            label={t("waitlist.batch.label")}
+            details={t("waitlist.batch.details")}
             value={values.batchSize}
             min={WAITLIST_SETTING_LIMITS.batchSize.min}
             max={WAITLIST_SETTING_LIMITS.batchSize.max}
@@ -179,8 +185,8 @@ export default function WaitlistPage() {
             onChange={set("batchSize")}
           />
           <s-number-field
-            label="Interval (minutter)"
-            details="Tid mellem to portioner. Før hver portion tjekkes det, at varen stadig kan købes."
+            label={t("waitlist.interval.label")}
+            details={t("waitlist.interval.details")}
             value={values.batchMinutes}
             min={WAITLIST_SETTING_LIMITS.batchMinutes.min}
             max={WAITLIST_SETTING_LIMITS.batchMinutes.max}
@@ -193,20 +199,14 @@ export default function WaitlistPage() {
               onClick={() => fetcher.submit(values, { method: "POST" })}
               {...(busy ? { loading: true } : {})}
             >
-              Gem
+              {t("product.save")}
             </s-button>
           </s-stack>
         </s-stack>
       </s-section>
 
-      <s-section heading="Kun besked om varen">
-        <s-paragraph>
-          Kunden har selv bedt om beskeden, så den må sendes uden samtykke — men
-          kun hvis den handler om varen. Læg du tilbud, andre varer eller
-          rabatkoder i den, bliver den markedsføring og kræver samtykke
-          (markedsføringslovens § 10). Tilmeldingen må ikke bruges til
-          nyhedsbrev.
-        </s-paragraph>
+      <s-section heading={t("waitlist.only.heading")}>
+        <s-paragraph>{t("waitlist.only.text")}</s-paragraph>
       </s-section>
     </s-page>
   );

@@ -1,3 +1,4 @@
+import { translate, type Locale } from "../i18n";
 import type { ReleaseSettings } from "../models/release.server";
 
 // Kontrol af butikkens indstillinger for annullering og afvist betaling.
@@ -13,7 +14,10 @@ export const LIMITS = {
 
 type Field = keyof typeof LIMITS;
 
-export function parseReleaseSettings(input: Record<string, unknown>) {
+export function parseReleaseSettings(
+  input: Record<string, unknown>,
+  locale: Locale = "da",
+) {
   const errors: Partial<
     Record<Field | "cancelWindow" | "cancelApproval", string>
   > = {};
@@ -23,21 +27,23 @@ export function parseReleaseSettings(input: Record<string, unknown>) {
       : input.cancelWindow === "UNTIL_FULFILLED"
         ? "UNTIL_FULFILLED"
         : null;
-  if (!cancelWindow) errors.cancelWindow = "Vælg en frist.";
+  if (!cancelWindow)
+    errors.cancelWindow = translate(locale, "releases.error.window");
   const cancelApproval =
     input.cancelApproval === "AUTO"
       ? "AUTO"
       : input.cancelApproval === "MANUAL"
         ? "MANUAL"
         : null;
-  if (!cancelApproval) errors.cancelApproval = "Vælg godkendelse.";
+  if (!cancelApproval)
+    errors.cancelApproval = translate(locale, "releases.error.approval");
   const numbers = {} as Record<Field, number>;
   for (const field of Object.keys(LIMITS) as Field[]) {
     const { min, max } = LIMITS[field];
     const text = String(input[field] ?? "").trim();
     const value = Number(text);
     if (!/^\d+$/.test(text) || value < min || value > max) {
-      errors[field] = `Skriv et helt tal fra ${min} til ${max}.`;
+      errors[field] = translate(locale, "releases.error.number", { min, max });
     } else {
       numbers[field] = value;
     }

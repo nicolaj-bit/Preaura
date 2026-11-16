@@ -220,7 +220,7 @@ describe("leverancer", () => {
     await allocate(A, delivery.id, 3, "1");
 
     await expect(data.deliveries.remove(delivery.id)).rejects.toThrow(
-      /kan ikke slettes/,
+      /action\.hasOrders/,
     );
     await data.deliveries.cancel(delivery.id);
 
@@ -259,7 +259,7 @@ describe("leverancer", () => {
         { date: "2026-12-01", quantity: "20" },
         TODAY,
       ),
-    ).rejects.toThrow(/annulleret/);
+    ).rejects.toThrow(/action\.cancelledNoEdit/);
   });
 });
 

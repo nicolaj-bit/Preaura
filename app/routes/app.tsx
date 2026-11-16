@@ -15,9 +15,12 @@ import {
   subscriptionRequired,
   subscriptionRequiredFrom,
 } from "../billing/subscriptionRequired";
+import { localeFor } from "../i18n/locale.server";
+import { LocaleContext, translate, useT } from "../i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
+  const locale = await localeFor(request, session.shop);
 
   // Kommer butikken tilbage fra Shopifys prisvalgsside, sætter Shopify
   // plan_handle i adressen. Den bruges kun som signal om at tømme cachen —
@@ -44,17 +47,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
     return {
       apiKey,
+      locale,
       billingError:
         error instanceof PartnerApiError
           ? error.message
-          : "Abonnementet kunne ikke tjekkes. Prøv igen om lidt.",
+          : translate(locale, "billing.errorGeneric"),
     };
   }
   if (access.status === "none") {
-    throw subscriptionRequired(pricingPageUrl(session.shop));
+    throw subscriptionRequired(pricingPageUrl(session.shop), locale);
   }
 
-  return { apiKey, billingError: null };
+  return { apiKey, locale, billingError: null };
 };
 
 // Shopifys typer kender ikke rel på s-link, men s-app-nav læser det
@@ -62,10 +66,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 const HOME_REL = { rel: "home" } as object;
 
 export default function App() {
-  const { apiKey, billingError } = useLoaderData<typeof loader>();
+  const { apiKey, locale, billingError } = useLoaderData<typeof loader>();
 
   return (
-    <AppProvider apiKey={apiKey}>
+    <LocaleContext.Provider value={locale}>
+      <AppProvider apiKey={apiKey}>
+        <AppFrame billingError={billingError} />
+      </AppProvider>
+    </LocaleContext.Provider>
+  );
+}
+
+function AppFrame({ billingError }: { billingError: string | null }) {
+  const { t } = useT();
+  return (
+    <>
       <s-app-nav>
         {/* Appens hjem: hvor et klik på appens navn i Shopify Admin fører
             hen. Vises ikke i menuen. Uden den bruger Shopify appens rod,
@@ -73,24 +88,24 @@ export default function App() {
         <s-link href="/app" {...HOME_REL}>
           PREAURA
         </s-link>
-        <s-link href="/app">Produkter</s-link>
-        <s-link href="/app/queue">Ordrebehandling</s-link>
-        <s-link href="/app/releases">Annulleringer</s-link>
-        <s-link href="/app/waitlist">Venteliste</s-link>
-        <s-link href="/app/events">Hændelser</s-link>
-        <s-link href="/app/settings">Indstillinger</s-link>
-        <s-link href="/app/subscription">Abonnement</s-link>
+        <s-link href="/app">{t("nav.products")}</s-link>
+        <s-link href="/app/queue">{t("nav.queue")}</s-link>
+        <s-link href="/app/releases">{t("nav.releases")}</s-link>
+        <s-link href="/app/waitlist">{t("nav.waitlist")}</s-link>
+        <s-link href="/app/events">{t("nav.events")}</s-link>
+        <s-link href="/app/settings">{t("nav.settings")}</s-link>
+        <s-link href="/app/subscription">{t("nav.subscription")}</s-link>
       </s-app-nav>
       {billingError ? (
         <s-page heading="PREAURA">
-          <s-banner tone="critical" heading="Abonnementet kunne ikke tjekkes">
+          <s-banner tone="critical" heading={t("billing.errorHeading")}>
             <s-paragraph>{billingError}</s-paragraph>
           </s-banner>
         </s-page>
       ) : (
         <Outlet />
       )}
-    </AppProvider>
+    </>
   );
 }
 
@@ -100,10 +115,12 @@ export function ErrorBoundary() {
   const required = subscriptionRequiredFrom(error);
   if (required) {
     return (
-      <SubscriptionRequired
-        apiKey={required.apiKey}
-        pricingUrl={required.pricingUrl}
-      />
+      <LocaleContext.Provider value={required.locale}>
+        <SubscriptionRequired
+          apiKey={required.apiKey}
+          pricingUrl={required.pricingUrl}
+        />
+      </LocaleContext.Provider>
     );
   }
   return boundary.error(error);
@@ -121,20 +138,17 @@ function SubscriptionRequired({
   apiKey: string;
   pricingUrl: string;
 }) {
+  const { t } = useT();
   useEffect(() => {
     window.open(pricingUrl, "_top");
   }, [pricingUrl]);
   return (
     <AppProvider apiKey={apiKey}>
-      <s-page heading="Vælg abonnement">
+      <s-page heading={t("subscriptionRequired.heading")}>
         <s-section>
-          <s-paragraph>
-            PREAURA kræver et aktivt abonnement. Du sendes nu videre til
-            Shopifys side, hvor du vælger det. Dine leverancer og
-            forudbestillinger er gemt og venter, til abonnementet er aktivt.
-          </s-paragraph>
+          <s-paragraph>{t("subscriptionRequired.text")}</s-paragraph>
           <s-button variant="primary" href={pricingUrl} target="_top">
-            Gå til abonnementet
+            {t("subscriptionRequired.button")}
           </s-button>
         </s-section>
       </s-page>

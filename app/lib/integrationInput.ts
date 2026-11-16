@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 // Kontrol af det, webshopejeren indtaster under Hændelser. Ren funktion,
 // så reglerne kan testes.
 
@@ -20,7 +21,7 @@ export function validateWebhookUrl(
   if (url.username || url.password) {
     return {
       ok: false,
-      error: "Adressen må ikke indeholde brugernavn eller adgangskode.",
+      error: coded("integration.urlCredentials"),
     };
   }
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
@@ -42,7 +43,7 @@ export function validateWebhookUrl(
   if (privateHost) {
     return {
       ok: false,
-      error: "Adressen skal være offentlig tilgængelig på internettet.",
+      error: coded("integration.urlPublic"),
     };
   }
   return { ok: true, url: url.toString() };
@@ -56,8 +57,7 @@ export function validateKlaviyoKey(
   if (!/^pk_[A-Za-z0-9]{10,}$/.test(key)) {
     return {
       ok: false,
-      error:
-        "Det ligner ikke en privat Klaviyo-nøgle. Den starter med pk_ og findes under Settings → API keys i Klaviyo.",
+      error: coded("integration.klaviyoKey"),
     };
   }
   return { ok: true, key };

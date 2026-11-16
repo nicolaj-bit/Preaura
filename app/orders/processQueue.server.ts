@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
@@ -178,7 +179,7 @@ export async function processShopQueue({
         byOrder.set(ref.orderId, group);
       }
       if (unreadable.length > 0) {
-        await queue.markFailed(unreadable, "Hændelsen indeholder ingen ordre.");
+        await queue.markFailed(unreadable, coded("stored.order.noOrder"));
         totals.failed += unreadable.length;
       }
 
@@ -289,7 +290,7 @@ async function processCompliance(
       };
       const customerId =
         payload.customer?.id != null ? String(payload.customer.id) : null;
-      if (!customerId) throw new Error("Hændelsen indeholder ingen kunde.");
+      if (!customerId) throw new Error(coded("stored.order.noCustomer"));
       const emailHash =
         typeof payload.customer?.email_hash === "string" &&
         payload.customer.email_hash
@@ -351,9 +352,7 @@ async function processOrder(
     await deps.syncOrder(orderId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    throw new Error(
-      `Ordren er tildelt, men leveringsdato og tag kunne ikke skrives på ordren i Shopify: ${message}`,
-    );
+    throw new Error(coded("stored.order.notWritten", { details: message }));
   }
 }
 
