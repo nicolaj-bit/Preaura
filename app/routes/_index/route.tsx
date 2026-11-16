@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { redirect, Form, useLoaderData } from "react-router";
 
 import { login } from "../../shopify.server";
+import { insideAdmin } from "../../lib/insideAdmin";
 
 import styles from "./styles.module.css";
 
@@ -10,6 +11,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
+  }
+  // Inde i Shopify Admin (fx et klik på appens navn i titellinjen) kommer
+  // anmodningen med App Bridges sessionstoken, men uden ?shop=. Så hører
+  // butikken til i appen, ikke på startsiden for besøgende udefra.
+  if (insideAdmin(request)) {
+    throw redirect("/app");
   }
 
   return { showForm: Boolean(login) };
@@ -22,9 +29,7 @@ export default function App() {
     <div className={styles.index}>
       <div className={styles.content}>
         <h1 className={styles.heading}>PREAURA</h1>
-        <p className={styles.text}>
-          Åbn PREAURA fra din butiks Shopify Admin.
-        </p>
+        <p className={styles.text}>Åbn PREAURA fra din butiks Shopify Admin.</p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
             <label className={styles.label}>

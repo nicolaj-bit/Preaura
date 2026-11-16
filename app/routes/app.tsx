@@ -1,4 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useEffect } from "react";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
@@ -10,9 +11,13 @@ import {
   pricingPageUrl,
 } from "../billing/access.server";
 import { PartnerApiError } from "../billing/partnerApi.server";
+import {
+  subscriptionRequired,
+  subscriptionRequiredFrom,
+} from "../billing/subscriptionRequired";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session, redirect } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
 
   // Kommer butikken tilbage fra Shopifys prisvalgsside, sætter Shopify
   // plan_handle i adressen. Den bruges kun som signal om at tømme cachen —
@@ -23,8 +28,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Intet aktivt abonnement (prøveperioden er udløbet, eller abonnementet er
   // opsagt): hele appen lukkes, og butikken sendes til Shopifys
-  // prisvalgsside. target "_top" er nødvendig — siden ligger uden for
-  // app-rammen (iframen). Intet data røres.
+  // prisvalgsside — via ErrorBoundary nedenfor, så der ikke glimter en tom
+  // side. Intet data røres.
   // eslint-disable-next-line no-undef
   const apiKey = process.env.SHOPIFY_API_KEY || "";
   let access;
@@ -46,11 +51,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   }
   if (access.status === "none") {
-    throw redirect(pricingPageUrl(session.shop), { target: "_top" });
+    throw subscriptionRequired(pricingPageUrl(session.shop));
   }
 
   return { apiKey, billingError: null };
 };
+
+// Shopifys typer kender ikke rel på s-link, men s-app-nav læser det
+// (https://shopify.dev/docs/api/app-home/app-bridge-web-components/app-nav).
+const HOME_REL = { rel: "home" } as object;
 
 export default function App() {
   const { apiKey, billingError } = useLoaderData<typeof loader>();
@@ -58,6 +67,12 @@ export default function App() {
   return (
     <AppProvider apiKey={apiKey}>
       <s-app-nav>
+        {/* Appens hjem: hvor et klik på appens navn i Shopify Admin fører
+            hen. Vises ikke i menuen. Uden den bruger Shopify appens rod,
+            som er startsiden for besøgende udefra. */}
+        <s-link href="/app" {...HOME_REL}>
+          PREAURA
+        </s-link>
         <s-link href="/app">Produkter</s-link>
         <s-link href="/app/queue">Ordrebehandling</s-link>
         <s-link href="/app/releases">Annulleringer</s-link>
@@ -81,7 +96,50 @@ export default function App() {
 
 // Shopify needs React Router to catch some thrown responses, so that their headers are included in the response.
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+  const required = subscriptionRequiredFrom(error);
+  if (required) {
+    return (
+      <SubscriptionRequired
+        apiKey={required.apiKey}
+        pricingUrl={required.pricingUrl}
+      />
+    );
+  }
+  return boundary.error(error);
+}
+
+/**
+ * Intet aktivt abonnement: en rigtig side i stedet for en tom, og butikken
+ * sendes selv videre til Shopifys prisvalgsside uden for app-rammen.
+ * Knappen er der, hvis browseren ikke sender videre af sig selv.
+ */
+function SubscriptionRequired({
+  apiKey,
+  pricingUrl,
+}: {
+  apiKey: string;
+  pricingUrl: string;
+}) {
+  useEffect(() => {
+    window.open(pricingUrl, "_top");
+  }, [pricingUrl]);
+  return (
+    <AppProvider apiKey={apiKey}>
+      <s-page heading="Vælg abonnement">
+        <s-section>
+          <s-paragraph>
+            PREAURA kræver et aktivt abonnement. Du sendes nu videre til
+            Shopifys side, hvor du vælger det. Dine leverancer og
+            forudbestillinger er gemt og venter, til abonnementet er aktivt.
+          </s-paragraph>
+          <s-button variant="primary" href={pricingUrl} target="_top">
+            Gå til abonnementet
+          </s-button>
+        </s-section>
+      </s-page>
+    </AppProvider>
+  );
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
