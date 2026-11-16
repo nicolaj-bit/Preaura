@@ -20,21 +20,55 @@ export type BlockStatus = "active" | "inactive" | "unknown";
 
 /**
  * Er blokken lagt ind i det udgivne tema? «active» betyder, at Shopify melder
- * den aktiv. Kan status ikke læses (fx ældre Shopify Admin), er den
- * «unknown» — så siger appen ikke noget forkert.
+ * den aktiv. Kan status ikke læses, er den «unknown» — så siger appen ikke
+ * noget forkert, og butikken kan selv bekræfte trinnet.
+ *
+ * Blokken genkendes på sit filnavn (preorder) i en temaudvidelse — helst
+ * vores (preaura-preorder), men også hvis Shopify melder udvidelsen under et
+ * andet navn.
  */
 export function blockStatus(
   extensions: ExtensionInfoLike[] | null,
 ): BlockStatus {
-  if (!extensions) return "unknown";
-  const extension = extensions.find(
-    (e) =>
-      e.type === "theme_app_extension" && e.handle === THEME_EXTENSION_HANDLE,
+  return describeBlock(extensions).status;
+}
+
+/** Status og en kort teknisk forklaring, når status ikke kan afgøres. */
+export function describeBlock(extensions: unknown): {
+  status: BlockStatus;
+  reason: string | null;
+} {
+  if (!Array.isArray(extensions)) {
+    return { status: "unknown", reason: "intet svar fra Shopify" };
+  }
+  const themeExtensions = (extensions as ExtensionInfoLike[]).filter(
+    (e) => e && e.type === "theme_app_extension",
   );
-  if (!extension) return "unknown";
-  const block = extension.activations.find((a) => a.handle === BLOCK_HANDLE);
-  if (!block) return "inactive";
-  return block.status === "active" ? "active" : "inactive";
+  if (themeExtensions.length === 0) {
+    return {
+      status: "unknown",
+      reason: `ingen temaudvidelse i svaret (${extensions.length} udvidelser)`,
+    };
+  }
+  const ours =
+    themeExtensions.find((e) => e.handle === THEME_EXTENSION_HANDLE) ??
+    themeExtensions.find((e) =>
+      (e.activations ?? []).some((a) => a?.handle === BLOCK_HANDLE),
+    );
+  if (!ours) {
+    return {
+      status: "unknown",
+      reason: `temaudvidelsen hedder ${themeExtensions.map((e) => e.handle).join(", ")}`,
+    };
+  }
+  const block = (ours.activations ?? []).find(
+    (a) => a?.handle === BLOCK_HANDLE,
+  );
+  if (!block) return { status: "inactive", reason: null };
+  return {
+    status: block.status === "active" ? "active" : "inactive",
+    reason: null,
+  };
 }
 
 /**
@@ -56,6 +90,8 @@ export type SetupState = {
   hasDelivery: boolean;
   hasEnabled: boolean;
   block: BlockStatus;
+  /** Butikken har selv bekræftet blokken (bruges, når status er ukendt). */
+  blockConfirmed?: boolean;
 };
 
 export type SetupStepId = "products" | "delivery" | "enable" | "block";
@@ -66,7 +102,14 @@ export function setupSteps(state: SetupState) {
     { id: "products", done: state.hasProducts },
     { id: "delivery", done: state.hasDelivery },
     { id: "enable", done: state.hasEnabled },
-    { id: "block", done: state.block === "active" },
+    {
+      id: "block",
+      // Shopify har det sidste ord: melder Shopify blokken inaktiv, tæller
+      // butikkens egen bekræftelse ikke.
+      done:
+        state.block === "active" ||
+        (state.block === "unknown" && Boolean(state.blockConfirmed)),
+    },
   ];
   const done = steps.filter((s) => s.done).length;
   return {

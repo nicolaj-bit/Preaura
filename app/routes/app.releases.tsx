@@ -219,8 +219,10 @@ export default function Releases() {
 
       <s-section heading={`Afviste betalinger (${openIssues.length})`}>
         <s-paragraph>
-          Ordrer, hvor opkrævningen ved afsendelse er afvist. Enhederne frigives
-          først efter fristen, så kunden kan nå at rette sit kort.
+          Ordrer, hvor betalingen blev afvist, da du sendte varen (fx et udløbet
+          kort). Kunden får det antal dage, du har valgt under Regler, til at
+          betale. Betaler kunden ikke, annulleres forudbestillingen, og varen
+          kommer tilbage i leverancen.
         </s-paragraph>
         {openIssues.length === 0 ? (
           <s-paragraph>Ingen afviste betalinger.</s-paragraph>
@@ -315,8 +317,8 @@ export default function Releases() {
             />
           )}
           <s-number-field
-            label="Frist ved afvist betaling (dage)"
-            details="Så længe kan kunden nå at betale, før enhederne frigives."
+            label="Dage til at betale, hvis betalingen afvises"
+            details="Kunden betaler først, når du sender varen. Afvises betalingen da — fx fordi kortet er udløbet — får kunden så mange dage til at betale. Betaler kunden ikke inden da, annulleres forudbestillingen, og varen kommer tilbage i leverancen, så en anden kan købe den."
             value={values.paymentGraceDays}
             min={LIMITS.paymentGraceDays.min}
             max={LIMITS.paymentGraceDays.max}

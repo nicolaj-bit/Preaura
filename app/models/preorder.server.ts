@@ -135,6 +135,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      /** Butikken bekræfter selv, at blokken er i temaet. */
+      async setThemeBlockConfirmed(confirmed: boolean) {
+        await client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, themeBlockConfirmed: confirmed },
+          update: { themeBlockConfirmed: confirmed },
+        });
+      },
+
       /** Opsætningsguiden på forsiden foldes sammen eller åbnes igen. */
       async setSetupGuideHidden(hidden: boolean) {
         await client.shopSetting.upsert({

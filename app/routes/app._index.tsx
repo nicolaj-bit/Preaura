@@ -14,7 +14,7 @@ import { queueFor } from "../models/queue.server";
 import { complianceFor } from "../models/compliance.server";
 import { dashboardStats, progressPct } from "../lib/dashboard";
 import { setupSteps, themeBlockUrl } from "../onboarding/setup";
-import { ThemeBlockBanner, useBlockStatus } from "../components/ThemeBlock";
+import { ThemeBlockBanner, useBlockInfo } from "../components/ThemeBlock";
 import { SUPPORT_EMAIL } from "../onboarding/support";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
@@ -109,6 +109,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       hasDelivery: allViews.length > 0,
       hasEnabled: enabledVariants.length > 0,
       hidden: settings.setupGuideHidden,
+      blockConfirmed: settings.themeBlockConfirmed,
       // Det første produkt — der oprettes den første leverance.
       firstProduct: summaries[0] ? numericId(summaries[0].productId) : null,
       // Åbner temaeditoren med PREAURA-blokken klar til at blive tilføjet.
@@ -144,6 +145,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const form = await request.formData();
 
+  if (form.get("intent") === "confirmBlock") {
+    await forShop(session.shop).settings.setThemeBlockConfirmed(true);
+    return { guide: true };
+  }
   if (form.get("intent") === "guide") {
     await forShop(session.shop).settings.setSetupGuideHidden(
       form.get("hidden") === "true",
@@ -190,7 +195,10 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const guide = useFetcher<typeof action>();
   const shopify = useAppBridge();
-  const block = useBlockStatus();
+  const blockInfo = useBlockInfo();
+  const block = blockInfo.status;
+  const confirmBlock = () =>
+    guide.submit({ intent: "confirmBlock" }, { method: "POST" });
   // Vis det nye valg med det samme, mens det gemmes.
   const guideHidden =
     guide.formData != null
@@ -293,7 +301,15 @@ export default function Index() {
       )}
 
       <SetupGuide
-        state={{ ...setup, block }}
+        state={{
+          ...setup,
+          block,
+          blockConfirmed:
+            setup.blockConfirmed ||
+            guide.formData?.get("intent") === "confirmBlock",
+        }}
+        blockReason={blockInfo.reason}
+        onConfirmBlock={confirmBlock}
         hidden={guideHidden}
         onToggle={toggleGuide}
         onSelectProducts={selectProducts}
@@ -515,8 +531,12 @@ function SetupGuide({
   onSelectProducts,
   themeBlockUrl,
   firstProduct,
+  blockReason,
+  onConfirmBlock,
 }: {
   state: Parameters<typeof setupSteps>[0];
+  blockReason: string | null;
+  onConfirmBlock: () => void;
   hidden: boolean;
   onToggle: (hidden: boolean) => void;
   onSelectProducts: () => void;
@@ -537,9 +557,16 @@ function SetupGuide({
         ) : null;
       case "block":
         return (
-          <s-button href={themeBlockUrl} target="_top">
-            Tilføj blokken
-          </s-button>
+          <s-stack direction="inline" gap="small-200">
+            <s-button href={themeBlockUrl} target="_top">
+              Tilføj blokken
+            </s-button>
+            {state.block === "unknown" && (
+              <s-button variant="tertiary" onClick={onConfirmBlock}>
+                Jeg har tilføjet blokken
+              </s-button>
+            )}
+          </s-stack>
         );
     }
   };
@@ -558,11 +585,7 @@ function SetupGuide({
             </s-heading>
             <s-text color="subdued">
               {guide.done} af {guide.total} trin gjort
-              {guide.complete
-                ? " — dine kunder kan nu forudbestille."
-                : state.block === "unknown"
-                  ? " (blokken i temaet kan ikke tjekkes herfra)"
-                  : ""}
+              {guide.complete ? " — dine kunder kan nu forudbestille." : ""}
             </s-text>
           </s-stack>
           <s-button variant="tertiary" onClick={() => onToggle(!hidden)}>
@@ -576,7 +599,11 @@ function SetupGuide({
               done={step.done}
               highlighted={step.id === guide.next}
               title={`${i + 1}. ${STEP_TEXT[step.id].title}`}
-              text={STEP_TEXT[step.id].text}
+              text={
+                step.id === "block" && state.block === "unknown" && !step.done
+                  ? `${STEP_TEXT.block.text} Shopify kan ikke fortælle os, om blokken er tilføjet${blockReason ? ` (${blockReason})` : ""}. Har du tilføjet den og trykket Gem, så markér trinnet som gjort.`
+                  : STEP_TEXT[step.id].text
+              }
             >
               {action(step.id)}
             </SetupStep>
