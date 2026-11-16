@@ -1,4 +1,4 @@
-# PREAURA i Shopify App Store — tekster
+# PREAURA i Shopify App Store, tekster
 
 Udkast til App Store-siden. Felterne står i samme rækkefølge som i Partner
 Dashboard (Apps → PREAURA → Distribution → App Store listing). Engelsk er
@@ -6,8 +6,9 @@ hovedsiden; dansk er oversættelsen til den danske side.
 
 Shopifys regler, teksterne er skrevet efter:
 
+- Ingen tankestreger («—», «–» eller « - ») i teksterne. Brug komma.
 - Ingen tal, statistik eller løfter («the best», «the only», «guaranteed»).
-- Pris står kun under Pricing — aldrig i tekst eller billeder.
+- Pris står kun under Pricing, aldrig i tekst eller billeder.
 - Fordelen for butikken først, ikke funktionens navn.
 - Sprog under «Languages» kun for sprog, appens egne sider i Shopify Admin
   findes på (se nederst).
@@ -34,7 +35,7 @@ Sell products before they arrive without overselling or confusing customers. Add
 1. Sell each incoming delivery with its own ship date and quantity
 2. Switches to pre-order when stock runs out, and back when it arrives
 3. The cart shows nothing is due today and what is charged when it ships
-4. Customers can cancel with a secure link — you approve, or approve automatically
+4. Customers can cancel with a secure link, approved by you or automatically
 5. Waitlist tells customers when a sold-out item can be bought again
 
 **Search terms** (up to 5, one idea each)
@@ -65,7 +66,7 @@ Store 2.0 theme).
 PREAURA Forudbestilling
 
 **Undertitel på app-kortet** (62)
-Sælg kommende varer med klar dato — kunden betaler intet i dag
+Sælg kommende varer med klar dato, kunden betaler intet i dag
 
 **Introduktion** (100)
 Tag imod forudbestillinger pr. leverance. Kunden ser datoen og betaler først, når varen sendes.
@@ -77,7 +78,7 @@ Sælg varer, før de er på lager, uden at sælge for meget og uden at forvirre 
 1. Sælg hver kommende leverance med sin egen dato og sit eget antal
 2. Skifter til forudbestilling, når lageret er tomt, og tilbage, når varen kommer
 3. Kurven viser, at der intet betales i dag, og hvad der trækkes ved afsendelse
-4. Kunden kan annullere via et sikkert link — du godkender, eller det sker selv
+4. Kunden kan annullere via et sikkert link, og du godkender, eller det sker selv
 5. Ventelisten giver besked, når en udsolgt vare kan købes igen
 
 **Søgeord** (op til 5)
@@ -108,7 +109,7 @@ Hvert billede får en alt-tekst (står i parentes).
    (Waitlist sign-up for a sold-out item)
 
 Hovedbilledet (feature image) er et rent billede med ét budskab, fx kurven
-med «Betales i dag 0,00 kr» — uden Shopify-logo og uden at gentage
+med «Betales i dag 0,00 kr», uden Shopify-logo og uden at gentage
 undertitlen.
 
 ---

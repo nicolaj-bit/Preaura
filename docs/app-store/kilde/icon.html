@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
+<style>
+  *{margin:0} body{width:1200px;height:1200px;overflow:hidden;background:transparent}
+  .tile{position:absolute;inset:0;border-radius:0;display:grid;place-items:center;overflow:hidden}
+  .dark{background:radial-gradient(circle at 50% 38%, #4A3F38 0%, #2A2420 55%, #1E1916 100%)}
+  .light{background:radial-gradient(circle at 50% 38%, #FBF7F3 0%, #EFE5DB 70%, #E7DBCF 100%)}
+  .A{font-family:Marcellus,serif;font-size:800px;line-height:1;position:relative;top:40px}
+  .dark .A{color:#F4EEE8} .light .A{color:#2A2420}
+  svg{position:absolute;inset:0} .light .glow{display:none}
+</style></head><body>
+<div class="tile" id="tile"><div class="A">A</div>
+<svg viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#B8988A" stop-opacity=".25"/>
+      <stop offset=".45" stop-color="#E9D6C8"/>
+      <stop offset=".7" stop-color="#B08A76"/>
+      <stop offset="1" stop-color="#8E6B5B" stop-opacity=".5"/>
+    </linearGradient>
+    <radialGradient id="glow"><stop offset="0" stop-color="#FFF4EA" stop-opacity=".55"/><stop offset="1" stop-color="#FFF4EA" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse class="glow" cx="600" cy="420" rx="150" ry="70" fill="url(#glow)"/>
+  <ellipse cx="600" cy="640" rx="390" ry="105" transform="rotate(-11 600 640)" fill="none" stroke="url(#g)" stroke-width="13"/>
+</svg></div>
+<script>document.getElementById('tile').classList.add(new URLSearchParams(location.search).get('v')||'dark');</script>
+</body></html>

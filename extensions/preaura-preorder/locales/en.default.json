@@ -4,7 +4,7 @@
     "delivery_label": "Expected delivery",
     "message": "{label}: {date}",
     "note": "This item is on pre-order. You won't be charged until it ships.",
-    "sold_out_message": "Sold out – all deliveries are sold out.",
+    "sold_out_message": "Sold out, all deliveries are sold out.",
     "button_text": "Pre-order",
     "remaining_text": "Only {count} left in this delivery.",
     "timeline_sold_out": "sold out",

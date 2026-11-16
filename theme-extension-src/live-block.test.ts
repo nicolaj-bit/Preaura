@@ -26,7 +26,7 @@ const settings = {
   shippingLabel: "Forventet afsendelse",
   deliveryLabel: "Forventet levering",
   message: "{label}: {dato}",
-  soldOutMessage: "Udsolgt – alle leverancer er udsolgt.",
+  soldOutMessage: "Udsolgt, alle leverancer er udsolgt.",
   changeButtonText: false,
   buttonText: "Forudbestil",
   showRemaining: true,
@@ -274,7 +274,7 @@ describe("siden følger med, når leverancen bliver udsolgt", () => {
     p.setResponse({ "1": { current: null, timeline: [] } });
     document.dispatchEvent(new Event("visibilitychange"));
     await settle();
-    expect(p.message()).toBe("Udsolgt – alle leverancer er udsolgt.");
+    expect(p.message()).toBe("Udsolgt, alle leverancer er udsolgt.");
     expect(p.fields()).toEqual({});
     expect(p.button().disabled).toBe(true);
     expect(p.remaining().hidden).toBe(true);

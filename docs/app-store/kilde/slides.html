@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@400;500&family=Playfair+Display:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4EEE8;--ink:#2A2420;--bronze:#9A7A68;--soft:#6B5F57;--line:#E4D9CF}
+*{box-sizing:border-box;margin:0}
+body{width:1600px;height:900px;overflow:hidden;position:relative;font-family:Jost,sans-serif;color:var(--ink);
+ background:radial-gradient(1200px 800px at 85% 20%,#FBF7F3 0%,#F1E8E0 45%,#E9DED3 100%)}
+body.dark .card{box-shadow:0 40px 100px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06)}
+body.dark{--bg:#221C19;--ink:#F4EEE8;--soft:#CDBFB4;background:radial-gradient(1200px 900px at 75% 30%,#4A3E37 0%,#2A2420 50%,#1B1614 100%)}
+/* ringen fra logoet */
+.ring{position:absolute;border-radius:50%;border:2px solid transparent;
+ background:linear-gradient(90deg,rgba(184,152,138,.15),#E9D6C8,#B08A76,rgba(142,107,91,.3)) border-box;
+ -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.copy{position:absolute;left:100px;top:0;bottom:0;width:520px;display:flex;flex-direction:column;justify-content:center;gap:26px;z-index:3}
+.eyebrow{font-weight:500;font-size:16px;letter-spacing:.34em;text-transform:uppercase;color:var(--bronze)}
+h1{text-wrap:balance;font-family:Marcellus,serif;font-weight:400;font-size:52px;line-height:1.1}
+.sub{font-size:21px;line-height:1.55;color:var(--soft);max-width:470px}
+.brand{position:absolute;left:100px;bottom:58px;font-family:Marcellus,serif;font-size:24px;letter-spacing:.16em;z-index:3}
+.brand b{color:var(--bronze);font-weight:400}
+.glow{position:absolute;border-radius:50%;filter:blur(10px);background:radial-gradient(circle,rgba(176,138,118,.45),rgba(176,138,118,0) 68%);z-index:0}
+.ring.front{display:none}
+.ring{z-index:1}
+body.dark .ring{border-width:3px}
+.card.big{font-size:20px;padding:36px 40px;border-radius:24px}
+.card.big .title{font-size:36px}
+.photo{position:absolute;border-radius:28px;background-size:cover;background-position:center;box-shadow:0 40px 90px rgba(42,36,32,.28)}
+.card{position:absolute;background:#F7F3EF;color:#3B3532;border-radius:20px;padding:30px 32px;font-family:"Helvetica Neue",Arial,sans-serif;font-size:17px;
+ box-shadow:0 30px 70px rgba(42,36,32,.22),0 2px 8px rgba(42,36,32,.08);z-index:2}
+.card .title{font-family:"Playfair Display",serif;font-size:30px;color:#3B3532;margin-bottom:6px}
+.card .price{font-size:18px;margin-bottom:4px}
+.btn{margin-top:14px;padding:15px;text-align:center;font-size:13px;letter-spacing:.2em;text-transform:uppercase;background:#DCD3C8;color:#3B3532}
+.btn.dark{background:#3B3532;color:#F7F3EF}
+.small{font-size:14px;opacity:.75}
+.tag{display:inline-block;font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.6;margin-bottom:14px}
+.line{display:flex;gap:16px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid #E2D9CF;margin-bottom:18px}
+  .thumb{width:76px;height:76px;border-radius:6px;background-size:cover;background-position:center;flex:none}
+.highlight{outline:2px solid rgba(154,122,104,.55);outline-offset:8px;border-radius:6px}
+/* PREAURAs egen stil (fra blocks/preorder.liquid og blocks/cart.liquid) */
+.preaura{display:flex;flex-direction:column;gap:.75em;margin:1.1em 0 0;padding:1.1em 1.25em;border:1px solid;border-color:color-mix(in srgb,currentColor 18%,transparent);border-radius:.6em}
+.preaura p{margin:0}
+.preaura__message{font-weight:600}
+.preaura__remaining{display:flex;align-items:center;gap:.5em}
+.preaura__remaining::before{content:"";flex:none;width:.5em;height:.5em;border-radius:50%;background:currentColor}
+.preaura__note{font-size:.875em;opacity:.75}
+.preaura__timeline{padding-top:.85em;border-top:1px solid;border-color:color-mix(in srgb,currentColor 12%,transparent)}
+.preaura__timeline-heading{margin-bottom:.7em!important;font-size:.75em;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+.preaura__timeline ol{list-style:none;margin:0;padding:0}
+.preaura__timeline li{position:relative;display:flex;justify-content:space-between;gap:1em;padding:0 0 .75em 1.6em}
+.preaura__timeline li:last-child{padding-bottom:0}
+.preaura__timeline li::before{content:"";position:absolute;left:0;top:.4em;width:.65em;height:.65em;box-sizing:border-box;border:1.5px solid currentColor;border-radius:50%}
+.preaura__timeline li::after{content:"";position:absolute;left:.3em;top:1.25em;bottom:.15em;width:1px;background:currentColor;opacity:.25}
+.preaura__timeline li:last-child::after{display:none}
+.preaura__timeline li[data-state=CURRENT]{font-weight:600}
+.preaura__timeline li[data-state=CURRENT]::before{background:currentColor}
+.preaura__timeline li[data-state=SOLD_OUT]{opacity:.5}
+.preaura__timeline li[data-state=SOLD_OUT] .preaura__date{text-decoration:line-through}
+.preaura__state{text-align:right;opacity:.8}
+.preaura__waitlist{display:flex;flex-direction:column;gap:.6em}
+.preaura__waitlist-heading{font-weight:600}
+.preaura__label{font-size:.875em;opacity:.8}
+.preaura__input{width:100%;padding:.75em 1em;font:inherit;color:#9A918A;border:1px solid;border-color:color-mix(in srgb,currentColor 35%,transparent);border-radius:.4em}
+.preaura__privacy{font-size:.8em;opacity:.7}
+.preaura-cart-note{display:block;font-size:15px;opacity:.85}
+.preaura-cart-totals{display:flex;flex-direction:column;gap:.45em}
+.preaura-cart-totals>div{display:flex;justify-content:space-between;gap:1em;font-size:19px}
+.preaura-cart-totals>div:last-child{font-weight:600;font-size:22px}
+</style></head><body><div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search), L=q.get('lang')||'da', S=q.get('s')||'1';
+const T={
+ da:{price1:'1.599 kr',price2:'499 kr',addPre:'Forudbestil',ship:'Forventet afsendelse',
+   d1:'28. november 2026',d0:'14. november 2026',d2:'19. december 2026',d3:'23. januar 2027',
+   note:'Varen er på forudbestilling. Du betaler først, når varen sendes.',remaining:'Kun 6 tilbage i denne leverance.',
+   soldOut:'udsolgt',current:'nuværende',upcoming:'kommende',
+   later:'Trækkes ved afsendelse',today:'Betales i dag',lineNote:'Intet at betale i dag. Beløbet trækkes, når varen sendes.',
+   cart:'Kurv',checkout:'Gå til betaling',plan:'Forudbestilling',total:'1.599,00 kr',zero:'0,00 kr',
+   wlHead:'Få besked, når varen kan købes',wlLabel:'Din e-mail',wlBtn:'Giv mig besked',wlPriv:'Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev.',
+   soldOutMsg:'Udsolgt, alle leverancer er udsolgt.',
+   pName1:'Luksus sengeslange',pName2:'Månepude',pName3:'Sengetøj baby',variant:'Sage',
+   s:{1:['Forudbestilling','Sælg det, der er på vej','Vis kunden datoen, reserver en plads i leverancen, og træk først pengene, når varen sendes.'],
+      2:['Produktsiden','Datoen står lige ved købsknappen','Hver leverance har sin egen dato og sit eget antal. Er en udsolgt, går appen selv videre til den næste.'],
+      3:['Kurven','Intet at betale i dag, og kunden kan se det','Kurven viser, hvad der betales nu, og hvad der trækkes ved afsendelse, så der ikke opstår tvivl ved kassen.'],
+      4:['Venteliste','Udsolgt? Kunden skriver sig op','Når varen kan købes igen, får hver tilmelding én besked, og kun om varen.']}},
+ en:{price1:'DKK 1,599',price2:'DKK 499',addPre:'Pre-order',ship:'Expected to ship',
+   d1:'November 28, 2026',d0:'November 14, 2026',d2:'December 19, 2026',d3:'January 23, 2027',
+   note:"This item is on pre-order. You won't be charged until it ships.",remaining:'Only 6 left in this delivery.',
+   soldOut:'sold out',current:'current',upcoming:'upcoming',
+   later:'Charged when the item ships',today:'Due today',lineNote:'Nothing due today. The amount is charged when the item ships.',
+   cart:'Cart',checkout:'Check out',plan:'Pre-order',total:'DKK 1,599.00',zero:'DKK 0.00',
+   wlHead:"Get notified when it's available",wlLabel:'Your email',wlBtn:'Notify me',wlPriv:"We only use your email to notify you about this item. You won't be subscribed to our newsletter.",
+   soldOutMsg:'Sold out, all deliveries are sold out.',
+   pName1:'Luxury bed bumper',pName2:'Moon pillow',pName3:'Baby bedding',variant:'Sage',
+   s:{1:['Pre-orders','Sell what’s on its way','Show the ship date, reserve a spot in the delivery, and charge only when the item ships.'],
+      2:['Product page','The ship date, right by the buy button','Each delivery has its own date and quantity. When one sells out, the app moves on to the next.'],
+      3:['Cart','Nothing due today, and customers can see it','The cart shows what is paid now and what is charged when the item ships, so checkout raises no doubts.'],
+      4:['Waitlist','Sold out? Customers join the waitlist','When the item can be bought again, each sign-up gets one message, and only about the item.']}}}[L];
+const [eb,h,sub]=T.s[S];
+const ring=(l,t,w,hh,r)=>{const st=`left:${l}px;top:${t}px;width:${w}px;height:${hh}px;transform:rotate(${r}deg)`;return `<div class="ring" style="${st}"></div><div class="ring front" style="${st}"></div>`};
+const glow=(l,t,d)=>`<div class="glow" style="left:${l}px;top:${t}px;width:${d}px;height:${d}px"></div>`;
+if(['1','3'].includes(S)) document.body.classList.add('dark');
+const block=(tl)=>`<div class="preaura"><p class="preaura__message">${T.ship}: ${T.d1}</p>
+ ${tl?`<p class="preaura__remaining">${T.remaining}</p>`:''}
+ <p class="preaura__note">${T.note}</p>
+ ${tl?`<div class="preaura__timeline"><p class="preaura__timeline-heading">${T.ship}</p><ol>
+   <li data-state="SOLD_OUT"><span class="preaura__date">${T.d0}</span><span class="preaura__state">${T.soldOut}</span></li>
+   <li data-state="CURRENT"><span class="preaura__date">${T.d1}</span><span class="preaura__state">${T.current}</span></li>
+   <li data-state="UPCOMING"><span class="preaura__date">${T.d2}</span><span class="preaura__state">${T.upcoming}</span></li></ol></div>`:''}</div>`;
+const totals=`<div class="preaura-cart-totals"><div><span>${T.later}</span><span>${T.total}</span></div><div><span>${T.today}</span><span>${T.zero}</span></div></div>`;
+let scene='';
+if(S==='1') scene=glow(760,40,820)+ring(700,330,900,250,-11)+`
+ <div class="card big" style="left:860px;top:110px;width:540px">
+   <div class="title">${T.pName1}</div><div class="price">${T.price1}</div>${block(false)}
+   <div class="btn dark">${T.addPre}</div></div>
+ <div class="card big" style="left:1010px;top:560px;width:500px;padding:28px 34px">${totals}</div>`;
+if(S==='2') scene=glow(780,20,840)+ring(690,300,940,260,-10)+`
+ <div class="card big" style="left:860px;top:70px;width:600px">
+   <div class="title">${T.pName2}</div><div class="price">${T.price2}</div>${block(true)}
+   <div class="btn dark">${T.addPre}</div></div>`;
+if(S==='3') scene=glow(780,40,840)+ring(700,480,900,240,-11)+`
+ <div class="card big" style="left:880px;top:220px;width:600px;display:flex;flex-direction:column">
+   <div class="tag">${T.cart}</div>
+   <div class="line">
+     <div><div>${T.pName1}</div><div class="small" style="margin:4px 0">${T.price1} · ${T.variant}</div><div class="small">${T.plan}</div>
+     <span class="preaura-cart-note" style="margin-top:8px">${T.lineNote}</span></div></div>
+   <div style="height:70px"></div>
+   <div class="highlight">${totals}</div>
+   <div class="btn" style="margin-top:24px">${T.checkout}</div></div>`;
+if(S==='4') scene=glow(800,60,800)+ring(700,340,920,250,-11)+`
+ <div class="card big" style="left:900px;top:120px;width:560px">
+   <div class="title">${T.pName3}</div><div class="price">${T.price2}</div>
+   <div class="preaura"><p class="preaura__message" style="opacity:.7">${T.soldOutMsg}</p><div class="preaura__waitlist"><p class="preaura__waitlist-heading">${T.wlHead}</p>
+   <label class="preaura__label">${T.wlLabel}</label><div class="preaura__input">anna@example.com</div>
+   <div class="btn dark" style="margin-top:4px">${T.wlBtn}</div><p class="preaura__privacy">${T.wlPriv}</p></div></div></div>`;
+document.getElementById('root').innerHTML=`${scene}<div class="copy"><div class="eyebrow">${eb}</div><h1>${h}</h1><p class="sub">${sub}</p></div><div class="brand">PREAURA<b>.</b></div>`;
+Promise.all([document.fonts.ready,...[...document.querySelectorAll('.photo,.thumb')].map(e=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=getComputedStyle(e).backgroundImage.slice(5,-2)}))]).then(()=>document.body.dataset.ready=1);
+</script></body></html>
