@@ -1,39 +1,53 @@
 import { useEffect, useState } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { blockStatus, type BlockStatus } from "../onboarding/setup";
+import { describeBlock, type BlockStatus } from "../onboarding/setup";
 
 // Er PREAURA-blokken aktiv i butikkens udgivne tema? Spørger Shopify via App
 // Bridge (app.extensions()) — kræver ingen ekstra adgangsret og læses frisk,
 // hver gang siden vises.
 
 export function useBlockStatus(): BlockStatus {
+  return useBlockInfo().status;
+}
+
+/** Status og — når den ikke kan afgøres — en kort teknisk forklaring. */
+export function useBlockInfo(): { status: BlockStatus; reason: string | null } {
   const shopify = useAppBridge();
-  const [status, setStatus] = useState<BlockStatus>("unknown");
+  const [info, setInfo] = useState<{
+    status: BlockStatus;
+    reason: string | null;
+  }>({ status: "unknown", reason: null });
   useEffect(() => {
     let cancelled = false;
     const app = (
       shopify as unknown as {
-        app?: { extensions?: () => Promise<unknown[]> };
+        app?: { extensions?: () => Promise<unknown> };
       }
     ).app;
-    if (!app?.extensions) return;
-    app
-      .extensions()
-      .then((extensions) => {
-        if (!cancelled) {
-          setStatus(
-            blockStatus(extensions as Parameters<typeof blockStatus>[0]),
-          );
+    // Altid asynkront, så tilstanden aldrig sættes direkte i effekten.
+    Promise.resolve()
+      .then(() => {
+        if (!app?.extensions) {
+          throw new Error("Shopify Admin tilbyder ikke app.extensions()");
         }
+        return app.extensions();
       })
-      .catch(() => {
-        if (!cancelled) setStatus("unknown");
+      .then((extensions) => {
+        if (!cancelled) setInfo(describeBlock(extensions));
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setInfo({
+            status: "unknown",
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [shopify]);
-  return status;
+  return info;
 }
 
 /**
@@ -67,7 +81,8 @@ export function ThemeBlockBanner({
         på ordren.
       </s-paragraph>
       <s-paragraph>
-        Knappen åbner temaeditoren med blokken klar — tryk Gem. Åbner den ikke
+        Knappen åbner temaeditoren med blokken klar — tryk Gem. Shopify ser kun
+        dit udgivne tema, så blokken skal ligge i det. Åbner knappen ikke
         blokken, understøtter dit tema sandsynligvis ikke app-blokke (det kræver
         et Online Store 2.0-tema). Skriv til os, så hjælper vi.
       </s-paragraph>

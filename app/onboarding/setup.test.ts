@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockStatus, setupSteps, themeBlockUrl } from "./setup";
+import { blockStatus, describeBlock, setupSteps, themeBlockUrl } from "./setup";
 
 describe("er blokken aktiv i det udgivne tema?", () => {
   const ext = (activations: { handle?: string; status?: string }[]) => [
@@ -56,5 +56,40 @@ describe("opsætningsguiden", () => {
     const all = { hasProducts: true, hasDelivery: true, hasEnabled: true };
     expect(setupSteps({ ...all, block: "active" }).complete).toBe(true);
     expect(setupSteps({ ...all, block: "unknown" }).complete).toBe(false);
+  });
+});
+
+describe("når Shopify ikke kan svare", () => {
+  it("genkender blokken, selv om udvidelsen meldes under et andet navn", () => {
+    expect(
+      blockStatus([
+        {
+          handle: "preaura-forudbestilling",
+          type: "theme_app_extension",
+          activations: [{ handle: "preorder", status: "active" }],
+        },
+      ]),
+    ).toBe("active");
+  });
+
+  it("giver en kort teknisk forklaring", () => {
+    expect(describeBlock(undefined)).toEqual({
+      status: "unknown",
+      reason: "intet svar fra Shopify",
+    });
+    expect(
+      describeBlock([{ handle: "x", type: "ui_extension", activations: [] }])
+        .reason,
+    ).toMatch(/ingen temaudvidelse/);
+  });
+
+  it("butikken kan selv bekræfte — men kun når Shopify ikke ved det", () => {
+    const all = { hasProducts: true, hasDelivery: true, hasEnabled: true };
+    expect(
+      setupSteps({ ...all, block: "unknown", blockConfirmed: true }).complete,
+    ).toBe(true);
+    expect(
+      setupSteps({ ...all, block: "inactive", blockConfirmed: true }).complete,
+    ).toBe(false);
   });
 });
