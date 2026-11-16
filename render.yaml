@@ -65,12 +65,16 @@ services:
         generateValue: true
       - key: SCOPES
         value: read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits,read_locales,write_translations
-      # Abonnementstjek (Shopify App Pricing). "off" indtil abonnementet er
-      # oprettet på produktionsappen; derefter "shopify" sammen med SHOPIFY_PARTNER_ORG_ID,
-      # SHOPIFY_PARTNER_API_ACCESS_TOKEN, SHOPIFY_APP_GID og
-      # PREAURA_APP_HANDLE, som sættes direkte i Render (aldrig her).
+      # Abonnementstjek (Shopify App Pricing): én plan, $39/md., 14 dages
+      # prøveperiode, oprettet i Partner Dashboard 16. nov. 2026.
+      # SHOPIFY_PARTNER_ORG_ID, SHOPIFY_PARTNER_API_ACCESS_TOKEN (produktionens
+      # egen nøgle) og SHOPIFY_APP_GID sættes direkte i Render (aldrig her).
       - key: PREAURA_BILLING
-        value: "off"
+        value: shopify
+      # Produktionsappens handle (ikke hemmelig) — bruges til prisvalgssidens
+      # adresse.
+      - key: PREAURA_APP_HANDLE
+        value: preaura
 
   # Testmiljøet. Samme kode, men sin egen app i Shopify («PREAURA Test»), sin
   # egen database og sine egne hemmeligheder. Bruges kun med
