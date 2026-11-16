@@ -11,17 +11,17 @@
       },
       "shipping_label": {
         "label": "Navn for forventet afsendelse",
-        "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren. Standard: «Forventet afsendelse». Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Forventet afsendelse"
       },
       "delivery_label": {
         "label": "Navn for forventet levering",
-        "info": "Bruges, når appens indstilling står til forventet levering. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Bruges, når appens indstilling står til forventet levering. Standard: «Forventet levering». Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Forventet levering"
       },
       "message": {
         "label": "Besked",
-        "info": "{label} bliver til navnet ovenfor, {date} til leverancens dato. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "{label} bliver til navnet ovenfor, {date} til leverancens dato. Standard: «{label}: {date}». Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "{label}: {date}"
       },
       "show_note": {
@@ -29,12 +29,12 @@
       },
       "note": {
         "label": "Forklaring",
-        "info": "Gør vilkårene tydelige før køb. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Gør vilkårene tydelige før køb. Standard: «Varen er på forudbestilling. Du betaler først, når varen sendes.» Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Varen er på forudbestilling. Du betaler først, når varen sendes."
       },
       "sold_out_message": {
         "label": "Besked, når alt er udsolgt",
-        "info": "Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Standard: «Udsolgt – alle leverancer er udsolgt.» Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Udsolgt – alle leverancer er udsolgt."
       },
       "change_button_text": {
@@ -43,7 +43,7 @@
       },
       "button_text": {
         "label": "Tekst på købsknappen",
-        "info": "Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Standard: «Forudbestil». Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Forudbestil"
       },
       "remaining_header": {
@@ -59,7 +59,7 @@
       },
       "remaining_text": {
         "label": "Tekst",
-        "info": "{count} bliver til antallet. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "{count} bliver til antallet. Standard: «Kun {count} tilbage i denne leverance.» Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Kun {count} tilbage i denne leverance."
       },
       "timeline_header": {
@@ -71,16 +71,18 @@
       },
       "timeline_sold_out": {
         "label": "Udsolgt leverance",
-        "placeholder": "udsolgt"
+        "placeholder": "udsolgt",
+        "info": "Standard: «udsolgt». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "timeline_current": {
         "label": "Leverancen, kunden køber ind i nu",
-        "info": "Kort tekst står pænest. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Kort tekst står pænest. Standard: «nuværende». Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "nuværende"
       },
       "timeline_upcoming": {
         "label": "Kommende leverance",
-        "placeholder": "kommende"
+        "placeholder": "kommende",
+        "info": "Standard: «kommende». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_header": {
         "content": "Venteliste"
@@ -93,35 +95,41 @@
       },
       "waitlist_heading": {
         "label": "Overskrift",
-        "placeholder": "Få besked, når varen kan købes"
+        "placeholder": "Få besked, når varen kan købes",
+        "info": "Standard: «Få besked, når varen kan købes». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_email_label": {
         "label": "Navn på feltet",
-        "placeholder": "Din e-mail"
+        "placeholder": "Din e-mail",
+        "info": "Standard: «Din e-mail». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_button": {
         "label": "Tekst på knappen",
-        "placeholder": "Giv mig besked"
+        "placeholder": "Giv mig besked",
+        "info": "Standard: «Giv mig besked». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_success": {
         "label": "Svar efter tilmelding",
-        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Tom: den grå standardtekst, på kundens sprog.",
+        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Standard: «Tak. Vi giver dig besked, når varen kan købes.» Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Tak. Vi giver dig besked, når varen kan købes."
       },
       "waitlist_invalid": {
         "label": "Svar ved ugyldig e-mail",
-        "placeholder": "Skriv en gyldig e-mail."
+        "placeholder": "Skriv en gyldig e-mail.",
+        "info": "Standard: «Skriv en gyldig e-mail.» Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_error": {
         "label": "Svar ved fejl",
-        "placeholder": "Det lykkedes ikke. Prøv igen om lidt."
+        "placeholder": "Det lykkedes ikke. Prøv igen om lidt.",
+        "info": "Standard: «Det lykkedes ikke. Prøv igen om lidt.» Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "waitlist_privacy": {
         "label": "Oplysning om brug af e-mail",
-        "placeholder": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev."
+        "placeholder": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev.",
+        "info": "Standard: «Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev.» Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "texts_info": {
-        "content": "Den grå tekst i felterne er PREAURAs standardtekst. Lader du et felt stå tomt, vises den på kundens sprog (dansk eller engelsk). Skriver du din egen, vises den som den er på alle sprog."
+        "content": "Standardteksten står under hvert felt. Lader du et felt stå tomt, vises den på kundens sprog (dansk eller engelsk). Skriver du din egen, vises den som den er på alle sprog."
       }
     }
   },
@@ -129,22 +137,25 @@
     "name": "PREAURA kurv",
     "settings": {
       "intro": {
-        "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven. Den grå tekst i felterne er standardteksten. Lader du et felt stå tomt, vises den på kundens sprog. Skriver du din egen, vises den som den er på alle sprog."
+        "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven. Standardteksten står under hvert felt. Lader du et felt stå tomt, vises den på kundens sprog. Skriver du din egen, vises den som den er på alle sprog."
       },
       "line_note": {
         "label": "Tekst under varen",
-        "placeholder": "Intet at betale i dag. Beløbet trækkes, når varen sendes."
+        "placeholder": "Intet at betale i dag. Beløbet trækkes, når varen sendes.",
+        "info": "Standard: «Intet at betale i dag. Beløbet trækkes, når varen sendes.» Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "show_totals": {
         "label": "Vis beløb over knappen til kassen"
       },
       "later_label": {
         "label": "Beløb, der trækkes senere",
-        "placeholder": "Trækkes ved afsendelse"
+        "placeholder": "Trækkes ved afsendelse",
+        "info": "Standard: «Trækkes ved afsendelse». Står feltet tomt, bruges standardteksten på kundens sprog."
       },
       "today_label": {
         "label": "Beløb i dag",
-        "placeholder": "Betales i dag"
+        "placeholder": "Betales i dag",
+        "info": "Standard: «Betales i dag». Står feltet tomt, bruges standardteksten på kundens sprog."
       }
     }
   }

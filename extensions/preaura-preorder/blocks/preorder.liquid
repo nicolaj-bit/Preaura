@@ -30,24 +30,26 @@
 {%- if preaura_product -%}
 {%- liquid
   # Tekster: butikkens egen tekst, ellers standardteksten på kundens sprog
-  # (locales/*.json).
-  assign preaura_d_shipping_label = 'preorder.shipping_label' | t
-  assign preaura_d_delivery_label = 'preorder.delivery_label' | t
-  assign preaura_d_message = 'preorder.message' | t
-  assign preaura_d_note = 'preorder.note' | t
-  assign preaura_d_sold_out_message = 'preorder.sold_out_message' | t
-  assign preaura_d_button_text = 'preorder.button_text' | t
-  assign preaura_d_remaining_text = 'preorder.remaining_text' | t
-  assign preaura_d_timeline_sold_out = 'preorder.timeline_sold_out' | t
-  assign preaura_d_timeline_current = 'preorder.timeline_current' | t
-  assign preaura_d_timeline_upcoming = 'preorder.timeline_upcoming' | t
-  assign preaura_d_waitlist_heading = 'preorder.waitlist_heading' | t
-  assign preaura_d_waitlist_email_label = 'preorder.waitlist_email_label' | t
-  assign preaura_d_waitlist_button = 'preorder.waitlist_button' | t
-  assign preaura_d_waitlist_success = 'preorder.waitlist_success' | t
-  assign preaura_d_waitlist_invalid = 'preorder.waitlist_invalid' | t
-  assign preaura_d_waitlist_error = 'preorder.waitlist_error' | t
-  assign preaura_d_waitlist_privacy = 'preorder.waitlist_privacy' | t
+  # (locales/*.json). Shopifys t-filter leverer teksten HTML-kodet («won&#39;t»);
+  # den afkodes her, fordi den kodes igen ved brug (escape i HTML, json i
+  # data til scriptet) — ellers står «&#39;» på siden.
+  assign preaura_d_shipping_label = 'preorder.shipping_label' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_delivery_label = 'preorder.delivery_label' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_message = 'preorder.message' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_note = 'preorder.note' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_sold_out_message = 'preorder.sold_out_message' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_button_text = 'preorder.button_text' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_remaining_text = 'preorder.remaining_text' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_timeline_sold_out = 'preorder.timeline_sold_out' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_timeline_current = 'preorder.timeline_current' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_timeline_upcoming = 'preorder.timeline_upcoming' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_heading = 'preorder.waitlist_heading' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_email_label = 'preorder.waitlist_email_label' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_button = 'preorder.waitlist_button' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_success = 'preorder.waitlist_success' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_invalid = 'preorder.waitlist_invalid' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_error = 'preorder.waitlist_error' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_waitlist_privacy = 'preorder.waitlist_privacy' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
   assign preaura_t_shipping_label = block.settings.shipping_label | default: preaura_d_shipping_label
   assign preaura_t_delivery_label = block.settings.delivery_label | default: preaura_d_delivery_label
   assign preaura_t_message = block.settings.message | default: preaura_d_message

@@ -16,9 +16,10 @@
 {%- liquid
   # Tekster: butikkens egen tekst, ellers standardteksten på kundens sprog
   # (locales/*.json).
-  assign preaura_d_line_note = 'cart.line_note' | t
-  assign preaura_d_later_label = 'cart.later_label' | t
-  assign preaura_d_today_label = 'cart.today_label' | t
+  # Shopifys t-filter leverer HTML-kodet tekst; afkodes, før json koder igen.
+  assign preaura_d_line_note = 'cart.line_note' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_later_label = 'cart.later_label' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
+  assign preaura_d_today_label = 'cart.today_label' | t | replace: '&#39;', "'" | replace: '&quot;', '"' | replace: '&lt;', '<' | replace: '&gt;', '>' | replace: '&amp;', '&'
   assign preaura_t_line_note = block.settings.line_note | default: preaura_d_line_note
   assign preaura_t_later_label = block.settings.later_label | default: preaura_d_later_label
   assign preaura_t_today_label = block.settings.today_label | default: preaura_d_today_label
