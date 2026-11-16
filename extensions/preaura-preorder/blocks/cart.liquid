@@ -1,0 +1,70 @@
+{%- comment -%}
+  PREAURA – kurven (app embed, slås til under «App-integrationer» i
+  temaeditoren).
+
+  Viser i kurvskuffen og på kurvsiden, at en forudbestilling intet koster i
+  dag: en linje under hver forudbestilt vare og to beløb over knappen til
+  kassen («Trækkes ved afsendelse» og «Betales i dag»).
+
+  Beløbene læses af assets/preaura-cart.js fra Shopifys egen kurv
+  (/cart.js) — intet kald til appens server. Er der ingen forudbestilling i
+  kurven, vises intet.
+
+  Ingen skrifttyper eller farver: linjen under varen får samme klasse som
+  temaets egen linje med planens navn, og beløbene arver temaets tekst.
+{%- endcomment -%}
+<style>
+  .preaura-cart-note{display:block}
+  .preaura-cart-totals{display:flex;flex-direction:column;gap:.35em;margin:0 0 1em}
+  .preaura-cart-totals>div{display:flex;justify-content:space-between;gap:1em}
+  .preaura-cart-totals>div:last-child{font-weight:600}
+</style>
+<script type="application/json" data-preaura-cart-config>
+  {
+    "lineNote": {{ block.settings.line_note | json }},
+    "showTotals": {{ block.settings.show_totals | json }},
+    "laterLabel": {{ block.settings.later_label | json }},
+    "todayLabel": {{ block.settings.today_label | json }},
+    "moneyFormat": {{ shop.money_format | json }},
+    "currency": {{ shop.currency | json }},
+    "count": {{ cart.item_count | json }}
+  }
+</script>
+<script src="{{ 'preaura-cart.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "PREAURA kurv",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven."
+    },
+    {
+      "type": "text",
+      "id": "line_note",
+      "label": "Tekst under varen",
+      "default": "Intet at betale i dag. Beløbet trækkes, når varen sendes."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_totals",
+      "label": "Vis beløb over knappen til kassen",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "later_label",
+      "label": "Beløb, der trækkes senere",
+      "default": "Trækkes ved afsendelse"
+    },
+    {
+      "type": "text",
+      "id": "today_label",
+      "label": "Beløb i dag",
+      "default": "Betales i dag"
+    }
+  ]
+}
+{% endschema %}

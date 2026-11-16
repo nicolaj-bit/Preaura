@@ -104,6 +104,8 @@ model ShopSetting {
   // Butikken har selv bekræftet, at blokken er i temaet (når Shopify ikke
   // kan svare på det).
   themeBlockConfirmed   Boolean  @default(false)
+  // Det samme for kurvens app embed.
+  cartEmbedConfirmed    Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
