@@ -77,9 +77,25 @@
   // --- Kurven ---------------------------------------------------------------
 
   /**
-   * Hvad i kurven betales senere? En linje tæller med, når dens plan intet
-   * trækker ved køb og resten senere — det er præcis PREAURAs planer.
+   * PREAURAs egne planer. Skal svare til PLAN_NAME og GROUP_OPTION i
+   * app/sync/plans.ts (en test holder dem ens). Shopifys /cart.js oplyser
+   * ikke, hvad der trækkes i dag, så planen genkendes på navn og valg.
+   * Vores planer trækker intet ved køb og hele beløbet ved afsendelse.
    */
+  var PLAN_NAME = "Forudbestilling";
+  var PLAN_OPTION = "Leverance";
+
+  function isOurs(plan) {
+    return (
+      plan.fixed_selling_plan === true &&
+      plan.name === PLAN_NAME &&
+      (plan.options || []).some(function (o) {
+        return o && o.name === PLAN_OPTION;
+      })
+    );
+  }
+
+  /** Hvad i kurven betales senere — og hvad i dag? */
   function summarize(cart) {
     var names = {};
     var later = 0;
@@ -87,14 +103,20 @@
     (cart.items || []).forEach(function (item) {
       var a = item.selling_plan_allocation;
       if (!a || !a.selling_plan) return;
+      // Linjens pris efter rabatter.
+      var line = Number(item.final_line_price) || 0;
       var now = Number(a.checkout_charge_amount);
       var rest = Number(a.remaining_balance_charge_amount);
-      if (!(rest > 0) || isNaN(now)) return;
+      if (rest > 0 && !isNaN(now)) {
+        // Oplyser Shopify fordelingen, bruges den.
+        later += Math.round((line * rest) / (rest + now));
+      } else if (isOurs(a.selling_plan)) {
+        later += line;
+      } else {
+        return;
+      }
       found = true;
       names[String(a.selling_plan.name).trim()] = true;
-      // Linjens pris efter rabatter, fordelt som planen fordeler den.
-      var line = Number(item.final_line_price);
-      later += Math.round((line * rest) / (rest + now));
     });
     if (!found) return null;
     var total = Number(cart.total_price) || 0;
