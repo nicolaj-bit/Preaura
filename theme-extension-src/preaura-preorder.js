@@ -127,7 +127,7 @@
     this.variantId = null;
     this.form = null;
     this.button = null;
-    this.buttonOriginal = null;
+    this.buttonNodes = []; // [{ node, original }] — tekstnoder vi har skiftet
     this.onFormData = this.onFormData.bind(this);
     this.check = this.check.bind(this);
   }
@@ -322,26 +322,68 @@
     );
   };
 
+  /**
+   * Tekstnoderne med knappens synlige tekst. Temaer bygger knappen forskelligt:
+   * Dawn har teksten i et <span>, mens Horizon har den direkte i knappen og
+   * bruger spans til ikon og flueben-animation. Skrev vi i første <span>, lå
+   * vores tekst oven i temaets. Derfor skiftes kun selve teksten — ikoner,
+   * skjulte dele og temaets øvrige spans røres ikke. Står teksten flere
+   * steder (nogle temaer har en kopi til animation), skiftes alle kopier.
+   */
+  function labelNodes(button) {
+    var walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+    var nodes = [];
+    var label = null;
+    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+      var text = node.nodeValue.trim();
+      if (!text) continue;
+      if (
+        node.parentElement.closest(
+          'svg,script,style,template,[hidden],[aria-hidden="true"]',
+        )
+      )
+        continue;
+      if (label === null) label = text;
+      if (text === label) nodes.push(node);
+    }
+    return nodes;
+  }
+
   Controller.prototype.applyButton = function () {
     if (!this.settings.changeButtonText || !this.settings.buttonText) return;
     if (!this.form) return;
     var button = findButton(this.form);
     if (!button) return;
-    var target = button.querySelector("span") || button;
-    if (this.button !== target) {
+    var text = this.settings.buttonText;
+    var intact =
+      this.button === button &&
+      this.buttonNodes.length > 0 &&
+      this.buttonNodes.every(function (n) {
+        return button.contains(n.node);
+      });
+    if (!intact) {
+      // Ny knap, eller temaet har selv skrevet knappen om: start forfra.
       this.restoreButton();
-      this.button = target;
-      this.buttonOriginal = target.textContent;
+      this.button = button;
+      this.buttonNodes = labelNodes(button).map(function (node) {
+        return { node: node, original: node.nodeValue };
+      });
     }
-    target.textContent = this.settings.buttonText;
+    this.buttonNodes.forEach(function (n) {
+      n.node.nodeValue = n.original.replace(n.original.trim(), function () {
+        return text;
+      });
+    });
   };
 
   Controller.prototype.restoreButton = function () {
-    if (this.button && this.buttonOriginal != null) {
-      this.button.textContent = this.buttonOriginal;
-    }
+    var text = this.settings.buttonText;
+    this.buttonNodes.forEach(function (n) {
+      // Har temaet selv skiftet teksten siden, er dens tekst den rigtige.
+      if (n.node.nodeValue.trim() === text) n.node.nodeValue = n.original;
+    });
     this.button = null;
-    this.buttonOriginal = null;
+    this.buttonNodes = [];
   };
 
   // --- Temaets egne anmodninger til kurven ----------------------------------
