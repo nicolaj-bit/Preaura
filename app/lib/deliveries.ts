@@ -1,3 +1,4 @@
+import { formatDate, translate, type Locale, type MessageKey } from "../i18n";
 // Kernelogikken for leverancer. Rene funktioner uden database eller Shopify,
 // så de kan testes direkte. Alt andet i appen hviler på disse.
 
@@ -77,6 +78,8 @@ export type ValidationResult =
 export type ValidationContext = {
   /** Dagens dato i butikkens tidszone, "YYYY-MM-DD". */
   today: string;
+  /** Sproget, fejlbeskederne skrives på. Standard: dansk. */
+  locale?: Locale;
   /** Allerede tildelt (aktive tildelinger). 0 for en ny leverance. */
   allocated: number;
   /**
@@ -95,34 +98,29 @@ export type ValidationContext = {
 };
 
 // Fejlbeskeder siger, hvad der er galt, OG hvad butikken skal gøre.
-export const MESSAGES = {
-  dateMissing:
-    "Vælg den dato, du forventer at sende varerne. Det er den dato, kunderne får lovet.",
-  dateInvalid:
-    "Datoen kan ikke læses. Vælg den i kalenderen, eller skriv den som ÅÅÅÅ-MM-DD, fx 2027-01-15.",
-  dateNotFuture:
-    "Datoen er i dag eller er passeret. Vælg en dato fra i morgen og frem — det er den dato, kunderne får lovet.",
-  quantityInvalid:
-    "Skriv antallet som et helt tal, fx 50 — uden komma, mellemrum eller «stk.».",
-  quantityNotPositive:
-    "Antallet skal være mindst 1: det er, hvor mange du kan sælge på forudbestilling i leverancen. Vil du stoppe salget, så annullér leverancen i stedet.",
-  quantityBelowAllocated: (allocated: number) =>
-    `${allocated} stk. er allerede solgt i leverancen, så antallet skal være mindst ${allocated}. Vil du sælge færre, må du annullere ordrer i Shopify først.`,
-  dateOverlaps: (position: number, date: string) =>
-    `Leverance ${position} har allerede datoen ${formatDanish(date)}. Ret antallet på leverance ${position} i stedet, eller vælg en anden dato.`,
-  dateBeforeExisting: (position: number, date: string) =>
-    `Nye leverancer sælges efter de eksisterende, så datoen skal ligge efter ${formatDanish(date)} (leverance ${position}). Kommer der varer før, så ret datoen på leverance ${position} i stedet.`,
-} as const;
-
-const danish = new Intl.DateTimeFormat("da-DK", {
-  dateStyle: "long",
-  timeZone: "UTC",
-});
-function formatDanish(date: string) {
-  return isValidDateString(date)
-    ? danish.format(new Date(`${date}T12:00:00Z`))
-    : date;
+/** Fejlbeskeder på det valgte sprog (app/i18n). */
+export function deliveryMessages(locale: Locale = "da") {
+  const t = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
+  const date = (value: string) =>
+    isValidDateString(value) ? formatDate(locale, value) : value;
+  return {
+    dateMissing: t("validation.dateMissing"),
+    dateInvalid: t("validation.dateInvalid"),
+    dateNotFuture: t("validation.dateNotFuture"),
+    quantityInvalid: t("validation.quantityInvalid"),
+    quantityNotPositive: t("validation.quantityNotPositive"),
+    quantityBelowAllocated: (allocated: number) =>
+      t("validation.quantityBelowAllocated", { allocated }),
+    dateOverlaps: (position: number, value: string) =>
+      t("validation.dateOverlaps", { position, date: date(value) }),
+    dateBeforeExisting: (position: number, value: string) =>
+      t("validation.dateBeforeExisting", { position, date: date(value) }),
+  };
 }
+
+/** De danske beskeder (bruges af testene). */
+export const MESSAGES = deliveryMessages("da");
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -160,6 +158,7 @@ export function validateDelivery(
   context: ValidationContext,
 ): ValidationResult {
   const errors: DeliveryErrors = {};
+  const MESSAGES = deliveryMessages(context.locale);
 
   const date = typeof input.date === "string" ? input.date.trim() : "";
   if (!date) {

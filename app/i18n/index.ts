@@ -60,6 +60,19 @@ export function formatDate(locale: Locale, date: string, timeZone = "UTC") {
   }).format(value);
 }
 
+/** Tidspunkt med dato og klokkeslæt, fx «16. nov. 2026 14.05». */
+export function formatDateTime(
+  locale: Locale,
+  date: Date | string,
+  timeZone = "UTC",
+) {
+  return new Intl.DateTimeFormat(locale === "da" ? "da-DK" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(typeof date === "string" ? new Date(date) : date);
+}
+
 export const LocaleContext = createContext<Locale>("da");
 
 /** Til komponenter: t("nøgle"), tn("nøgle", antal) og sproget. */

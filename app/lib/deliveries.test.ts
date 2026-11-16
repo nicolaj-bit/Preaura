@@ -311,3 +311,33 @@ describe("konkrete fejlbeskeder", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("fejlbeskeder på butiksejerens sprog", () => {
+  const ctx = { today: "2026-11-02", allocated: 0 };
+
+  it("engelsk, når sproget er engelsk — også datoen", () => {
+    const result = validateDelivery(
+      { date: "2026-12-01", quantity: "0" },
+      {
+        ...ctx,
+        locale: "en",
+        others: [{ position: 1, date: "2026-12-01" }],
+      },
+    );
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        date: "Delivery 1 already has the date December 1, 2026. Change the quantity of delivery 1 instead, or choose another date.",
+        quantity: expect.stringMatching(/^The quantity must be at least 1/),
+      },
+    });
+  });
+
+  it("dansk som standard", () => {
+    const result = validateDelivery({ date: "", quantity: "5" }, ctx);
+    expect(result).toEqual({
+      ok: false,
+      errors: { date: expect.stringMatching(/^Vælg den dato/) },
+    });
+  });
+});

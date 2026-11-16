@@ -14,23 +14,31 @@ import { fetchShopTimeZone } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
 import { shopifySync } from "../sync/index.server";
 import { scheduleQueue } from "../orders/scheduler.server";
+import {
+  formatDateTime,
+  translate,
+  translateCount,
+  useT,
+  type MessageKey,
+} from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 
 // En leverance med dens ordrer. Siden, webshopejeren bruger, når sendingen
 // kommer hjem: hvem skal have hvad.
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
+  const locale = await localeFor(request, session.shop);
   const result = await forShop(session.shop).orders.forDelivery(
     String(params.deliveryId),
   );
-  if (!result) throw new Response("Leverancen findes ikke.", { status: 404 });
+  if (!result) {
+    throw new Response(translate(locale, "delivery.notFound"), {
+      status: 404,
+    });
+  }
   const { delivery, allocations } = result;
   const timeZone = await fetchShopTimeZone(admin.graphql);
-  const format = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  });
 
   return {
     delivery: {
@@ -47,7 +55,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       orderName: row.orderName,
       quantity: row.quantity,
       status: row.status,
-      orderedAt: row.orderCreatedAt ? format.format(row.orderCreatedAt) : "–",
+      orderedAt: row.orderCreatedAt
+        ? formatDateTime(locale, row.orderCreatedAt, timeZone)
+        : "–",
       promisedDate: row.promisedDate,
       ready: row.readyAt != null,
     })),
@@ -61,9 +71,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
  */
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
+  const locale = await localeFor(request, session.shop);
   const form = await request.formData();
   if (form.get("intent") !== "ready") {
-    return { ok: false, message: "Ukendt handling." };
+    return { ok: false, message: translate(locale, "common.unknownAction") };
   }
   const { variantId, count } = await forShop(session.shop).deliveries.markReady(
     String(params.deliveryId),
@@ -74,24 +85,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     ok: true,
     message:
       count === 0
-        ? "Alle forudbestillinger var allerede klar"
-        : `${count} forudbestilling(er) markeret klar til afsendelse`,
+        ? translate(locale, "delivery.readyNone")
+        : translateCount(locale, "delivery.ready", count),
   };
 };
 
-const dateFormat = new Intl.DateTimeFormat("da-DK", {
-  dateStyle: "long",
-  timeZone: "UTC",
-});
-const formatDate = (date: string) =>
-  dateFormat.format(new Date(`${date}T00:00:00Z`));
-
-const STATUS: Record<
-  string,
-  { label: string; tone: "success" | "critical" | "neutral" }
-> = {
-  ACTIVE: { label: "Aktiv", tone: "success" },
-  CANCELLED: { label: "Annulleret", tone: "neutral" },
+const STATUS_TONES: Record<string, "success" | "critical" | "neutral"> = {
+  ACTIVE: "success",
+  CANCELLED: "neutral",
 };
 
 export default function DeliveryOrders() {
@@ -100,6 +101,7 @@ export default function DeliveryOrders() {
   const waiting = active.filter((o) => !o.ready).length;
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const { t, date } = useT();
 
   useEffect(() => {
     if (fetcher.data) {
@@ -109,10 +111,13 @@ export default function DeliveryOrders() {
 
   return (
     <s-page
-      heading={`Leverance ${delivery.position} · ${formatDate(delivery.date)}`}
+      heading={t("delivery.heading", {
+        position: delivery.position,
+        date: date(delivery.date),
+      })}
     >
       <s-link slot="breadcrumb-actions" href="/app">
-        Produkter
+        {t("nav.products")}
       </s-link>
       {waiting > 0 && (
         <s-button
@@ -123,74 +128,82 @@ export default function DeliveryOrders() {
           }
           {...(fetcher.state !== "idle" ? { loading: true } : {})}
         >
-          Varerne er kommet — klar til afsendelse
+          {t("delivery.arrived")}
         </s-button>
       )}
 
       <s-section>
         <s-grid gridTemplateColumns="1fr 1fr 1fr 1fr" gap="base">
           <s-stack gap="small-500">
-            <s-text color="subdued">Antal</s-text>
+            <s-text color="subdued">{t("product.col.quantity")}</s-text>
             <s-text>{delivery.quantity}</s-text>
           </s-stack>
           <s-stack gap="small-500">
-            <s-text color="subdued">Tildelt</s-text>
+            <s-text color="subdued">{t("product.col.allocated")}</s-text>
             <s-text>{delivery.allocated}</s-text>
           </s-stack>
           <s-stack gap="small-500">
-            <s-text color="subdued">Resterende</s-text>
+            <s-text color="subdued">{t("product.col.remaining")}</s-text>
             <s-text>{delivery.remaining}</s-text>
           </s-stack>
           <s-stack gap="small-500">
-            <s-text color="subdued">Aktive ordrelinjer</s-text>
+            <s-text color="subdued">{t("delivery.activeLines")}</s-text>
             <s-text>{active.length}</s-text>
           </s-stack>
         </s-grid>
       </s-section>
 
-      <s-section heading="Ordrer" padding="none">
+      <s-section heading={t("delivery.orders")} padding="none">
         {orders.length === 0 ? (
           <s-box padding="base">
-            <s-paragraph>Ingen ordrer i denne leverance endnu.</s-paragraph>
+            <s-paragraph>{t("delivery.noOrders")}</s-paragraph>
           </s-box>
         ) : (
           <s-table>
             <s-table-header-row>
-              <s-table-header listSlot="primary">Ordre</s-table-header>
-              <s-table-header format="numeric">Antal</s-table-header>
-              <s-table-header listSlot="secondary">Status</s-table-header>
-              <s-table-header>Bestilt</s-table-header>
-              <s-table-header>Lovet dato</s-table-header>
+              <s-table-header listSlot="primary">
+                {t("delivery.col.order")}
+              </s-table-header>
+              <s-table-header format="numeric">
+                {t("product.col.quantity")}
+              </s-table-header>
+              <s-table-header listSlot="secondary">
+                {t("product.col.status")}
+              </s-table-header>
+              <s-table-header>{t("delivery.col.ordered")}</s-table-header>
+              <s-table-header>{t("delivery.col.promised")}</s-table-header>
             </s-table-header-row>
             <s-table-body>
               {orders.map((order) => {
-                const status = STATUS[order.status] ?? {
-                  label: order.status,
-                  tone: "neutral" as const,
-                };
+                const tone = STATUS_TONES[order.status] ?? "neutral";
+                const label =
+                  order.status === "ACTIVE" || order.status === "CANCELLED"
+                    ? t(`delivery.status.${order.status}` as MessageKey)
+                    : order.status;
                 return (
                   <s-table-row key={order.id}>
                     <s-table-cell>
                       <s-link
                         href={`shopify://admin/orders/${order.orderNumber}`}
                       >
-                        {order.orderName || `Ordre ${order.orderNumber}`}
+                        {order.orderName ||
+                          t("product.order", { number: order.orderNumber })}
                       </s-link>
                     </s-table-cell>
                     <s-table-cell>{order.quantity}</s-table-cell>
                     <s-table-cell>
                       <s-stack direction="inline" gap="small-200">
-                        <s-badge tone={status.tone}>{status.label}</s-badge>
+                        <s-badge tone={tone}>{label}</s-badge>
                         {order.status === "ACTIVE" && order.ready ? (
-                          <s-badge tone="info">Klar til afsendelse</s-badge>
+                          <s-badge tone="info">
+                            {t("delivery.readyBadge")}
+                          </s-badge>
                         ) : null}
                       </s-stack>
                     </s-table-cell>
                     <s-table-cell>{order.orderedAt}</s-table-cell>
                     <s-table-cell>
-                      {order.promisedDate
-                        ? formatDate(order.promisedDate)
-                        : "–"}
+                      {order.promisedDate ? date(order.promisedDate) : "–"}
                     </s-table-cell>
                   </s-table-row>
                 );

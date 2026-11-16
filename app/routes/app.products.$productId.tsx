@@ -21,6 +21,8 @@ import {
   fetchShopTimeZone,
 } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
+import { formatDateTime, translate, useT, type MessageKey } from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 import { shopifySync } from "../sync/index.server";
 import { scheduleQueue } from "../orders/scheduler.server";
 import {
@@ -34,16 +36,17 @@ import {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const data = forShop(session.shop);
+  const locale = await localeFor(request, session.shop);
 
   if (!/^\d+$/.test(params.productId ?? "")) {
-    throw new Response("Produktet findes ikke.", { status: 404 });
+    throw new Response(translate(locale, "product.notFound"), { status: 404 });
   }
   const productId = `gid://shopify/Product/${params.productId}`;
 
   // Kun produkter, butikken selv har valgt, kan åbnes.
   let plans = await data.variantPlans.listForProduct(productId);
   if (plans.length === 0) {
-    throw new Response("Produktet findes ikke i appen.", { status: 404 });
+    throw new Response(translate(locale, "product.notInApp"), { status: 404 });
   }
 
   const [product] = await fetchProducts(admin.graphql, [productId]);
@@ -77,19 +80,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     ),
   );
 
-  const syncTimeFormat = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  });
   const formatSyncTime = (date: Date | null) =>
-    date ? syncTimeFormat.format(date) : null;
+    date ? formatDateTime(locale, date, timeZone) : null;
 
   return {
     today: todayInTimeZone(timeZone),
     themeBlockUrl: themeBlockUrl(process.env.SHOPIFY_API_KEY ?? ""),
     product: {
-      title: product?.title ?? "Produktet findes ikke længere i Shopify",
+      title: product?.title ?? translate(locale, "product.goneInShopify"),
       imageUrl: product?.imageUrl ?? null,
       mode: productMode(plans, product?.variants.length ?? plans.length),
       requiresSellingPlan: product?.requiresSellingPlan ?? false,
@@ -102,7 +100,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       const active = variantDeliveries.find((d) => d.state === "ACTIVE");
       return {
         variantId: plan.variantId,
-        title: variant?.title ?? "Varianten findes ikke længere i Shopify",
+        title: variant?.title ?? translate(locale, "product.variantGone"),
         sku: variant?.sku ?? null,
         enabled: plan.preorderEnabled,
         mode: {
@@ -154,6 +152,8 @@ export const action = async ({
 }: ActionFunctionArgs): Promise<ActionResult> => {
   const { admin, session } = await authenticate.admin(request);
   const data = forShop(session.shop);
+  const locale = await localeFor(request, session.shop);
+  const t = (key: MessageKey) => translate(locale, key);
   const form = await request.formData();
   const intent = String(form.get("intent"));
   const today = () =>
@@ -175,7 +175,7 @@ export const action = async ({
     return {
       ok: true,
       syncFailed: true,
-      message: `${message}, men Shopify kunne ikke opdateres`,
+      message: translate(locale, "product.syncFailedSuffix", { message }),
     };
   }
 
@@ -187,7 +187,7 @@ export const action = async ({
         await data.variantPlans.setEnabled(variantId, enabled);
         return done(
           variantId,
-          enabled ? "Forudbestilling slået til" : "Forudbestilling slået fra",
+          enabled ? t("product.toast.enabled") : t("product.toast.disabled"),
         );
       }
       case "create": {
@@ -196,28 +196,30 @@ export const action = async ({
           variantId,
           { date: form.get("date"), quantity: form.get("quantity") },
           await today(),
+          locale,
         );
-        return done(variantId, "Leverance oprettet");
+        return done(variantId, t("product.toast.created"));
       }
       case "update": {
         const { variantId } = await data.deliveries.update(
           String(form.get("deliveryId")),
           { date: form.get("date"), quantity: form.get("quantity") },
           await today(),
+          locale,
         );
-        return done(variantId, "Leverance gemt");
+        return done(variantId, t("product.toast.saved"));
       }
       case "delete": {
         const { variantId } = await data.deliveries.remove(
           String(form.get("deliveryId")),
         );
-        return done(variantId, "Leverance slettet");
+        return done(variantId, t("product.toast.deleted"));
       }
       case "cancel": {
         const { variantId } = await data.deliveries.cancel(
           String(form.get("deliveryId")),
         );
-        return done(variantId, "Leverance annulleret");
+        return done(variantId, t("product.toast.cancelled"));
       }
       case "force": {
         const variantId = String(form.get("variantId"));
@@ -225,18 +227,18 @@ export const action = async ({
         await data.variantPlans.setForced(variantId, forced);
         return done(
           variantId,
-          forced ? "Forudbestilling tvunget" : "Tvang slået fra",
+          forced ? t("product.toast.forced") : t("product.toast.unforced"),
         );
       }
       case "sync": {
         const variantId = String(form.get("variantId"));
         if (!(await data.syncState.getVariant(variantId))) {
-          return { ok: false, message: "Varianten findes ikke i appen." };
+          return { ok: false, message: t("product.variantNotInApp") };
         }
-        return done(variantId, "Synkroniseret med Shopify");
+        return done(variantId, t("product.toast.synced"));
       }
       default:
-        return { ok: false, message: "Ukendt handling." };
+        return { ok: false, message: t("common.unknownAction") };
     }
   } catch (error) {
     if (error instanceof DeliveryValidationError) {
@@ -256,14 +258,6 @@ export const action = async ({
 type LoaderData = ReturnType<typeof useLoaderData<typeof loader>>;
 type VariantData = LoaderData["variants"][number];
 
-const dateFormat = new Intl.DateTimeFormat("da-DK", {
-  dateStyle: "long",
-  timeZone: "UTC",
-});
-function formatDate(date: string) {
-  return dateFormat.format(new Date(`${date}T00:00:00Z`));
-}
-
 /** Viser en toast, når en handling lykkes. */
 function useSuccessToast(result: ActionResult | undefined) {
   const shopify = useAppBridge();
@@ -278,12 +272,13 @@ export default function ProductPage() {
   const { product, variants, today, themeBlockUrl } =
     useLoaderData<typeof loader>();
   const block = useBlockStatus();
+  const { t } = useT();
   const anyEnabled = variants.some((v) => v.enabled);
 
   return (
     <s-page heading={product.title}>
       <s-link slot="breadcrumb-actions" href="/app">
-        Produkter
+        {t("nav.products")}
       </s-link>
       <ThemeBlockBanner
         status={block}
@@ -313,39 +308,23 @@ export default function ProductPage() {
  * forudbestilling — ikke på en hjælpeside.
  */
 function PreorderLimitations() {
+  const { t } = useT();
+  const items: MessageKey[] = [
+    "product.limits.gateways",
+    "product.limits.localMethods",
+    "product.limits.channels",
+    "product.limits.discounts",
+    "product.limits.permalinks",
+    "product.limits.declined",
+  ];
   return (
-    <s-banner tone="info" heading="Før du sælger på forudbestilling">
+    <s-banner tone="info" heading={t("product.limits.heading")}>
       <s-stack gap="small-200">
-        <s-paragraph>
-          Kunden betaler først, når du sender varen. Shopify gemmer kortet ved
-          bestilling og trækker beløbet ved afsendelse. Det virker kun sammen
-          med visse betalingsløsninger og funktioner:
-        </s-paragraph>
+        <s-paragraph>{t("product.limits.intro")}</s-paragraph>
         <s-unordered-list>
-          <s-list-item>
-            Kun disse betalingsløsninger understøtter det: Shopify Payments,
-            PayPal Express, Adyen og Stripe (kun for nogle butikker). Bruger du
-            en anden, kan kunderne ikke gennemføre en forudbestilling.
-          </s-list-item>
-          <s-list-item>
-            Lokale betalingsmetoder (fx MobilePay og bankoverførsel) kan ikke
-            bruges til forudbestillinger.
-          </s-list-item>
-          <s-list-item>
-            Forudbestillinger kan ikke sælges i Shopify POS, på kladdeordrer
-            eller til B2B-kunder.
-          </s-list-item>
-          <s-list-item>
-            Rabatter af typen «Køb X, få Y» virker ikke på forudbestilte varer.
-          </s-list-item>
-          <s-list-item>
-            Links direkte til kurven (cart permalinks) og en checkout, der er
-            tilpasset med checkout.liquid, understøtter ikke forudbestilling.
-          </s-list-item>
-          <s-list-item>
-            Er kortet udløbet eller uden dækning, når du sender, står ordren som
-            ubetalt. Se «Annulleringer» for afviste betalinger.
-          </s-list-item>
+          {items.map((key) => (
+            <s-list-item key={key}>{t(key)}</s-list-item>
+          ))}
         </s-unordered-list>
       </s-stack>
     </s-banner>
@@ -359,39 +338,25 @@ function ProductModeBanner({
   mode: "ALL" | "MIXED" | "NONE";
   requiresSellingPlan: boolean;
 }) {
+  const { t } = useT();
   if (mode === "NONE") return null;
   if (mode === "ALL") {
     return (
       <s-banner
         tone={requiresSellingPlan ? "success" : "warning"}
-        heading="Kun forudbestilling"
+        heading={t("product.modeAll.heading")}
       >
-        <s-paragraph>
-          Alle varianter er på forudbestilling. Shopify tillader derfor kun køb
-          som forudbestilling: valget «Engangskøb» vises ikke på produktsiden.
-        </s-paragraph>
+        <s-paragraph>{t("product.modeAll.text")}</s-paragraph>
         {!requiresSellingPlan && (
-          <s-paragraph>
-            Shopify er ikke opdateret endnu. Tryk «Synkronisér» på en af
-            varianterne.
-          </s-paragraph>
+          <s-paragraph>{t("product.modeAll.notSynced")}</s-paragraph>
         )}
       </s-banner>
     );
   }
   return (
-    <s-banner tone="info" heading="Blandet: nogle varianter sælges almindeligt">
-      <s-paragraph>
-        Kun nogle varianter er på forudbestilling. Shopify kan kun kræve
-        forudbestilling for hele produktet, og det ville spærre de almindelige
-        varianter — så det bliver ikke slået til.
-      </s-paragraph>
-      <s-paragraph>
-        I stedet sørger PREAURA-blokken på produktsiden for, at varianterne på
-        forudbestilling købes som forudbestilling. Køber nogen alligevel uden
-        (fx via en kladdeordre eller POS), tæller appen salget med i den aktive
-        leverance og viser det under Ordrebehandling.
-      </s-paragraph>
+    <s-banner tone="info" heading={t("product.modeMixed.heading")}>
+      <s-paragraph>{t("product.modeMixed.text1")}</s-paragraph>
+      <s-paragraph>{t("product.modeMixed.text2")}</s-paragraph>
     </s-banner>
   );
 }
@@ -407,6 +372,7 @@ function VariantSection({
 }) {
   const toggle = useFetcher<typeof action>();
   useSuccessToast(toggle.data);
+  const { t } = useT();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Vis den nye værdi med det samme, mens den gemmes.
@@ -419,14 +385,14 @@ function VariantSection({
 
   const heading = showTitle
     ? `${variant.title}${variant.sku ? ` · ${variant.sku}` : ""}`
-    : "Leverancer";
+    : t("product.deliveries");
 
   return (
     <s-section heading={heading}>
       <s-stack gap="base">
         <s-switch
-          label="Forudbestilling, når lageret er tomt"
-          details="Appen skifter selv: lagermode, når der er varer på hylden, og forudbestilling, når lageret rammer 0, og der er plads i en leverance."
+          label={t("product.toggle.label")}
+          details={t("product.toggle.details")}
           checked={enabled}
           onChange={() =>
             toggle.submit(
@@ -449,20 +415,11 @@ function VariantSection({
           <ModeStatus variantId={variant.variantId} mode={variant.mode} />
         )}
         {enabled && !hasActive && variant.mode.mode === "PREORDER" && (
-          <s-banner tone="warning">
-            Forudbestilling er slået til, men der er ingen leverance med ledige
-            pladser. Opret en leverance nedenfor.
-          </s-banner>
+          <s-banner tone="warning">{t("product.noActive")}</s-banner>
         )}
 
         {variant.deliveries.length === 0 && (
-          <s-paragraph>
-            Ingen leverancer endnu. En leverance er en forsendelse, du venter
-            hjem: hvornår du forventer at sende varerne, og hvor mange du vil
-            sælge på forudbestilling. Kunderne forudbestiller i den første
-            leverance med ledige pladser og får dens dato lovet. Opret den
-            første nedenfor.
-          </s-paragraph>
+          <s-paragraph>{t("product.noDeliveries")}</s-paragraph>
         )}
         {variant.deliveries.length > 0 && (
           <DeliveryTable
@@ -474,24 +431,24 @@ function VariantSection({
         {editing ? (
           <DeliveryForm
             key={editing.id}
-            heading={`Ret leverance ${editing.position}`}
+            heading={t("product.editDelivery", { position: editing.position })}
             intent="update"
             target={{ deliveryId: editing.id }}
             initial={{ date: editing.date, quantity: String(editing.quantity) }}
             minimum={editing.allocated}
             today={today}
-            submitLabel="Gem"
+            submitLabel={t("product.save")}
             onDone={() => setEditingId(null)}
           />
         ) : (
           <DeliveryForm
-            heading="Ny leverance"
+            heading={t("product.newDelivery")}
             intent="create"
             target={{ variantId: variant.variantId }}
             initial={{ date: "", quantity: "" }}
             minimum={0}
             today={today}
-            submitLabel="Tilføj leverance"
+            submitLabel={t("product.addDelivery")}
           />
         )}
       </s-stack>
@@ -508,6 +465,7 @@ function ModeStatus({
 }) {
   const fetcher = useFetcher<typeof action>();
   useSuccessToast(fetcher.data);
+  const { t } = useT();
   const forced =
     fetcher.formData != null
       ? fetcher.formData.get("forced") === "true"
@@ -517,30 +475,33 @@ function ModeStatus({
     <s-box padding="base" border="base" borderRadius="base">
       <s-stack gap="base">
         <s-stack direction="inline" gap="small" alignItems="center">
-          <s-text type="strong">Tilstand nu:</s-text>
+          <s-text type="strong">{t("product.mode.now")}</s-text>
           {mode.mode === "STOCK" ? (
-            <s-badge>Lagermode</s-badge>
+            <s-badge>{t("product.mode.stock")}</s-badge>
           ) : mode.forced ? (
-            <s-badge tone="warning">Forudbestilling (tvunget)</s-badge>
+            <s-badge tone="warning">{t("product.mode.forced")}</s-badge>
           ) : (
-            <s-badge tone="success">Forudbestilling (automatisk)</s-badge>
+            <s-badge tone="success">{t("product.mode.auto")}</s-badge>
           )}
         </s-stack>
         <s-paragraph>
           {mode.mode === "STOCK"
-            ? "Der er varer på lager. Varianten sælges som enhver anden vare, og appen rører hverken lageret eller produktsiden."
+            ? t("product.mode.stockText")
             : mode.forced
-              ? "Varianten er tvunget i forudbestilling af dig, selvom der kan være varer på lager. Appen styrer lageret, indtil du slår tvangen fra."
-              : "Lageret er tomt. Kunderne kan forudbestille, og appen styrer lageret ud fra leverancerne. Lægger du varer på lager (som en tilføjelse, fx +20), skifter varianten selv tilbage — efter at forudbestillingerne er dækket."}
+              ? t("product.mode.forcedText")
+              : t("product.mode.autoText")}
         </s-paragraph>
         <s-text color="subdued">
           {mode.changedAt
-            ? `Sidst skiftet ${mode.changedAt}: ${mode.reason ?? ""}`
-            : "Har ikke skiftet tilstand endnu."}
+            ? t("product.mode.lastChanged", {
+                date: mode.changedAt,
+                reason: mode.reason ?? "",
+              })
+            : t("product.mode.neverChanged")}
         </s-text>
         <s-checkbox
-          label="Tving forudbestilling"
-          details="Bruges, når de sidste stk. på lager er beskadigede eller reserverede. Slås tvangen fra, sættes lageret tilbage til det, det var."
+          label={t("product.force.label")}
+          details={t("product.force.details")}
           checked={forced}
           onChange={() =>
             fetcher.submit(
@@ -563,6 +524,7 @@ function SyncStatus({
 }) {
   const fetcher = useFetcher<typeof action>();
   useSuccessToast(fetcher.data);
+  const { t, date } = useT();
   const busy = fetcher.state !== "idle";
   const syncNow = () =>
     fetcher.submit({ intent: "sync", variantId }, { method: "POST" });
@@ -570,17 +532,19 @@ function SyncStatus({
   return (
     <s-stack gap="base">
       {sync.lastSyncError && (
-        <s-banner tone="critical" heading="Shopify er ikke opdateret">
+        <s-banner tone="critical" heading={t("product.sync.errorHeading")}>
           <s-paragraph>{sync.lastSyncError}</s-paragraph>
           {sync.lastSyncAttemptAt && (
-            <s-paragraph>Seneste forsøg: {sync.lastSyncAttemptAt}</s-paragraph>
+            <s-paragraph>
+              {t("product.sync.lastAttempt", { date: sync.lastSyncAttemptAt })}
+            </s-paragraph>
           )}
           <s-button
             slot="secondary-actions"
             onClick={syncNow}
             {...(busy ? { loading: true } : {})}
           >
-            Prøv igen
+            {t("product.sync.retry")}
           </s-button>
         </s-banner>
       )}
@@ -590,41 +554,44 @@ function SyncStatus({
         alignItems="center"
       >
         <s-stack gap="small-500">
-          <s-text color="subdued">Aktiv leverance</s-text>
+          <s-text color="subdued">{t("product.sync.active")}</s-text>
           <s-text>
             {sync.activeDelivery
-              ? `Nr. ${sync.activeDelivery.position} · ${formatDate(sync.activeDelivery.date)}`
-              : "Ingen"}
+              ? t("product.sync.activeValue", {
+                  position: sync.activeDelivery.position,
+                  date: date(sync.activeDelivery.date),
+                })
+              : t("common.none")}
           </s-text>
         </s-stack>
         <s-stack gap="small-500">
-          <s-text color="subdued">Lager i Shopify nu</s-text>
+          <s-text color="subdued">{t("product.sync.stock")}</s-text>
           <s-text>
             {sync.shopifyAvailable == null
-              ? "Ukendt"
-              : `${sync.shopifyAvailable} stk.`}
+              ? t("product.sync.unknown")
+              : t("common.units", { count: sync.shopifyAvailable })}
           </s-text>
         </s-stack>
         <s-stack gap="small-500">
-          <s-text color="subdued">Sidst synkroniseret</s-text>
-          <s-text>{sync.lastSyncedAt ?? "Aldrig"}</s-text>
+          <s-text color="subdued">{t("product.sync.last")}</s-text>
+          <s-text>{sync.lastSyncedAt ?? t("product.sync.never")}</s-text>
         </s-stack>
         <s-button onClick={syncNow} {...(busy ? { loading: true } : {})}>
-          Synkronisér
+          {t("product.sync.button")}
         </s-button>
       </s-grid>
     </s-stack>
   );
 }
 
-const STATE_BADGES: Record<
+const STATE_TONES: Record<
   DeliveryView["state"],
-  { label: string; tone: "success" | "neutral" | "warning" | "critical" }
+  "success" | "neutral" | "warning" | "critical"
 > = {
-  ACTIVE: { label: "Aktiv", tone: "success" },
-  UPCOMING: { label: "Kommende", tone: "neutral" },
-  SOLD_OUT: { label: "Udsolgt", tone: "warning" },
-  CANCELLED: { label: "Annulleret", tone: "critical" },
+  ACTIVE: "success",
+  UPCOMING: "neutral",
+  SOLD_OUT: "warning",
+  CANCELLED: "critical",
 };
 
 function DeliveryTable({
@@ -634,16 +601,27 @@ function DeliveryTable({
   deliveries: DeliveryView[];
   onEdit: (id: string) => void;
 }) {
+  const { t } = useT();
   return (
     <s-table>
       <s-table-header-row>
-        <s-table-header>Nr.</s-table-header>
-        <s-table-header listSlot="primary">Dato</s-table-header>
-        <s-table-header format="numeric">Antal</s-table-header>
-        <s-table-header format="numeric">Tildelt</s-table-header>
-        <s-table-header format="numeric">Resterende</s-table-header>
-        <s-table-header listSlot="secondary">Status</s-table-header>
-        <s-table-header>Handlinger</s-table-header>
+        <s-table-header>{t("product.col.position")}</s-table-header>
+        <s-table-header listSlot="primary">
+          {t("product.col.date")}
+        </s-table-header>
+        <s-table-header format="numeric">
+          {t("product.col.quantity")}
+        </s-table-header>
+        <s-table-header format="numeric">
+          {t("product.col.allocated")}
+        </s-table-header>
+        <s-table-header format="numeric">
+          {t("product.col.remaining")}
+        </s-table-header>
+        <s-table-header listSlot="secondary">
+          {t("product.col.status")}
+        </s-table-header>
+        <s-table-header>{t("product.col.actions")}</s-table-header>
       </s-table-header-row>
       <s-table-body>
         {deliveries.map((delivery) => (
@@ -664,7 +642,8 @@ function DeliveryRow({
   const fetcher = useFetcher<typeof action>();
   useSuccessToast(fetcher.data);
   const busy = fetcher.state !== "idle";
-  const badge = STATE_BADGES[delivery.state];
+  const { t, tn, date } = useT();
+  const tone = STATE_TONES[delivery.state];
   const cancelled = delivery.state === "CANCELLED";
   const modalId = `cancel-${delivery.id}`;
 
@@ -674,12 +653,14 @@ function DeliveryRow({
   return (
     <s-table-row>
       <s-table-cell>{delivery.position}</s-table-cell>
-      <s-table-cell>{formatDate(delivery.date)}</s-table-cell>
+      <s-table-cell>{date(delivery.date)}</s-table-cell>
       <s-table-cell>{delivery.quantity}</s-table-cell>
       <s-table-cell>{delivery.allocated}</s-table-cell>
       <s-table-cell>{cancelled ? "–" : delivery.remaining}</s-table-cell>
       <s-table-cell>
-        <s-badge tone={badge.tone}>{badge.label}</s-badge>
+        <s-badge tone={tone}>
+          {t(`product.state.${delivery.state}` as MessageKey)}
+        </s-badge>
       </s-table-cell>
       <s-table-cell>
         <s-stack gap="small">
@@ -689,20 +670,20 @@ function DeliveryRow({
                 slot="secondary-actions"
                 href={`/app/deliveries/${delivery.id}`}
               >
-                Ordrer
+                {t("product.action.orders")}
               </s-button>
               <s-button
                 slot="secondary-actions"
                 onClick={() => onEdit(delivery.id)}
               >
-                Ret
+                {t("product.action.edit")}
               </s-button>
               <s-button
                 slot="secondary-actions"
                 commandFor={modalId}
                 command="--show"
               >
-                Annullér
+                {t("product.action.cancel")}
               </s-button>
               <s-button
                 slot="secondary-actions"
@@ -710,7 +691,7 @@ function DeliveryRow({
                 onClick={() => submit("delete")}
                 {...(busy ? { loading: true } : {})}
               >
-                Slet
+                {t("product.action.delete")}
               </s-button>
             </s-button-group>
           )}
@@ -723,7 +704,7 @@ function DeliveryRow({
             <>
               <AffectedOrders orders={delivery.orders} />
               <s-link href={`/app/deliveries/${delivery.id}`}>
-                Se leverancens ordrer
+                {t("product.seeDeliveryOrders")}
               </s-link>
             </>
           )}
@@ -731,23 +712,20 @@ function DeliveryRow({
 
         <s-modal
           id={modalId}
-          heading={`Annullér leverance ${delivery.position}?`}
+          heading={t("product.cancelModal.heading", {
+            position: delivery.position,
+          })}
         >
           <s-stack gap="base">
             <s-paragraph>
-              Leverancen den {formatDate(delivery.date)} markeres som
-              annulleret. Det kan ikke fortrydes.
+              {t("product.cancelModal.text", { date: date(delivery.date) })}
             </s-paragraph>
             {delivery.allocationCount > 0 ? (
               <s-paragraph>
-                {delivery.allocationCount === 1
-                  ? "1 ordrelinje"
-                  : `${delivery.allocationCount} ordrelinjer`}{" "}
-                er tildelt leverancen. Tildelingerne bliver stående, så du
-                bagefter kan se, hvilke ordrer der er berørt.
+                {tn("product.cancelModal.allocated", delivery.allocationCount)}
               </s-paragraph>
             ) : (
-              <s-paragraph>Ingen ordrer er tildelt leverancen.</s-paragraph>
+              <s-paragraph>{t("product.cancelModal.none")}</s-paragraph>
             )}
           </s-stack>
           <s-button
@@ -758,14 +736,14 @@ function DeliveryRow({
             command="--hide"
             onClick={() => submit("cancel")}
           >
-            Annullér leverance
+            {t("product.cancelModal.confirm")}
           </s-button>
           <s-button
             slot="secondary-actions"
             commandFor={modalId}
             command="--hide"
           >
-            Behold
+            {t("product.cancelModal.keep")}
           </s-button>
         </s-modal>
       </s-table-cell>
@@ -776,14 +754,15 @@ function DeliveryRow({
 function AffectedOrders({ orders }: { orders: DeliveryView["orders"] }) {
   // Samme ordre kan have flere linjer i leverancen; vis hver ordre én gang.
   const orderIds = [...new Set(orders.map((order) => order.orderId))];
+  const { t } = useT();
   return (
     <s-stack gap="small-200">
-      <s-text type="strong">Berørte ordrer</s-text>
+      <s-text type="strong">{t("product.affected")}</s-text>
       <s-unordered-list>
         {orderIds.map((orderId) => (
           <s-list-item key={orderId}>
             <s-link href={`shopify://admin/orders/${numericId(orderId)}`}>
-              Ordre {numericId(orderId)}
+              {t("product.order", { number: numericId(orderId) })}
             </s-link>
           </s-list-item>
         ))}
@@ -813,6 +792,7 @@ function DeliveryForm({
 }) {
   const fetcher = useFetcher<typeof action>();
   useSuccessToast(fetcher.data);
+  const { t } = useT();
   const [date, setDate] = useState(initial.date);
   const [quantity, setQuantity] = useState(initial.quantity);
   const busy = fetcher.state !== "idle";
@@ -846,7 +826,7 @@ function DeliveryForm({
         )}
         <s-stack direction="inline" gap="base">
           <s-date-field
-            label="Dato"
+            label={t("product.form.date")}
             value={date}
             // Ved oprettelse kan kun datoer efter i dag vælges. Ved rettelse
             // må en uændret, passeret dato stå — serveren validerer begge.
@@ -857,12 +837,14 @@ function DeliveryForm({
             onChange={(event) => setDate(event.currentTarget.value)}
           />
           <s-number-field
-            label="Antal"
+            label={t("product.form.quantity")}
             value={quantity}
             min={Math.max(1, minimum)}
             step={1}
             details={
-              minimum > 0 ? `${minimum} stk. er allerede tildelt.` : undefined
+              minimum > 0
+                ? t("product.form.alreadyAllocated", { count: minimum })
+                : undefined
             }
             error={fieldErrors?.quantity}
             onChange={(event) => setQuantity(event.currentTarget.value)}
@@ -881,7 +863,9 @@ function DeliveryForm({
           >
             {submitLabel}
           </s-button>
-          {onDone && <s-button onClick={onDone}>Fortryd</s-button>}
+          {onDone && (
+            <s-button onClick={onDone}>{t("product.form.undo")}</s-button>
+          )}
         </s-stack>
       </s-stack>
     </s-box>

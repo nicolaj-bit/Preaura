@@ -150,4 +150,149 @@ export const en: Record<MessageKey, string> = {
   "subscription.ifStops.heading": "If the subscription stops",
   "subscription.ifStops.text":
     "If the free trial ends without a subscription, or you cancel, the app’s features close. Deliveries, pre-orders and orders are never deleted. If you start the subscription again, everything is as it was.",
+  // Product page
+  "product.notFound": "The product doesn’t exist.",
+  "product.notInApp": "The product isn’t in the app.",
+  "product.goneInShopify": "The product no longer exists in Shopify",
+  "product.variantGone": "The variant no longer exists in Shopify",
+  "product.variantNotInApp": "The variant isn’t in the app.",
+  "product.syncFailedSuffix": "{message}, but Shopify couldn’t be updated",
+  "product.toast.enabled": "Pre-order turned on",
+  "product.toast.disabled": "Pre-order turned off",
+  "product.toast.created": "Delivery created",
+  "product.toast.saved": "Delivery saved",
+  "product.toast.deleted": "Delivery deleted",
+  "product.toast.cancelled": "Delivery cancelled",
+  "product.toast.forced": "Pre-order forced",
+  "product.toast.unforced": "Forcing turned off",
+  "product.toast.synced": "Synced with Shopify",
+  "product.limits.heading": "Before you sell on pre-order",
+  "product.limits.intro":
+    "The customer only pays when you ship the item. Shopify saves the card when the order is placed and charges it when the order ships. This only works with certain payment providers and features:",
+  "product.limits.gateways":
+    "Only these payment providers support it: Shopify Payments, PayPal Express, Adyen and Stripe (for some stores only). If you use another one, customers can’t complete a pre-order.",
+  "product.limits.localMethods":
+    "Local payment methods (such as MobilePay and bank transfer) can’t be used for pre-orders.",
+  "product.limits.channels":
+    "Pre-orders can’t be sold in Shopify POS, on draft orders or to B2B customers.",
+  "product.limits.discounts":
+    "«Buy X, get Y» discounts don’t work on pre-ordered items.",
+  "product.limits.permalinks":
+    "Cart permalinks and a checkout customized with checkout.liquid don’t support pre-orders.",
+  "product.limits.declined":
+    "If the card has expired or has insufficient funds when you ship, the order is marked unpaid. See «Cancellations» for declined payments.",
+  "product.modeAll.heading": "Pre-order only",
+  "product.modeAll.text":
+    "All variants are on pre-order. Shopify therefore only allows buying on pre-order: the «One-time purchase» option isn’t shown on the product page.",
+  "product.modeAll.notSynced":
+    "Shopify hasn’t been updated yet. Click «Sync» on one of the variants.",
+  "product.modeMixed.heading": "Mixed: some variants are sold as usual",
+  "product.modeMixed.text1":
+    "Only some variants are on pre-order. Shopify can only require pre-order for the whole product, which would block the regular variants — so it isn’t turned on.",
+  "product.modeMixed.text2":
+    "Instead, the PREAURA block on the product page makes sure the variants on pre-order are bought as pre-orders. If someone buys without it anyway (for example on a draft order or in POS), the app counts the sale in the active delivery and shows it under Order processing.",
+  "product.deliveries": "Deliveries",
+  "product.toggle.label": "Pre-order when out of stock",
+  "product.toggle.details":
+    "The app switches by itself: selling from stock while there are items on the shelf, and pre-order when stock reaches 0 and a delivery has room.",
+  "product.noActive":
+    "Pre-order is turned on, but no delivery has room left. Create a delivery below.",
+  "product.noDeliveries":
+    "No deliveries yet. A delivery is a shipment you’re expecting: when you expect to ship the goods and how many you’ll sell on pre-order. Customers pre-order into the first delivery with room left and are promised its date. Create the first one below.",
+  "product.editDelivery": "Edit delivery {position}",
+  "product.newDelivery": "New delivery",
+  "product.save": "Save",
+  "product.addDelivery": "Add delivery",
+  "product.mode.now": "Current mode:",
+  "product.mode.stock": "Selling from stock",
+  "product.mode.forced": "Pre-order (forced)",
+  "product.mode.auto": "Pre-order (automatic)",
+  "product.mode.stockText":
+    "There are items in stock. The variant is sold like any other item, and the app touches neither the stock nor the product page.",
+  "product.mode.forcedText":
+    "You’ve forced the variant into pre-order, even though there may be items in stock. The app manages the stock until you turn forcing off.",
+  "product.mode.autoText":
+    "Stock is empty. Customers can pre-order, and the app manages the stock from the deliveries. If you add stock (as an adjustment, for example +20), the variant switches back by itself — once the pre-orders are covered.",
+  "product.mode.lastChanged": "Last changed {date}: {reason}",
+  "product.mode.neverChanged": "Hasn’t changed mode yet.",
+  "product.force.label": "Force pre-order",
+  "product.force.details":
+    "Use this when the last units in stock are damaged or reserved. When forcing is turned off, stock is set back to what it was.",
+  "product.sync.errorHeading": "Shopify isn’t updated",
+  "product.sync.lastAttempt": "Last attempt: {date}",
+  "product.sync.retry": "Try again",
+  "product.sync.active": "Active delivery",
+  "product.sync.activeValue": "No. {position} · {date}",
+  "product.sync.stock": "Stock in Shopify now",
+  "product.sync.unknown": "Unknown",
+  "product.sync.last": "Last synced",
+  "product.sync.never": "Never",
+  "product.sync.button": "Sync",
+  "product.state.ACTIVE": "Active",
+  "product.state.UPCOMING": "Upcoming",
+  "product.state.SOLD_OUT": "Sold out",
+  "product.state.CANCELLED": "Cancelled",
+  "product.col.position": "No.",
+  "product.col.date": "Date",
+  "product.col.quantity": "Quantity",
+  "product.col.allocated": "Allocated",
+  "product.col.remaining": "Remaining",
+  "product.col.status": "Status",
+  "product.col.actions": "Actions",
+  "product.action.orders": "Orders",
+  "product.action.edit": "Edit",
+  "product.action.cancel": "Cancel",
+  "product.action.delete": "Delete",
+  "product.seeDeliveryOrders": "See the delivery’s orders",
+  "product.cancelModal.heading": "Cancel delivery {position}?",
+  "product.cancelModal.text":
+    "The delivery on {date} will be marked as cancelled. This can’t be undone.",
+  "product.cancelModal.allocated.one":
+    "1 order line is allocated to the delivery. The allocations stay, so you can see afterwards which orders are affected.",
+  "product.cancelModal.allocated.other":
+    "{count} order lines are allocated to the delivery. The allocations stay, so you can see afterwards which orders are affected.",
+  "product.cancelModal.none": "No orders are allocated to the delivery.",
+  "product.cancelModal.confirm": "Cancel delivery",
+  "product.cancelModal.keep": "Keep",
+  "product.affected": "Affected orders",
+  "product.order": "Order {number}",
+  "product.form.date": "Date",
+  "product.form.quantity": "Quantity",
+  "product.form.alreadyAllocated": "{count} units are already allocated.",
+  "product.form.undo": "Cancel",
+
+  // Delivery orders
+  "delivery.notFound": "The delivery doesn’t exist.",
+  "delivery.heading": "Delivery {position} · {date}",
+  "delivery.readyNone": "All pre-orders were already ready",
+  "delivery.ready.one": "1 pre-order marked ready to ship",
+  "delivery.ready.other": "{count} pre-orders marked ready to ship",
+  "delivery.arrived": "The goods have arrived — ready to ship",
+  "delivery.activeLines": "Active order lines",
+  "delivery.orders": "Orders",
+  "delivery.noOrders": "No orders in this delivery yet.",
+  "delivery.col.order": "Order",
+  "delivery.col.ordered": "Ordered",
+  "delivery.col.promised": "Promised date",
+  "delivery.status.ACTIVE": "Active",
+  "delivery.status.CANCELLED": "Cancelled",
+  "delivery.readyBadge": "Ready to ship",
+
+  // Delivery errors
+  "validation.dateMissing":
+    "Choose the date you expect to ship the goods. It’s the date customers are promised.",
+  "validation.dateInvalid":
+    "The date can’t be read. Pick it in the calendar, or write it as YYYY-MM-DD, for example 2027-01-15.",
+  "validation.dateNotFuture":
+    "The date is today or has passed. Choose a date from tomorrow onwards — it’s the date customers are promised.",
+  "validation.quantityInvalid":
+    "Write the quantity as a whole number, for example 50 — without commas, spaces or «units».",
+  "validation.quantityNotPositive":
+    "The quantity must be at least 1: it’s how many you can sell on pre-order in the delivery. To stop selling, cancel the delivery instead.",
+  "validation.quantityBelowAllocated":
+    "{allocated} units have already been sold in the delivery, so the quantity must be at least {allocated}. To sell fewer, cancel orders in Shopify first.",
+  "validation.dateOverlaps":
+    "Delivery {position} already has the date {date}. Change the quantity of delivery {position} instead, or choose another date.",
+  "validation.dateBeforeExisting":
+    "New deliveries are sold after the existing ones, so the date must be after {date} (delivery {position}). If goods arrive earlier, change the date of delivery {position} instead.",
 };

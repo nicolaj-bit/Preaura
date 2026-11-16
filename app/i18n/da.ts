@@ -147,6 +147,152 @@ export const da = {
   "subscription.ifStops.heading": "Hvis abonnementet stopper",
   "subscription.ifStops.text":
     "Udløber prøveperioden uden abonnement, eller opsiger du, lukkes appens funktioner. Leverancer, forudbestillinger og ordrer slettes aldrig. Starter du abonnementet igen, er alt, som det var.",
+  // Produktsiden
+  "product.notFound": "Produktet findes ikke.",
+  "product.notInApp": "Produktet findes ikke i appen.",
+  "product.goneInShopify": "Produktet findes ikke længere i Shopify",
+  "product.variantGone": "Varianten findes ikke længere i Shopify",
+  "product.variantNotInApp": "Varianten findes ikke i appen.",
+  "product.syncFailedSuffix": "{message}, men Shopify kunne ikke opdateres",
+  "product.toast.enabled": "Forudbestilling slået til",
+  "product.toast.disabled": "Forudbestilling slået fra",
+  "product.toast.created": "Leverance oprettet",
+  "product.toast.saved": "Leverance gemt",
+  "product.toast.deleted": "Leverance slettet",
+  "product.toast.cancelled": "Leverance annulleret",
+  "product.toast.forced": "Forudbestilling tvunget",
+  "product.toast.unforced": "Tvang slået fra",
+  "product.toast.synced": "Synkroniseret med Shopify",
+  "product.limits.heading": "Før du sælger på forudbestilling",
+  "product.limits.intro":
+    "Kunden betaler først, når du sender varen. Shopify gemmer kortet ved bestilling og trækker beløbet ved afsendelse. Det virker kun sammen med visse betalingsløsninger og funktioner:",
+  "product.limits.gateways":
+    "Kun disse betalingsløsninger understøtter det: Shopify Payments, PayPal Express, Adyen og Stripe (kun for nogle butikker). Bruger du en anden, kan kunderne ikke gennemføre en forudbestilling.",
+  "product.limits.localMethods":
+    "Lokale betalingsmetoder (fx MobilePay og bankoverførsel) kan ikke bruges til forudbestillinger.",
+  "product.limits.channels":
+    "Forudbestillinger kan ikke sælges i Shopify POS, på kladdeordrer eller til B2B-kunder.",
+  "product.limits.discounts":
+    "Rabatter af typen «Køb X, få Y» virker ikke på forudbestilte varer.",
+  "product.limits.permalinks":
+    "Links direkte til kurven (cart permalinks) og en checkout, der er tilpasset med checkout.liquid, understøtter ikke forudbestilling.",
+  "product.limits.declined":
+    "Er kortet udløbet eller uden dækning, når du sender, står ordren som ubetalt. Se «Annulleringer» for afviste betalinger.",
+  "product.modeAll.heading": "Kun forudbestilling",
+  "product.modeAll.text":
+    "Alle varianter er på forudbestilling. Shopify tillader derfor kun køb som forudbestilling: valget «Engangskøb» vises ikke på produktsiden.",
+  "product.modeAll.notSynced":
+    "Shopify er ikke opdateret endnu. Tryk «Synkronisér» på en af varianterne.",
+  "product.modeMixed.heading": "Blandet: nogle varianter sælges almindeligt",
+  "product.modeMixed.text1":
+    "Kun nogle varianter er på forudbestilling. Shopify kan kun kræve forudbestilling for hele produktet, og det ville spærre de almindelige varianter — så det bliver ikke slået til.",
+  "product.modeMixed.text2":
+    "I stedet sørger PREAURA-blokken på produktsiden for, at varianterne på forudbestilling købes som forudbestilling. Køber nogen alligevel uden (fx via en kladdeordre eller POS), tæller appen salget med i den aktive leverance og viser det under Ordrebehandling.",
+  "product.deliveries": "Leverancer",
+  "product.toggle.label": "Forudbestilling, når lageret er tomt",
+  "product.toggle.details":
+    "Appen skifter selv: lagermode, når der er varer på hylden, og forudbestilling, når lageret rammer 0, og der er plads i en leverance.",
+  "product.noActive":
+    "Forudbestilling er slået til, men der er ingen leverance med ledige pladser. Opret en leverance nedenfor.",
+  "product.noDeliveries":
+    "Ingen leverancer endnu. En leverance er en forsendelse, du venter hjem: hvornår du forventer at sende varerne, og hvor mange du vil sælge på forudbestilling. Kunderne forudbestiller i den første leverance med ledige pladser og får dens dato lovet. Opret den første nedenfor.",
+  "product.editDelivery": "Ret leverance {position}",
+  "product.newDelivery": "Ny leverance",
+  "product.save": "Gem",
+  "product.addDelivery": "Tilføj leverance",
+  "product.mode.now": "Tilstand nu:",
+  "product.mode.stock": "Lagermode",
+  "product.mode.forced": "Forudbestilling (tvunget)",
+  "product.mode.auto": "Forudbestilling (automatisk)",
+  "product.mode.stockText":
+    "Der er varer på lager. Varianten sælges som enhver anden vare, og appen rører hverken lageret eller produktsiden.",
+  "product.mode.forcedText":
+    "Varianten er tvunget i forudbestilling af dig, selvom der kan være varer på lager. Appen styrer lageret, indtil du slår tvangen fra.",
+  "product.mode.autoText":
+    "Lageret er tomt. Kunderne kan forudbestille, og appen styrer lageret ud fra leverancerne. Lægger du varer på lager (som en tilføjelse, fx +20), skifter varianten selv tilbage — efter at forudbestillingerne er dækket.",
+  "product.mode.lastChanged": "Sidst skiftet {date}: {reason}",
+  "product.mode.neverChanged": "Har ikke skiftet tilstand endnu.",
+  "product.force.label": "Tving forudbestilling",
+  "product.force.details":
+    "Bruges, når de sidste stk. på lager er beskadigede eller reserverede. Slås tvangen fra, sættes lageret tilbage til det, det var.",
+  "product.sync.errorHeading": "Shopify er ikke opdateret",
+  "product.sync.lastAttempt": "Seneste forsøg: {date}",
+  "product.sync.retry": "Prøv igen",
+  "product.sync.active": "Aktiv leverance",
+  "product.sync.activeValue": "Nr. {position} · {date}",
+  "product.sync.stock": "Lager i Shopify nu",
+  "product.sync.unknown": "Ukendt",
+  "product.sync.last": "Sidst synkroniseret",
+  "product.sync.never": "Aldrig",
+  "product.sync.button": "Synkronisér",
+  "product.state.ACTIVE": "Aktiv",
+  "product.state.UPCOMING": "Kommende",
+  "product.state.SOLD_OUT": "Udsolgt",
+  "product.state.CANCELLED": "Annulleret",
+  "product.col.position": "Nr.",
+  "product.col.date": "Dato",
+  "product.col.quantity": "Antal",
+  "product.col.allocated": "Tildelt",
+  "product.col.remaining": "Resterende",
+  "product.col.status": "Status",
+  "product.col.actions": "Handlinger",
+  "product.action.orders": "Ordrer",
+  "product.action.edit": "Ret",
+  "product.action.cancel": "Annullér",
+  "product.action.delete": "Slet",
+  "product.seeDeliveryOrders": "Se leverancens ordrer",
+  "product.cancelModal.heading": "Annullér leverance {position}?",
+  "product.cancelModal.text":
+    "Leverancen den {date} markeres som annulleret. Det kan ikke fortrydes.",
+  "product.cancelModal.allocated.one":
+    "1 ordrelinje er tildelt leverancen. Tildelingerne bliver stående, så du bagefter kan se, hvilke ordrer der er berørt.",
+  "product.cancelModal.allocated.other":
+    "{count} ordrelinjer er tildelt leverancen. Tildelingerne bliver stående, så du bagefter kan se, hvilke ordrer der er berørt.",
+  "product.cancelModal.none": "Ingen ordrer er tildelt leverancen.",
+  "product.cancelModal.confirm": "Annullér leverance",
+  "product.cancelModal.keep": "Behold",
+  "product.affected": "Berørte ordrer",
+  "product.order": "Ordre {number}",
+  "product.form.date": "Dato",
+  "product.form.quantity": "Antal",
+  "product.form.alreadyAllocated": "{count} stk. er allerede tildelt.",
+  "product.form.undo": "Fortryd",
+
+  // Leverancens ordrer
+  "delivery.notFound": "Leverancen findes ikke.",
+  "delivery.heading": "Leverance {position} · {date}",
+  "delivery.readyNone": "Alle forudbestillinger var allerede klar",
+  "delivery.ready.one": "1 forudbestilling markeret klar til afsendelse",
+  "delivery.ready.other":
+    "{count} forudbestillinger markeret klar til afsendelse",
+  "delivery.arrived": "Varerne er kommet — klar til afsendelse",
+  "delivery.activeLines": "Aktive ordrelinjer",
+  "delivery.orders": "Ordrer",
+  "delivery.noOrders": "Ingen ordrer i denne leverance endnu.",
+  "delivery.col.order": "Ordre",
+  "delivery.col.ordered": "Bestilt",
+  "delivery.col.promised": "Lovet dato",
+  "delivery.status.ACTIVE": "Aktiv",
+  "delivery.status.CANCELLED": "Annulleret",
+  "delivery.readyBadge": "Klar til afsendelse",
+
+  // Fejl i en leverance
+  "validation.dateMissing":
+    "Vælg den dato, du forventer at sende varerne. Det er den dato, kunderne får lovet.",
+  "validation.dateInvalid":
+    "Datoen kan ikke læses. Vælg den i kalenderen, eller skriv den som ÅÅÅÅ-MM-DD, fx 2027-01-15.",
+  "validation.dateNotFuture":
+    "Datoen er i dag eller er passeret. Vælg en dato fra i morgen og frem — det er den dato, kunderne får lovet.",
+  "validation.quantityInvalid":
+    "Skriv antallet som et helt tal, fx 50 — uden komma, mellemrum eller «stk.».",
+  "validation.quantityNotPositive":
+    "Antallet skal være mindst 1: det er, hvor mange du kan sælge på forudbestilling i leverancen. Vil du stoppe salget, så annullér leverancen i stedet.",
+  "validation.quantityBelowAllocated":
+    "{allocated} stk. er allerede solgt i leverancen, så antallet skal være mindst {allocated}. Vil du sælge færre, må du annullere ordrer i Shopify først.",
+  "validation.dateOverlaps":
+    "Leverance {position} har allerede datoen {date}. Ret antallet på leverance {position} i stedet, eller vælg en anden dato.",
+  "validation.dateBeforeExisting":
+    "Nye leverancer sælges efter de eksisterende, så datoen skal ligge efter {date} (leverance {position}). Kommer der varer før, så ret datoen på leverance {position} i stedet.",
 };
 
 export type MessageKey = keyof typeof da;

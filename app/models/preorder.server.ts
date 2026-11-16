@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import db from "../db.server";
@@ -367,7 +368,12 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
 
       /** Opretter en leverance bagerst i rækkefølgen for varianten. */
-      async create(variantId: string, input: DeliveryInput, today: string) {
+      async create(
+        variantId: string,
+        input: DeliveryInput,
+        today: string,
+        locale?: Locale,
+      ) {
         return client.$transaction(async (tx) => {
           const others = await tx.delivery.findMany({
             where: { shop, variantId, status: "OPEN" },
@@ -375,6 +381,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           });
           const result = validateDelivery(input, {
             today,
+            locale,
             allocated: 0,
             others,
             newDelivery: true,
@@ -402,7 +409,12 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
-      async update(id: string, input: DeliveryInput, today: string) {
+      async update(
+        id: string,
+        input: DeliveryInput,
+        today: string,
+        locale?: Locale,
+      ) {
         return client.$transaction(async (tx) => {
           const delivery = await findDelivery(tx, id);
           if (delivery.status === "CANCELLED") {
@@ -423,6 +435,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           });
           const result = validateDelivery(input, {
             today,
+            locale,
             allocated,
             currentDate: delivery.date,
             others,
