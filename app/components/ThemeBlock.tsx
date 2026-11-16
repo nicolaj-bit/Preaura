@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { describeBlock, type BlockStatus } from "../onboarding/setup";
+import {
+  BLOCK_HANDLE,
+  describeBlock,
+  type BlockStatus,
+} from "../onboarding/setup";
 
 // Er PREAURA-blokken aktiv i butikkens udgivne tema? Spørger Shopify via App
 // Bridge (app.extensions()) — kræver ingen ekstra adgangsret og læses frisk,
@@ -10,8 +14,14 @@ export function useBlockStatus(): BlockStatus {
   return useBlockInfo().status;
 }
 
-/** Status og — når den ikke kan afgøres — en kort teknisk forklaring. */
-export function useBlockInfo(): { status: BlockStatus; reason: string | null } {
+/**
+ * Status og — når den ikke kan afgøres — en kort teknisk forklaring.
+ * handle: produktsidens blok (standard) eller kurvens app embed.
+ */
+export function useBlockInfo(handle: string = BLOCK_HANDLE): {
+  status: BlockStatus;
+  reason: string | null;
+} {
   const shopify = useAppBridge();
   const [info, setInfo] = useState<{
     status: BlockStatus;
@@ -33,7 +43,7 @@ export function useBlockInfo(): { status: BlockStatus; reason: string | null } {
         return app.extensions();
       })
       .then((extensions) => {
-        if (!cancelled) setInfo(describeBlock(extensions));
+        if (!cancelled) setInfo(describeBlock(extensions, handle));
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -46,7 +56,7 @@ export function useBlockInfo(): { status: BlockStatus; reason: string | null } {
     return () => {
       cancelled = true;
     };
-  }, [shopify]);
+  }, [shopify, handle]);
   return info;
 }
 

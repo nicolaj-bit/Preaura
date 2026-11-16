@@ -144,6 +144,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      /** Butikken bekræfter selv, at kurvens app embed er slået til. */
+      async setCartEmbedConfirmed(confirmed: boolean) {
+        await client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, cartEmbedConfirmed: confirmed },
+          update: { cartEmbedConfirmed: confirmed },
+        });
+      },
+
       /** Opsætningsguiden på forsiden foldes sammen eller åbnes igen. */
       async setSetupGuideHidden(hidden: boolean) {
         await client.shopSetting.upsert({

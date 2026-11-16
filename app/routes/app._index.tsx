@@ -13,7 +13,12 @@ import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
 import { queueFor } from "../models/queue.server";
 import { complianceFor } from "../models/compliance.server";
 import { dashboardStats, progressPct } from "../lib/dashboard";
-import { setupSteps, themeBlockUrl } from "../onboarding/setup";
+import {
+  CART_EMBED_HANDLE,
+  cartEmbedUrl,
+  setupSteps,
+  themeBlockUrl,
+} from "../onboarding/setup";
 import { ThemeBlockBanner, useBlockInfo } from "../components/ThemeBlock";
 import { SUPPORT_EMAIL } from "../onboarding/support";
 
@@ -110,10 +115,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       hasEnabled: enabledVariants.length > 0,
       hidden: settings.setupGuideHidden,
       blockConfirmed: settings.themeBlockConfirmed,
+      cartConfirmed: settings.cartEmbedConfirmed,
       // Det første produkt — der oprettes den første leverance.
       firstProduct: summaries[0] ? numericId(summaries[0].productId) : null,
       // Åbner temaeditoren med PREAURA-blokken klar til at blive tilføjet.
       themeBlockUrl: themeBlockUrl(process.env.SHOPIFY_API_KEY ?? ""),
+      // Åbner App-integrationer med kurvens app embed slået til.
+      cartEmbedUrl: cartEmbedUrl(process.env.SHOPIFY_API_KEY ?? ""),
     },
     supportEmail: SUPPORT_EMAIL,
 
@@ -147,6 +155,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (form.get("intent") === "confirmBlock") {
     await forShop(session.shop).settings.setThemeBlockConfirmed(true);
+    return { guide: true };
+  }
+  if (form.get("intent") === "confirmCart") {
+    await forShop(session.shop).settings.setCartEmbedConfirmed(true);
     return { guide: true };
   }
   if (form.get("intent") === "guide") {
@@ -199,6 +211,9 @@ export default function Index() {
   const block = blockInfo.status;
   const confirmBlock = () =>
     guide.submit({ intent: "confirmBlock" }, { method: "POST" });
+  const cartInfo = useBlockInfo(CART_EMBED_HANDLE);
+  const confirmCart = () =>
+    guide.submit({ intent: "confirmCart" }, { method: "POST" });
   // Vis det nye valg med det samme, mens det gemmes.
   const guideHidden =
     guide.formData != null
@@ -307,9 +322,16 @@ export default function Index() {
           blockConfirmed:
             setup.blockConfirmed ||
             guide.formData?.get("intent") === "confirmBlock",
+          cart: cartInfo.status,
+          cartConfirmed:
+            setup.cartConfirmed ||
+            guide.formData?.get("intent") === "confirmCart",
         }}
         blockReason={blockInfo.reason}
         onConfirmBlock={confirmBlock}
+        cartReason={cartInfo.reason}
+        onConfirmCart={confirmCart}
+        cartEmbedUrl={setup.cartEmbedUrl}
         hidden={guideHidden}
         onToggle={toggleGuide}
         onSelectProducts={selectProducts}
@@ -498,7 +520,7 @@ export default function Index() {
 }
 
 const STEP_TEXT: Record<
-  "products" | "delivery" | "enable" | "block",
+  "products" | "delivery" | "enable" | "block" | "cart",
   { title: string; text: string }
 > = {
   products: {
@@ -517,6 +539,10 @@ const STEP_TEXT: Record<
     title: "Vis forudbestillingen på produktsiden",
     text: "Tilføj PREAURA-blokken i dit tema. Knappen åbner temaeditoren med blokken klar — du skal kun trykke Gem.",
   },
+  cart: {
+    title: "Vis i kurven, at der intet betales i dag",
+    text: "Slå «PREAURA kurv» til under App-integrationer. Så står der under hver forudbestilt vare i kurven, at der intet betales i dag, og over knappen til kassen, hvad der trækkes ved afsendelse. Knappen åbner temaeditoren med den slået til — du skal kun trykke Gem.",
+  },
 };
 
 /**
@@ -533,10 +559,16 @@ function SetupGuide({
   firstProduct,
   blockReason,
   onConfirmBlock,
+  cartReason,
+  onConfirmCart,
+  cartEmbedUrl,
 }: {
   state: Parameters<typeof setupSteps>[0];
   blockReason: string | null;
   onConfirmBlock: () => void;
+  cartReason: string | null;
+  onConfirmCart: () => void;
+  cartEmbedUrl: string;
   hidden: boolean;
   onToggle: (hidden: boolean) => void;
   onSelectProducts: () => void;
@@ -564,6 +596,19 @@ function SetupGuide({
             {state.block === "unknown" && (
               <s-button variant="tertiary" onClick={onConfirmBlock}>
                 Jeg har tilføjet blokken
+              </s-button>
+            )}
+          </s-stack>
+        );
+      case "cart":
+        return (
+          <s-stack direction="inline" gap="small-200">
+            <s-button href={cartEmbedUrl} target="_top">
+              Slå til i kurven
+            </s-button>
+            {(state.cart ?? "unknown") === "unknown" && (
+              <s-button variant="tertiary" onClick={onConfirmCart}>
+                Jeg har slået den til
               </s-button>
             )}
           </s-stack>
@@ -602,7 +647,11 @@ function SetupGuide({
               text={
                 step.id === "block" && state.block === "unknown" && !step.done
                   ? `${STEP_TEXT.block.text} Shopify kan ikke fortælle os, om blokken er tilføjet${blockReason ? ` (${blockReason})` : ""}. Har du tilføjet den og trykket Gem, så markér trinnet som gjort.`
-                  : STEP_TEXT[step.id].text
+                  : step.id === "cart" &&
+                      (state.cart ?? "unknown") === "unknown" &&
+                      !step.done
+                    ? `${STEP_TEXT.cart.text} Shopify kan ikke fortælle os, om den er slået til${cartReason ? ` (${cartReason})` : ""}. Har du slået den til og trykket Gem, så markér trinnet som gjort.`
+                    : STEP_TEXT[step.id].text
               }
             >
               {action(step.id)}

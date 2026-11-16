@@ -4,6 +4,8 @@
 /** Mappen i extensions/ og blokkens filnavn i blocks/. */
 export const THEME_EXTENSION_HANDLE = "preaura-preorder";
 export const BLOCK_HANDLE = "preorder";
+/** Kurvens app embed (blocks/cart.liquid). */
+export const CART_EMBED_HANDLE = "cart";
 
 /** Det, App Bridge's app.extensions() returnerer (kun det, vi bruger). */
 export type ExtensionInfoLike = {
@@ -33,8 +35,15 @@ export function blockStatus(
   return describeBlock(extensions).status;
 }
 
-/** Status og en kort teknisk forklaring, når status ikke kan afgøres. */
-export function describeBlock(extensions: unknown): {
+/**
+ * Status og en kort teknisk forklaring, når status ikke kan afgøres. Gælder
+ * både produktsidens blok og kurvens app embed (handle = filnavnet i
+ * blocks/).
+ */
+export function describeBlock(
+  extensions: unknown,
+  handle: string = BLOCK_HANDLE,
+): {
   status: BlockStatus;
   reason: string | null;
 } {
@@ -61,9 +70,7 @@ export function describeBlock(extensions: unknown): {
       reason: `temaudvidelsen hedder ${themeExtensions.map((e) => e.handle).join(", ")}`,
     };
   }
-  const block = (ours.activations ?? []).find(
-    (a) => a?.handle === BLOCK_HANDLE,
-  );
+  const block = (ours.activations ?? []).find((a) => a?.handle === handle);
   if (!block) return { status: "inactive", reason: null };
   return {
     status: block.status === "active" ? "active" : "inactive",
@@ -85,6 +92,18 @@ export function themeBlockUrl(apiKey: string) {
   return `shopify://admin/themes/current/editor?${params}`;
 }
 
+/**
+ * Dybt link til temaeditoren: åbner «App-integrationer» med kurvens app
+ * embed slået til. Butikken skal kun trykke «Gem».
+ */
+export function cartEmbedUrl(apiKey: string) {
+  const params = new URLSearchParams({
+    context: "apps",
+    activateAppId: `${apiKey}/${CART_EMBED_HANDLE}`,
+  });
+  return `shopify://admin/themes/current/editor?${params}`;
+}
+
 export type SetupState = {
   hasProducts: boolean;
   hasDelivery: boolean;
@@ -92,9 +111,17 @@ export type SetupState = {
   block: BlockStatus;
   /** Butikken har selv bekræftet blokken (bruges, når status er ukendt). */
   blockConfirmed?: boolean;
+  /** Kurvens app embed i det udgivne tema. */
+  cart?: BlockStatus;
+  /** Butikken har selv bekræftet kurvens app embed. */
+  cartConfirmed?: boolean;
 };
 
-export type SetupStepId = "products" | "delivery" | "enable" | "block";
+export type SetupStepId = "products" | "delivery" | "enable" | "block" | "cart";
+
+/** Shopify har det sidste ord; butikkens bekræftelse tæller kun ved «ukendt». */
+const isOn = (status: BlockStatus | undefined, confirmed?: boolean) =>
+  status === "active" || ((status ?? "unknown") === "unknown" && Boolean(confirmed));
 
 /** Trinnene i rækkefølge, og om hvert er gjort. */
 export function setupSteps(state: SetupState) {
@@ -106,10 +133,9 @@ export function setupSteps(state: SetupState) {
       id: "block",
       // Shopify har det sidste ord: melder Shopify blokken inaktiv, tæller
       // butikkens egen bekræftelse ikke.
-      done:
-        state.block === "active" ||
-        (state.block === "unknown" && Boolean(state.blockConfirmed)),
+      done: isOn(state.block, state.blockConfirmed),
     },
+    { id: "cart", done: isOn(state.cart, state.cartConfirmed) },
   ];
   const done = steps.filter((s) => s.done).length;
   return {
