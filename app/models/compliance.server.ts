@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { purgeWaitlist, waitlistFor } from "./waitlist.server";
 import { purgeReleaseHistory } from "./release.server";
+import { accessLogFor, purgeAccessLog } from "./accessLog.server";
 
 // Databeskyttelse: kunders dataanmodninger og sletning.
 //
@@ -140,6 +141,11 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
       data: StoredOrderData[];
       waitlist?: StoredWaitlist[];
     }) {
+      await accessLogFor(shop, client).record({
+        action: "export_customer_data",
+        subject: `customer ${input.customerId}`,
+        purpose: "customers/data_request",
+      });
       return client.dataRequest.create({
         data: {
           shop,
@@ -152,11 +158,20 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
       });
     },
 
+    /** Dataanmodningerne til admin. Visningen logges (actor «admin»). */
     async dataRequests() {
       const rows = await client.dataRequest.findMany({
         where: { shop },
         orderBy: { receivedAt: "desc" },
       });
+      await accessLogFor(shop, client).record(
+        ...rows.map((row) => ({
+          action: "view_data_request" as const,
+          subject: `customer ${row.customerId}`,
+          purpose: "data request shown in admin",
+          actor: "admin" as const,
+        })),
+      );
       return rows.map((row) => ({
         ...row,
         orderIds: JSON.parse(row.orderIds) as string[],
@@ -190,6 +205,11 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
     }) {
       const emailHash = input.emailHash ?? null;
       const orders = new Set(input.orderIds);
+      await accessLogFor(shop, client).record({
+        action: "erase_customer",
+        subject: `customer ${input.customerId}`,
+        purpose: "customers/redact",
+      });
       const events = await client.webhookEvent.findMany({
         where: {
           shop,
@@ -250,6 +270,9 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
      */
     async redactShop() {
       const where = { where: { shop } };
+      // Loggen slettes med resten; selve sletningen står i serverens log.
+      console.info(`PREAURA: shop/redact — alt om ${shop} slettes.`);
+      await accessLogFor(shop, client).deleteAll();
       // Tildelinger før leverancer (fremmednøglen forbyder det omvendte).
       await client.$transaction([
         client.allocation.deleteMany(where),
@@ -310,6 +333,7 @@ export async function purgeOldData(
   ]);
   const waitlist = await purgeWaitlist(client, now);
   const release = await purgeReleaseHistory(client, now);
+  const accessLog = await purgeAccessLog(client, now);
   return {
     events: events.count,
     dataRequests: requests.count,
@@ -319,5 +343,6 @@ export async function purgeOldData(
     waitlistNotified: waitlist.notified,
     releaseRequests: release.requests,
     releaseIssues: release.issues,
+    accessLog,
   };
 }

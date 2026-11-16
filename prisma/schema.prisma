@@ -506,3 +506,23 @@ model PaymentIssue {
   @@index([shop, status, releaseAt])
   @@index([shop, orderId])
 }
+
+// Adgangslog: hver gang appen læser kundens navn eller e-mail (fra Shopify
+// eller dekrypteret fra databasen), eksporterer en kundes data eller sletter
+// dem. Indeholder ingen persondata — kun id'er, hvad der skete og hvorfor.
+// Slettes efter 365 dage og ved shop/redact.
+model AccessLog {
+  id      String   @id @default(cuid())
+  shop    String
+  at      DateTime @default(now())
+  /// Hvem: «system» (appen selv) eller «admin» (butikken i appen).
+  actor   String
+  /// Hvad: fx read_customer_contact, decrypt_event_payload.
+  action  String
+  /// Hvilken ressource: ordrens, hændelsens eller tilmeldingens id.
+  subject String
+  /// Hvorfor, kort.
+  purpose String
+
+  @@index([shop, at])
+}

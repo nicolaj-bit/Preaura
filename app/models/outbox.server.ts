@@ -1,3 +1,4 @@
+import { accessLogFor } from "./accessLog.server";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { decrypt, encrypt, last4, randomSecret } from "../lib/crypto.server";
@@ -226,6 +227,14 @@ export function outboxFor(shop: string, client: PrismaClient = db) {
           orderBy: { nextAttemptAt: "asc" },
           take: limit,
         });
+        const withPayload = rows.filter((row) => row.event.payloadEnc);
+        await accessLogFor(shop, client).record(
+          ...withPayload.map((row) => ({
+            action: "decrypt_event_payload" as const,
+            subject: row.eventId,
+            purpose: `send to ${row.channel}`,
+          })),
+        );
         return rows.map((row) => ({
           id: row.id,
           channel: row.channel as Channel,

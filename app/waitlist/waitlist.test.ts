@@ -119,6 +119,12 @@ describe("tilmelding", () => {
     expect(row.emailEnc).not.toContain("anna");
     expect(row.emailHash).toBe(hashEmail("anna@example.com"));
     expect(await waitlist().emailFor(row.id)).toBe("anna@example.com");
+    // Læsningen af e-mailen står i adgangsloggen — uden e-mailen.
+    const log = await client.accessLog.findMany({ where: { shop: SHOP } });
+    expect(log.map((r) => [r.action, r.subject])).toEqual([
+      ["decrypt_waitlist_email", row.id],
+    ]);
+    expect(JSON.stringify(log)).not.toContain("anna");
   });
 
   it("samme e-mail på samme variant står der kun én gang", async () => {

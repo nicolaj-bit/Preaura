@@ -1,3 +1,4 @@
+import { accessLogFor } from "./accessLog.server";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
@@ -278,7 +279,13 @@ export function waitlistFor(shop: string, client: PrismaClient = db) {
         where: { shop, id: entryId },
         select: { emailEnc: true },
       });
-      return row ? decrypt(row.emailEnc) : null;
+      if (!row) return null;
+      await accessLogFor(shop, client).record({
+        action: "decrypt_waitlist_email",
+        subject: entryId,
+        purpose: "waitlist notification",
+      });
+      return decrypt(row.emailEnc);
     },
   };
 }

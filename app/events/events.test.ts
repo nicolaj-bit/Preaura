@@ -388,6 +388,16 @@ describe("alle fire hændelser bygges ens uanset modtager", () => {
       Authorization: `Klaviyo-API-Key ${KLAVIYO_KEY}`,
       revision: KLAVIYO_REVISION,
     });
+    // Adgangsloggen: kundens navn og e-mail hentet én gang og dekrypteret
+    // én gang pr. modtager — uden persondata i loggen.
+    const log = await client.accessLog.findMany({ where: { shop: SHOP } });
+    expect(log.map((r) => r.action).sort()).toEqual([
+      "decrypt_event_payload",
+      "decrypt_event_payload",
+      "decrypt_event_payload",
+      "read_customer_contact",
+    ]);
+    expect(JSON.stringify(log)).not.toMatch(/kunde@example\.com|Anna/);
   });
 });
 
