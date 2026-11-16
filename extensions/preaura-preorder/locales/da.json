@@ -4,7 +4,7 @@
     "delivery_label": "Forventet levering",
     "message": "{label}: {date}",
     "note": "Varen er på forudbestilling. Du betaler først, når varen sendes.",
-    "sold_out_message": "Udsolgt – alle leverancer er udsolgt.",
+    "sold_out_message": "Udsolgt, alle leverancer er udsolgt.",
     "button_text": "Forudbestil",
     "remaining_text": "Kun {count} tilbage i denne leverance.",
     "timeline_sold_out": "udsolgt",

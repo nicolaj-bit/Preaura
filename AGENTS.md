@@ -46,3 +46,10 @@ PREAURA har to miljøer, der ikke deler noget:
    Shopify (annullere eller nedsætte antal) og lade `orders.apply` afstemme.
    Byg aldrig en anden vej, der frigiver i appens eget regnskab. Appen
    udbetaler aldrig penge.
+
+# Skrivestil
+
+**Brug aldrig tankestreg** («—», «–» eller « - » mellem ord) i tekster, der
+skrives: app-tekster, butikstekster, App Store-tekster, billeder, svar og
+dokumentation. Brug komma i stedet. Bindestreg inde i et ord
+(fx «Shopify-logo») er fint.

@@ -23,7 +23,7 @@ const defaults = {
   shippingLabel: "Forventet afsendelse",
   deliveryLabel: "Forventet levering",
   message: "{label}: {dato}",
-  soldOutMessage: "Udsolgt – alle leverancer er udsolgt.",
+  soldOutMessage: "Udsolgt, alle leverancer er udsolgt.",
   changeButtonText: false,
   buttonText: "Forudbestil",
 };
@@ -191,7 +191,7 @@ describe("app-blokken på produktsiden", () => {
     });
     expect(p.fields()).toEqual({});
     expect(p.root.hidden).toBe(false);
-    expect(p.message()).toBe("Udsolgt – alle leverancer er udsolgt.");
+    expect(p.message()).toBe("Udsolgt, alle leverancer er udsolgt.");
   });
 
   it("vinder over temaets eget «Engangskøb», når formularen sendes", () => {
