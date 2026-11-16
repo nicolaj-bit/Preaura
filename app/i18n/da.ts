@@ -32,7 +32,7 @@ export const da = {
   "themeBlock.consequence":
     "Forudbestillinger bliver ikke vist for kunderne, før PREAURA-blokken er slået til på produktsiden i dit tema. Uden den ser kunderne hverken leveringsdatoen eller vilkårene, og datoen kommer ikke med i kurven og på ordren.",
   "themeBlock.howTo":
-    "Knappen åbner temaeditoren med blokken klar — tryk Gem. Shopify ser kun dit udgivne tema, så blokken skal ligge i det. Åbner knappen ikke blokken, understøtter dit tema sandsynligvis ikke app-blokke (det kræver et Online Store 2.0-tema). Skriv til os, så hjælper vi.",
+    "Knappen åbner temaeditoren med blokken klar. Tryk Gem. Shopify ser kun dit udgivne tema, så blokken skal ligge i det. Åbner knappen ikke blokken, understøtter dit tema sandsynligvis ikke app-blokke (det kræver et Online Store 2.0-tema). Skriv til os, så hjælper vi.",
   "themeBlock.button": "Tilføj blokken i temaet",
 
   // Forsiden
@@ -64,7 +64,7 @@ export const da = {
     "{count} ordrer de seneste 7 dage købte en vare på forudbestilling uden at vælge forudbestilling. Appen har talt dem med, men det kan betyde, at noget i opsætningen er galt.",
   "home.products.heading": "Produkter",
   "home.products.empty":
-    "Du har ikke valgt nogen produkter endnu. Vælg de produkter, der skal kunne forudbestilles, når de er udsolgt — fx en vare, du venter en ny forsendelse af. Produkterne bliver solgt almindeligt fra lageret, indtil lageret rammer 0.",
+    "Du har ikke valgt nogen produkter endnu. Vælg de produkter, der skal kunne forudbestilles, når de er udsolgt, fx en vare, du venter en ny forsendelse af. Produkterne bliver solgt almindeligt fra lageret, indtil lageret rammer 0.",
   "home.overview.heading": "Oversigt",
   "home.overview.intro": "Forudbestillinger fra ordrer i perioden. Beløb i butikkens valuta.",
   "home.period.days": "{count} dage",
@@ -107,7 +107,7 @@ export const da = {
   "guide.headingDone": "PREAURA er sat op",
   "guide.heading": "Kom i gang med PREAURA",
   "guide.progress": "{done} af {total} trin gjort",
-  "guide.progressDone": " — dine kunder kan nu forudbestille.",
+  "guide.progressDone": ", dine kunder kan nu forudbestille.",
   "guide.show": "Vis trin",
   "guide.hide": "Skjul",
   "guide.openProduct": "Åbn produktet",
@@ -123,15 +123,15 @@ export const da = {
     "Åbn produktet, og skriv hvornår du forventer at sende varerne, og hvor mange du vil sælge på forudbestilling. Datoen er den, kunderne får lovet.",
   "guide.enable.title": "Slå forudbestilling til",
   "guide.enable.text":
-    "Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv til forudbestilling, når lageret rammer 0. Har varen stadig lager, ser kunderne ingen forudbestilling endnu — vil du se den med det samme, så slå «Tving forudbestilling» til på produktet.",
+    "Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv til forudbestilling, når lageret rammer 0. Har varen stadig lager, ser kunderne ingen forudbestilling endnu. Vil du se den med det samme, så slå «Tving forudbestilling» til på produktet.",
   "guide.block.title": "Vis forudbestillingen på produktsiden",
   "guide.block.text":
-    "Tilføj PREAURA-blokken i dit tema. Knappen åbner temaeditoren med blokken klar — du skal kun trykke Gem.",
+    "Tilføj PREAURA-blokken i dit tema. Knappen åbner temaeditoren med blokken klar. Du skal kun trykke Gem.",
   "guide.block.unknown":
     "Shopify kan ikke fortælle os, om blokken er tilføjet{reason}. Har du tilføjet den og trykket Gem, så markér trinnet som gjort.",
   "guide.cart.title": "Vis i kurven, at der intet betales i dag",
   "guide.cart.text":
-    "Slå «PREAURA kurv» til under App-integrationer. Så står der under hver forudbestilt vare i kurven, at der intet betales i dag, og over knappen til kassen, hvad der trækkes ved afsendelse. Knappen åbner temaeditoren med den slået til — du skal kun trykke Gem.",
+    "Slå «PREAURA kurv» til under App-integrationer. Så står der under hver forudbestilt vare i kurven, at der intet betales i dag, og over knappen til kassen, hvad der trækkes ved afsendelse. Knappen åbner temaeditoren med den slået til. Du skal kun trykke Gem.",
   "guide.cart.unknown":
     "Shopify kan ikke fortælle os, om den er slået til{reason}. Har du slået den til og trykket Gem, så markér trinnet som gjort.",
 
@@ -193,7 +193,7 @@ export const da = {
     "Shopify er ikke opdateret endnu. Tryk «Synkronisér» på en af varianterne.",
   "product.modeMixed.heading": "Blandet: nogle varianter sælges almindeligt",
   "product.modeMixed.text1":
-    "Kun nogle varianter er på forudbestilling. Shopify kan kun kræve forudbestilling for hele produktet, og det ville spærre de almindelige varianter — så det bliver ikke slået til.",
+    "Kun nogle varianter er på forudbestilling. Shopify kan kun kræve forudbestilling for hele produktet, og det ville spærre de almindelige varianter, så det bliver ikke slået til.",
   "product.modeMixed.text2":
     "I stedet sørger PREAURA-blokken på produktsiden for, at varianterne på forudbestilling købes som forudbestilling. Køber nogen alligevel uden (fx via en kladdeordre eller POS), tæller appen salget med i den aktive leverance og viser det under Ordrebehandling.",
   "product.deliveries": "Leverancer",
@@ -217,7 +217,7 @@ export const da = {
   "product.mode.forcedText":
     "Varianten er tvunget i forudbestilling af dig, selvom der kan være varer på lager. Appen styrer lageret, indtil du slår tvangen fra.",
   "product.mode.autoText":
-    "Lageret er tomt. Kunderne kan forudbestille, og appen styrer lageret ud fra leverancerne. Lægger du varer på lager (som en tilføjelse, fx +20), skifter varianten selv tilbage — efter at forudbestillingerne er dækket.",
+    "Lageret er tomt. Kunderne kan forudbestille, og appen styrer lageret ud fra leverancerne. Lægger du varer på lager (som en tilføjelse, fx +20), skifter varianten selv tilbage, når forudbestillingerne er dækket.",
   "product.mode.lastChanged": "Sidst skiftet {date}: {reason}",
   "product.mode.neverChanged": "Har ikke skiftet tilstand endnu.",
   "product.force.label": "Tving forudbestilling",
@@ -273,7 +273,7 @@ export const da = {
   "delivery.ready.one": "1 forudbestilling markeret klar til afsendelse",
   "delivery.ready.other":
     "{count} forudbestillinger markeret klar til afsendelse",
-  "delivery.arrived": "Varerne er kommet — klar til afsendelse",
+  "delivery.arrived": "Varerne er kommet, klar til afsendelse",
   "delivery.activeLines": "Aktive ordrelinjer",
   "delivery.orders": "Ordrer",
   "delivery.noOrders": "Ingen ordrer i denne leverance endnu.",
@@ -290,9 +290,9 @@ export const da = {
   "validation.dateInvalid":
     "Datoen kan ikke læses. Vælg den i kalenderen, eller skriv den som ÅÅÅÅ-MM-DD, fx 2027-01-15.",
   "validation.dateNotFuture":
-    "Datoen er i dag eller er passeret. Vælg en dato fra i morgen og frem — det er den dato, kunderne får lovet.",
+    "Datoen er i dag eller er passeret. Vælg en dato fra i morgen og frem. Det er den dato, kunderne får lovet.",
   "validation.quantityInvalid":
-    "Skriv antallet som et helt tal, fx 50 — uden komma, mellemrum eller «stk.».",
+    "Skriv antallet som et helt tal, fx 50, uden komma, mellemrum eller «stk.».",
   "validation.quantityNotPositive":
     "Antallet skal være mindst 1: det er, hvor mange du kan sælge på forudbestilling i leverancen. Vil du stoppe salget, så annullér leverancen i stedet.",
   "validation.quantityBelowAllocated":
@@ -425,9 +425,9 @@ export const da = {
   "queue.withoutPlan.none":
     "Alle forudbestillinger er købt som forudbestilling.",
   "queue.withoutPlan.intro.one":
-    "1 ordre de seneste 30 dage købte en vare på forudbestilling uden at vælge forudbestilling — fx en kladdeordre, et salg i POS, en ordre fra en anden app, eller fordi PREAURA-blokken mangler på produktsiden. Appen har talt den med i den aktive leverance, så varen ikke sælges for meget. Sker det tit, er der som regel noget galt i opsætningen.",
+    "1 ordre de seneste 30 dage købte en vare på forudbestilling uden at vælge forudbestilling, fx en kladdeordre, et salg i POS, en ordre fra en anden app, eller fordi PREAURA-blokken mangler på produktsiden. Appen har talt den med i den aktive leverance, så varen ikke sælges for meget. Sker det tit, er der som regel noget galt i opsætningen.",
   "queue.withoutPlan.intro.other":
-    "{count} ordrer de seneste 30 dage købte en vare på forudbestilling uden at vælge forudbestilling — fx en kladdeordre, et salg i POS, en ordre fra en anden app, eller fordi PREAURA-blokken mangler på produktsiden. Appen har talt dem med i den aktive leverance, så varen ikke sælges for meget. Sker det tit, er der som regel noget galt i opsætningen.",
+    "{count} ordrer de seneste 30 dage købte en vare på forudbestilling uden at vælge forudbestilling, fx en kladdeordre, et salg i POS, en ordre fra en anden app, eller fordi PREAURA-blokken mangler på produktsiden. Appen har talt dem med i den aktive leverance, så varen ikke sælges for meget. Sker det tit, er der som regel noget galt i opsætningen.",
   "queue.failed.heading": "Hændelser, der fejlede",
   "queue.failed.none": "Ingen fejl.",
   "queue.retry": "Prøv igen",
@@ -489,13 +489,13 @@ export const da = {
     "Senere annulleringer venter på din godkendelse.",
   "releases.rules.grace": "Dage til at betale, hvis betalingen afvises",
   "releases.rules.graceDetails":
-    "Kunden betaler først, når du sender varen. Afvises betalingen da — fx fordi kortet er udløbet — får kunden så mange dage til at betale. Betaler kunden ikke inden da, annulleres forudbestillingen, og varen kommer tilbage i leverancen, så en anden kan købe den.",
+    "Kunden betaler først, når du sender varen. Afvises betalingen da, fx fordi kortet er udløbet, får kunden så mange dage til at betale. Betaler kunden ikke inden da, annulleres forudbestillingen, og varen kommer tilbage i leverancen, så en anden kan købe den.",
   "releases.rules.link":
     "Kundens link til at annullere står på ordren som metafeltet {field} og i hændelserne til Klaviyo, Shopify Flow og webhook.",
   "releases.history": "Historik",
-  "releases.history.request": "{order}: {count} stk., {date} —",
+  "releases.history.request": "{order}: {count} stk., {date}",
   "releases.history.retrying": "Forsøger igen: ",
-  "releases.history.issue": "{order}: betaling afvist {date} —",
+  "releases.history.issue": "{order}: betaling afvist {date}",
   // Venteliste
   "waitlist.heading": "Venteliste",
   "waitlist.saved": "Indstillinger gemt",
@@ -506,14 +506,14 @@ export const da = {
     "Tilmeldinger samles, men der udløses ingen beskeder, før mindst én modtager er slået til under",
   "waitlist.waiting.heading": "Venter på besked ({count})",
   "waitlist.empty":
-    "Ingen har skrevet sig op endnu. Feltet vises på produktsiden, når en variant hverken kan købes på lager eller forudbestilles — slå det til i blokken «Forudbestilling» i temaeditoren.",
+    "Ingen har skrevet sig op endnu. Feltet vises på produktsiden, når en variant hverken kan købes på lager eller forudbestilles. Slå det til i blokken «Forudbestilling» i temaeditoren.",
   "waitlist.col.product": "Produkt",
   "waitlist.col.variant": "Variant",
   "waitlist.col.waiting": "Venter nu",
   "waitlist.col.notified": "Har fået besked",
   "waitlist.how.heading": "Sådan sendes beskederne",
   "waitlist.how.text":
-    "Når en variant kan købes igen — fordi den er kommet på lager, eller fordi en leverance med ledige pladser er åbnet — får de tilmeldte besked i den rækkefølge, de skrev sig op. Hver tilmelding får én besked og lukkes derefter. Selve beskeden sender du via Shopify Flow eller Klaviyo.",
+    "Når en variant kan købes igen, fordi den er kommet på lager, eller fordi en leverance med ledige pladser er åbnet, får de tilmeldte besked i den rækkefølge, de skrev sig op. Hver tilmelding får én besked og lukkes derefter. Selve beskeden sender du via Shopify Flow eller Klaviyo.",
   "waitlist.stable.label": "Ventetid (minutter)",
   "waitlist.stable.details":
     "Varen skal have kunnet købes så længe, før der sendes. Så giver et kort udsving i lageret ingen beskeder.",
@@ -525,7 +525,7 @@ export const da = {
     "Tid mellem to portioner. Før hver portion tjekkes det, at varen stadig kan købes.",
   "waitlist.only.heading": "Kun besked om varen",
   "waitlist.only.text":
-    "Kunden har selv bedt om beskeden, så den må sendes uden samtykke — men kun hvis den handler om varen. Lægger du tilbud, andre varer eller rabatkoder i den, bliver den markedsføring og kræver samtykke (i Danmark markedsføringslovens § 10). Tilmeldingen må ikke bruges til nyhedsbrev.",
+    "Kunden har selv bedt om beskeden, så den må sendes uden samtykke, men kun hvis den handler om varen. Lægger du tilbud, andre varer eller rabatkoder i den, bliver den markedsføring og kræver samtykke (i Danmark markedsføringslovens § 10). Tilmeldingen må ikke bruges til nyhedsbrev.",
   // Hændelser
   "events.heading": "Hændelser",
   "events.toast.confirmed": "Bekræftet",
@@ -548,16 +548,16 @@ export const da = {
   "events.status.PENDING": "Venter",
   "events.waitlistRef": "Venteliste",
   "events.intro":
-    "PREAURA sender en hændelse, når der sker noget med en forudbestilling: oprettet, forsinket, klar til afsendelse, annulleret eller betaling afvist — og når en vare på ventelisten kan købes igen. Hver hændelse indeholder butik, kundens navn og e-mail, ordrenummer, produkt og variant, antal, leverancens dato, den tidligere dato, hvis den er ændret, og et entydigt id. Indholdet er det samme hos alle modtagere — det er jer, der bygger mailen.",
+    "PREAURA sender en hændelse, når der sker noget med en forudbestilling: oprettet, forsinket, klar til afsendelse, annulleret eller betaling afvist, og når en vare på ventelisten kan købes igen. Hver hændelse indeholder butik, kundens navn og e-mail, ordrenummer, produkt og variant, antal, leverancens dato, den tidligere dato, hvis den er ændret, og et entydigt id. Indholdet er det samme hos alle modtagere. Det er jer, der bygger mailen.",
   "events.responsibility.heading": "Ansvar for kundeoplysninger",
   "events.responsibility.warning":
-    "Webhook og Klaviyo sender kundens navn og e-mail videre til en tredjepart. Butikken er selv ansvarlig for at have et lovligt grundlag for det (fx samtykke eller kundens ordre) og for sin egen aftale med modtageren. PREAURA sender kun på butikkens instruks og er databehandler — ikke afsender.",
+    "Webhook og Klaviyo sender kundens navn og e-mail videre til en tredjepart. Butikken er selv ansvarlig for at have et lovligt grundlag for det (fx samtykke eller kundens ordre) og for sin egen aftale med modtageren. PREAURA sender kun på butikkens instruks og er databehandler, ikke afsender.",
   "events.responsibility.label":
     "Butikken har grundlag for at sende kundeoplysninger til de modtagere, den slår til nedenfor",
   "events.responsibility.accepted":
     "Bekræftet {date}. Fjernes bekræftelsen, slås webhook og Klaviyo fra.",
   "events.responsibility.required":
-    "Kræves for at slå webhook og Klaviyo til. Shopify Flow kræver det ikke — det bliver i Shopify.",
+    "Kræves for at slå webhook og Klaviyo til. Shopify Flow kræver det ikke, for det bliver i Shopify.",
   "events.flow.label": "Send hændelser til Shopify Flow",
   "events.flow.details":
     "Hver hændelse er en trigger i Flow, fx «Forudbestilling oprettet» og «Forudbestilling klar til afsendelse». Byg en workflow i Flow-appen, fx en mail eller et tag, når ordren er klar.",
@@ -571,7 +571,7 @@ export const da = {
   "events.webhook.label": "Send hændelser til webhooken",
   "events.webhook.secret": "Signaturnøgle",
   "events.webhook.signature":
-    "Hvert kald har headeren {header}: HMAC-SHA256 af den rå tekst i kaldet med denne nøgle, base64-kodet. Beregn den selv, og sammenlign — så ved I, at kaldet kommer fra PREAURA. Headeren X-Preaura-Event-Id er hændelsens id; brug den til at se bort fra gentagelser.",
+    "Hvert kald har headeren {header}: HMAC-SHA256 af den rå tekst i kaldet med denne nøgle, base64-kodet. Beregn den selv, og sammenlign. Så ved I, at kaldet kommer fra PREAURA. Headeren X-Preaura-Event-Id er hændelsens id; brug den til at se bort fra gentagelser.",
   "events.webhook.newSecret": "Lav ny signaturnøgle",
   "events.klaviyo.intro":
     "Hændelserne sendes til Klaviyo som metrics, fx «PREAURA: Forudbestilling klar til afsendelse», på kundens profil. Klaviyo opretter selv metricen første gang, og den kan bruges som udløser i et flow. Brug en privat API-nøgle med adgang til Events (Settings → API keys i Klaviyo).",
@@ -666,7 +666,7 @@ export const da = {
   "action.variantMissing": "Varianten findes ikke i appen.",
   "action.cancelledNoEdit": "En annulleret leverance kan ikke rettes.",
   "action.hasOrders":
-    "Leverancen har tildelte ordrer og kan ikke slettes. Annullér den i stedet — så kan du se, hvilke ordrer der er berørt.",
+    "Leverancen har tildelte ordrer og kan ikke slettes. Annullér den i stedet, så kan du se, hvilke ordrer der er berørt.",
   "integration.urlCredentials":
     "Adressen må ikke indeholde brugernavn eller adgangskode.",
   "integration.urlPublic":
@@ -675,9 +675,9 @@ export const da = {
     "Det ligner ikke en privat Klaviyo-nøgle. Den starter med pk_ og findes under Settings → API keys i Klaviyo.",
   // Noter på ordren i Shopify
   "orderNote.cancelled":
-    "Annulleret af PREAURA. Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+    "Annulleret af PREAURA. Intet er refunderet. Refundér i Shopify, hvis kunden har betalt.",
   "orderNote.reduced":
-    "Antal nedsat af PREAURA (annullering). Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+    "Antal nedsat af PREAURA (annullering). Intet er refunderet. Refundér i Shopify, hvis kunden har betalt.",
   // Kundens side til annullering (i butikken)
   "cancelPage.heading": "Annullér forudbestilling",
   "cancelPage.invalid":

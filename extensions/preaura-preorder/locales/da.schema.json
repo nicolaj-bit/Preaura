@@ -34,8 +34,8 @@
       },
       "sold_out_message": {
         "label": "Besked, når alt er udsolgt",
-        "info": "Standard: «Udsolgt – alle leverancer er udsolgt.» Står feltet tomt, bruges standardteksten på kundens sprog.",
-        "placeholder": "Udsolgt – alle leverancer er udsolgt."
+        "info": "Standard: «Udsolgt, alle leverancer er udsolgt.» Står feltet tomt, bruges standardteksten på kundens sprog.",
+        "placeholder": "Udsolgt, alle leverancer er udsolgt."
       },
       "change_button_text": {
         "label": "Skift teksten på købsknappen",
@@ -55,7 +55,7 @@
       },
       "remaining_threshold": {
         "label": "Vis først tallet, når der er højst",
-        "info": "Fx 25: «Kun 480 tilbage» skaber ingen hast — det er bare støj."
+        "info": "Fx 25: «Kun 480 tilbage» skaber ingen hast. Det er bare støj."
       },
       "remaining_text": {
         "label": "Tekst",
@@ -88,7 +88,7 @@
         "content": "Venteliste"
       },
       "waitlist_intro": {
-        "content": "Kan varianten hverken købes på lager eller forudbestilles, kan kunden skrive sig op og få besked, når den kan købes. Beskeden sendes som hændelse til Shopify Flow, Klaviyo eller din webhook. Den må kun handle om varen — tilbud, andre varer og rabatkoder kræver samtykke."
+        "content": "Kan varianten hverken købes på lager eller forudbestilles, kan kunden skrive sig op og få besked, når den kan købes. Beskeden sendes som hændelse til Shopify Flow, Klaviyo eller din webhook. Den må kun handle om varen. Tilbud, andre varer og rabatkoder kræver samtykke."
       },
       "waitlist_enabled": {
         "label": "Vis tilmelding til venteliste"
@@ -110,7 +110,7 @@
       },
       "waitlist_success": {
         "label": "Svar efter tilmelding",
-        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Standard: «Tak. Vi giver dig besked, når varen kan købes.» Står feltet tomt, bruges standardteksten på kundens sprog.",
+        "info": "Vises altid efter en tilmelding, også hvis e-mailen allerede stod på listen. Standard: «Tak. Vi giver dig besked, når varen kan købes.» Står feltet tomt, bruges standardteksten på kundens sprog.",
         "placeholder": "Tak. Vi giver dig besked, når varen kan købes."
       },
       "waitlist_invalid": {
