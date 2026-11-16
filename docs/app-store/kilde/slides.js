@@ -1,3 +1,4 @@
+/* eslint-env node */
 const { chromium } = require('playwright'); const path = require('path'); const fs = require('fs');
 (async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:1600,height:900}, deviceScaleFactor:1 });
   fs.mkdirSync('ud/da',{recursive:true}); fs.mkdirSync('ud/en',{recursive:true});
