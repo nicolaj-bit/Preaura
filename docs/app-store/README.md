@@ -6,7 +6,7 @@ engelsk, og app-ikonet (1200 × 1200) i en mørk og en lys udgave.
 Billederne er bygget i `kilde/`. PREAURAs dele (datoboks, tidslinje, kurvens
 beløb, venteliste) bruger samme stil som temaudvidelsen, og admin-siderne er
 lavet med Shopifys Polaris-komponenter og appens egne tekster. Tallene er
-demodata. Produktfotos er LALATOTOs egne.
+demodata.
 
 Byg igen (kræver Playwright og netadgang til Google Fonts og cdn.shopify.com):
 

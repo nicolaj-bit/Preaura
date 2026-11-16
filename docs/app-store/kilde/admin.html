@@ -13,7 +13,7 @@ body.dark{--bg:#221C19;--ink:#F4EEE8;--soft:#CDBFB4;background:radial-gradient(1
  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
 .copy{position:absolute;left:100px;top:0;bottom:0;width:520px;display:flex;flex-direction:column;justify-content:center;gap:26px;z-index:3}
 .eyebrow{font-weight:500;font-size:16px;letter-spacing:.34em;text-transform:uppercase;color:var(--bronze)}
-h1{font-family:Marcellus,serif;font-weight:400;font-size:52px;line-height:1.1}
+h1{text-wrap:balance;font-family:Marcellus,serif;font-weight:400;font-size:52px;line-height:1.1}
 .sub{font-size:21px;line-height:1.55;color:var(--soft);max-width:470px}
 .brand{position:absolute;left:100px;bottom:58px;font-family:Marcellus,serif;font-size:24px;letter-spacing:.16em;z-index:3}
 .brand b{color:var(--bronze);font-weight:400}
@@ -59,6 +59,11 @@ h1{font-family:Marcellus,serif;font-weight:400;font-size:52px;line-height:1.1}
 .preaura-cart-totals>div{display:flex;justify-content:space-between;gap:1em;font-size:19px}
 .preaura-cart-totals>div:last-child{font-weight:600;font-size:22px}
 
+.glow{position:absolute;border-radius:50%;filter:blur(10px);background:radial-gradient(circle,rgba(176,138,118,.45),rgba(176,138,118,0) 68%);z-index:0}
+.ring.front{display:none}
+.ring{z-index:1}
+body.dark .panel{box-shadow:0 40px 100px rgba(0,0,0,.55)}
+body.dark{--ink:#F4EEE8;--soft:#CDBFB4;background:radial-gradient(1200px 900px at 75% 30%,#4A3E37 0%,#2A2420 50%,#1B1614 100%)}
 .panel{position:absolute;right:70px;top:50%;transform:translateY(-50%);width:900px;background:#F1F1F1;border-radius:24px;overflow:hidden;
  box-shadow:0 40px 90px rgba(42,36,32,.28),0 2px 8px rgba(42,36,32,.08);z-index:2;padding:26px;font-family:Inter,-apple-system,"Segoe UI",sans-serif}
 .panel .bar{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#303030;margin:0 0 18px 4px}
@@ -102,7 +107,8 @@ en:{
  newD:'New delivery',date:'Date',qty:'Quantity',add:'Add delivery'}}[L];
 const thumbs={'Luksus sengeslange':'img/sengeslange1.jpg','Luxury bed bumper':'img/sengeslange1.jpg','Månepude':'img/manepude-2.jpg','Moon pillow':'img/manepude-2.jpg'};
 const [eb,h,sub]=S==='5'?T.s5:T.s6;
-const ring=(l,t,w,hh,r)=>`<div class="ring" style="left:${l}px;top:${t}px;width:${w}px;height:${hh}px;transform:rotate(${r}deg)"></div>`;
+const ring=(l,t,w,hh,r)=>{const st=`left:${l}px;top:${t}px;width:${w}px;height:${hh}px;transform:rotate(${r}deg)`;return `<div class="ring" style="${st}"></div><div class="ring front" style="${st}"></div>`};
+if(S==='5') document.body.classList.add('dark');
 let panel='';
 if(S==='5'){
  const stat=([i,l,v,tr])=>`<s-box padding="base" border="base" borderRadius="base" background="base"><s-stack gap="small-200"><s-stack direction="inline" gap="small-200" alignItems="center"><s-icon type="${i}" size="small"></s-icon><s-text color="subdued">${l}</s-text></s-stack><s-stack direction="inline" gap="small-200" alignItems="center"><s-heading>${v}</s-heading>${tr?`<s-badge tone="success">${tr}</s-badge>`:''}</s-stack></s-stack></s-box>`;
@@ -131,7 +137,7 @@ if(S==='5'){
    <s-stack direction="inline"><s-button variant="primary">${T.add}</s-button></s-stack></s-stack></s-box>
  </s-stack></s-section>`;
 }
-document.getElementById('root').innerHTML=ring(560,40,1000,300,-10)+`<div class="panel"><div class="bar"><img src="preaura-ikon-dark.png">PREAURA</div>${panel}</div>
+document.getElementById('root').innerHTML=`<div class="glow" style="left:700px;top:0;width:900px;height:900px"></div>`+ring(560,420,1040,300,-9)+`<div class="panel"><div class="bar"><img src="preaura-ikon-dark.png">PREAURA</div>${panel}</div>
  <div class="copy"><div class="eyebrow">${eb}</div><h1>${h}</h1><p class="sub">${sub}</p></div><div class="brand">PREAURA<b>.</b></div>`;
 Promise.all([document.fonts.ready,customElements.whenDefined('s-section')]).then(()=>setTimeout(()=>document.body.dataset.ready=1,1500));
 </script></body></html>
