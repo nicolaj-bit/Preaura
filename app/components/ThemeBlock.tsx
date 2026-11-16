@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   BLOCK_HANDLE,
@@ -74,30 +75,21 @@ export function ThemeBlockBanner({
   /** Er forudbestilling slået til på mindst én variant? */
   preorderOn: boolean;
 }) {
+  const { t } = useT();
   if (status !== "inactive") return null;
   return (
     <s-banner
       tone={preorderOn ? "critical" : "warning"}
       heading={
         preorderOn
-          ? "Dine kunder kan ikke se forudbestillingen endnu"
-          : "PREAURA-blokken mangler i dit tema"
+          ? t("themeBlock.headingPreorderOn")
+          : t("themeBlock.headingPreorderOff")
       }
     >
-      <s-paragraph>
-        Forudbestillinger bliver ikke vist for kunderne, før PREAURA-blokken er
-        slået til på produktsiden i dit tema. Uden den ser kunderne hverken
-        leveringsdatoen eller vilkårene, og datoen kommer ikke med i kurven og
-        på ordren.
-      </s-paragraph>
-      <s-paragraph>
-        Knappen åbner temaeditoren med blokken klar — tryk Gem. Shopify ser kun
-        dit udgivne tema, så blokken skal ligge i det. Åbner knappen ikke
-        blokken, understøtter dit tema sandsynligvis ikke app-blokke (det kræver
-        et Online Store 2.0-tema). Skriv til os, så hjælper vi.
-      </s-paragraph>
+      <s-paragraph>{t("themeBlock.consequence")}</s-paragraph>
+      <s-paragraph>{t("themeBlock.howTo")}</s-paragraph>
       <s-button slot="secondary-actions" href={url} target="_top">
-        Tilføj blokken i temaet
+        {t("themeBlock.button")}
       </s-button>
     </s-banner>
   );

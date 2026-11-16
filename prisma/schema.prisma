@@ -106,6 +106,9 @@ model ShopSetting {
   themeBlockConfirmed   Boolean  @default(false)
   // Det samme for kurvens app embed.
   cartEmbedConfirmed    Boolean  @default(false)
+  // Sproget i butiksejerens Shopify Admin («da» eller «en»), husket fra
+  // ?locale=, så appen kan vises på samme sprog (app/i18n).
+  adminLocale           String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

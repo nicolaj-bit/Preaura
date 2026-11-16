@@ -144,6 +144,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
         });
       },
 
+      /** Sproget i butiksejerens Shopify Admin (app/i18n/locale.server.ts). */
+      async setAdminLocale(locale: string) {
+        await client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, adminLocale: locale },
+          update: { adminLocale: locale },
+        });
+      },
+
       /** Butikken bekræfter selv, at kurvens app embed er slået til. */
       async setCartEmbedConfirmed(confirmed: boolean) {
         await client.shopSetting.upsert({

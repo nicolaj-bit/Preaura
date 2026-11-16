@@ -21,6 +21,8 @@ import {
 } from "../onboarding/setup";
 import { ThemeBlockBanner, useBlockInfo } from "../components/ThemeBlock";
 import { SUPPORT_EMAIL } from "../onboarding/support";
+import { formatDate, translate, useT, type MessageKey } from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 
 // Oversigt over produkter i appen. Produkter vælges med Shopifys egen
 // produktvælger. Et produkt står som slået til, hvis mindst én variant er.
@@ -28,6 +30,7 @@ import { SUPPORT_EMAIL } from "../onboarding/support";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const data = forShop(session.shop);
+  const locale = await localeFor(request, session.shop);
 
   const [summaries, settings] = await Promise.all([
     data.variantPlans.listProducts(),
@@ -68,12 +71,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ]),
     ),
   );
-  const dateFormat = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  });
-  const formatDate = (date: string) =>
-    dateFormat.format(new Date(`${date}T12:00:00Z`));
   const deliveries = views
     .filter((view) => view.state !== "CANCELLED")
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -81,13 +78,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const info = variantInfo.get(view.variantId);
       return {
         id: view.id,
-        productTitle: info?.product.title ?? "Ukendt produkt",
+        productTitle:
+          info?.product.title ?? translate(locale, "common.unknownProduct"),
         variantTitle:
           info && info.variantTitle !== "Default Title"
             ? info.variantTitle
             : null,
         imageUrl: info?.product.imageUrl ?? null,
-        date: formatDate(view.date),
+        date: formatDate(locale, view.date),
         allocated: view.allocated,
         quantity: view.quantity,
         pct: progressPct(view.allocated, view.quantity),
@@ -168,7 +166,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { guide: true };
   }
   if (form.get("intent") !== "addProducts") {
-    return { error: "Ukendt handling." };
+    return { error: "unknown_action" };
   }
 
   // Kun produkt-id'er kommer fra browseren. Varianter og lager-id'er hentes
@@ -207,6 +205,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const guide = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const { t, tn } = useT();
   const blockInfo = useBlockInfo();
   const block = blockInfo.status;
   const confirmBlock = () =>
@@ -228,8 +227,9 @@ export default function Index() {
 
   useEffect(() => {
     if (fetcher.data && "added" in fetcher.data && fetcher.data.added) {
-      shopify.toast.show("Produkter tilføjet");
+      shopify.toast.show(t("home.productsAdded"));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data, shopify]);
 
   async function selectProducts() {
@@ -247,14 +247,14 @@ export default function Index() {
   }
 
   return (
-    <s-page heading="Forudbestilling">
+    <s-page heading={t("home.heading")}>
       <s-button
         slot="primary-action"
         variant="primary"
         onClick={selectProducts}
         {...(busy ? { loading: true } : {})}
       >
-        Vælg produkter
+        {t("home.selectProducts")}
       </s-button>
 
       <ThemeBlockBanner
@@ -264,53 +264,39 @@ export default function Index() {
       />
 
       {unresolvedOrders > 0 && (
-        <s-banner tone="critical" heading="Ordrer uden plads i en leverance">
+        <s-banner tone="critical" heading={t("home.unresolved.heading")}>
           <s-paragraph>
-            {unresolvedOrders === 1
-              ? "1 ordre har"
-              : `${unresolvedOrders} ordrer har`}{" "}
-            forudbestilte varer, der ikke er plads til i nogen leverance.
+            {tn("home.unresolved.text", unresolvedOrders)}
           </s-paragraph>
           <s-link slot="secondary-actions" href="/app/queue">
-            Se ordrerne
+            {t("home.seeOrders")}
           </s-link>
         </s-banner>
       )}
       {dataRequests > 0 && (
-        <s-banner tone="warning" heading="En kunde har bedt om sine data">
+        <s-banner tone="warning" heading={t("home.dataRequests.heading")}>
           <s-paragraph>
-            {dataRequests === 1
-              ? "1 dataanmodning venter"
-              : `${dataRequests} dataanmodninger venter`}{" "}
-            på svar. Kunden har ret til svar inden for 30 dage.
+            {tn("home.dataRequests.text", dataRequests)}
           </s-paragraph>
           <s-link slot="secondary-actions" href="/app/queue">
-            Se anmodningen
+            {t("home.dataRequests.link")}
           </s-link>
         </s-banner>
       )}
       {failedEvents > 0 && (
-        <s-banner tone="warning" heading="Ordrer kunne ikke behandles">
-          <s-paragraph>
-            {failedEvents === 1 ? "1 hændelse" : `${failedEvents} hændelser`}{" "}
-            fra Shopify fejlede og venter på, at du prøver igen.
-          </s-paragraph>
+        <s-banner tone="warning" heading={t("home.failed.heading")}>
+          <s-paragraph>{tn("home.failed.text", failedEvents)}</s-paragraph>
           <s-link slot="secondary-actions" href="/app/queue">
-            Gå til ordrebehandling
+            {t("home.failed.link")}
           </s-link>
         </s-banner>
       )}
 
       {withoutPlan7 > 0 && (
-        <s-banner tone="info" heading="Forudbestillinger købt uden plan">
-          <s-paragraph>
-            {withoutPlan7 === 1 ? "1 ordre" : `${withoutPlan7} ordrer`} de
-            seneste 7 dage købte en vare på forudbestilling uden at vælge
-            forudbestilling. Appen har talt dem med, men det kan betyde, at
-            noget i opsætningen er galt.
-          </s-paragraph>
+        <s-banner tone="info" heading={t("home.withoutPlan.heading")}>
+          <s-paragraph>{tn("home.withoutPlan.text", withoutPlan7)}</s-paragraph>
           <s-link slot="secondary-actions" href="/app/queue">
-            Se ordrerne
+            {t("home.seeOrders")}
           </s-link>
         </s-banner>
       )}
@@ -340,17 +326,12 @@ export default function Index() {
       />
 
       {!setup.hasProducts && (
-        <s-section heading="Produkter">
+        <s-section heading={t("home.products.heading")}>
           <s-stack gap="base">
-            <s-paragraph>
-              Du har ikke valgt nogen produkter endnu. Vælg de produkter, der
-              skal kunne forudbestilles, når de er udsolgt — fx en vare, du
-              venter en ny forsendelse af. Produkterne bliver solgt almindeligt
-              fra lageret, indtil lageret rammer 0.
-            </s-paragraph>
+            <s-paragraph>{t("home.products.empty")}</s-paragraph>
             <s-stack direction="inline">
               <s-button variant="primary" onClick={selectProducts}>
-                Vælg produkter
+                {t("home.selectProducts")}
               </s-button>
             </s-stack>
           </s-stack>
@@ -363,45 +344,39 @@ export default function Index() {
           gap="base"
         >
           <StatCard
-            label="Forudbestillinger (30 dage)"
+            label={t("home.stats.orders30")}
             value={String(stats.orders30)}
             trend={stats.ordersTrendPct}
           />
           <StatCard
-            label="Forudbestilte stk. (30 dage)"
+            label={t("home.stats.units30")}
             value={String(stats.units30)}
           />
           <StatCard
-            label="Venter på varer"
-            value={`${stats.waitingUnits} stk.`}
+            label={t("home.stats.waiting")}
+            value={t("common.units", { count: stats.waitingUnits })}
             note={
               stats.readyUnits > 0
-                ? `${stats.readyUnits} stk. klar til afsendelse`
+                ? t("home.stats.ready", { count: stats.readyUnits })
                 : undefined
             }
           />
           <StatCard
-            label="Næste leverance"
-            value={stats.nextDelivery?.date ?? "Ingen"}
+            label={t("home.stats.next")}
+            value={stats.nextDelivery?.date ?? t("common.none")}
             note={stats.nextDelivery?.product}
           />
         </s-grid>
       )}
 
       {setup.hasProducts && deliveries.length === 0 && (
-        <s-section heading="Leverancer">
+        <s-section heading={t("home.deliveries.heading")}>
           <s-stack gap="base">
-            <s-paragraph>
-              Ingen leverancer endnu. En leverance er en forsendelse af varer,
-              du venter hjem: en forventet dato og et antal. Kunderne
-              forudbestiller i den første leverance med ledige pladser og får
-              dens dato lovet. Når den er udsolgt, fortsætter salget i den
-              næste.
-            </s-paragraph>
+            <s-paragraph>{t("home.deliveries.empty")}</s-paragraph>
             {setup.firstProduct && (
               <s-stack direction="inline">
                 <s-button href={`/app/products/${setup.firstProduct}`}>
-                  Opret den første leverance
+                  {t("home.deliveries.createFirst")}
                 </s-button>
               </s-stack>
             )}
@@ -410,13 +385,17 @@ export default function Index() {
       )}
 
       {deliveries.length > 0 && (
-        <s-section heading="Leverancer" padding="base">
+        <s-section heading={t("home.deliveries.heading")} padding="base">
           <s-table>
             <s-table-header-row>
-              <s-table-header listSlot="primary">Produkt</s-table-header>
-              <s-table-header>Dato</s-table-header>
-              <s-table-header>Solgt</s-table-header>
-              <s-table-header listSlot="secondary">Status</s-table-header>
+              <s-table-header listSlot="primary">
+                {t("home.col.product")}
+              </s-table-header>
+              <s-table-header>{t("home.col.date")}</s-table-header>
+              <s-table-header>{t("home.col.sold")}</s-table-header>
+              <s-table-header listSlot="secondary">
+                {t("home.col.status")}
+              </s-table-header>
             </s-table-header-row>
             <s-table-body>
               {deliveries.map((d) => (
@@ -443,17 +422,22 @@ export default function Index() {
                     <s-stack direction="inline" gap="small" alignItems="center">
                       <ProgressBar pct={d.pct} />
                       <s-text>
-                        {d.allocated} af {d.quantity}
+                        {t("common.of", {
+                          done: d.allocated,
+                          total: d.quantity,
+                        })}
                       </s-text>
                     </s-stack>
                   </s-table-cell>
                   <s-table-cell>
                     {d.state === "ACTIVE" ? (
-                      <s-badge tone="success">Aktiv</s-badge>
+                      <s-badge tone="success">{t("home.state.active")}</s-badge>
                     ) : d.state === "SOLD_OUT" ? (
-                      <s-badge tone="warning">Udsolgt</s-badge>
+                      <s-badge tone="warning">
+                        {t("home.state.soldOut")}
+                      </s-badge>
                     ) : (
-                      <s-badge>Kommende</s-badge>
+                      <s-badge>{t("home.state.upcoming")}</s-badge>
                     )}
                   </s-table-cell>
                 </s-table-row>
@@ -464,12 +448,16 @@ export default function Index() {
       )}
 
       {products.length > 0 && (
-        <s-section heading="Produkter" padding="base">
+        <s-section heading={t("home.products.heading")} padding="base">
           <s-table>
             <s-table-header-row>
-              <s-table-header listSlot="primary">Produkt</s-table-header>
-              <s-table-header>Varianter med forudbestilling</s-table-header>
-              <s-table-header listSlot="secondary">Status</s-table-header>
+              <s-table-header listSlot="primary">
+                {t("home.col.product")}
+              </s-table-header>
+              <s-table-header>{t("home.col.variantsOn")}</s-table-header>
+              <s-table-header listSlot="secondary">
+                {t("home.col.status")}
+              </s-table-header>
             </s-table-header-row>
             <s-table-body>
               {products.map((product) => (
@@ -482,22 +470,27 @@ export default function Index() {
                         size="small"
                       />
                       <s-link href={`/app/products/${product.numericId}`}>
-                        {product.title ?? "Produktet findes ikke længere"}
+                        {product.title ?? t("home.productGone")}
                       </s-link>
                     </s-stack>
                   </s-table-cell>
                   <s-table-cell>
-                    {product.enabled} af {product.variants}
+                    {t("common.of", {
+                      done: product.enabled,
+                      total: product.variants,
+                    })}
                   </s-table-cell>
                   <s-table-cell>
                     {product.enabled === 0 ? (
-                      <s-badge>Slået fra</s-badge>
+                      <s-badge>{t("home.badge.off")}</s-badge>
                     ) : product.allPreorder ? (
-                      <s-badge tone="success">Kun forudbestilling</s-badge>
+                      <s-badge tone="success">
+                        {t("home.badge.onlyPreorder")}
+                      </s-badge>
                     ) : product.inPreorder > 0 ? (
-                      <s-badge tone="info">Blandet</s-badge>
+                      <s-badge tone="info">{t("home.badge.mixed")}</s-badge>
                     ) : (
-                      <s-badge>Lagermode</s-badge>
+                      <s-badge>{t("home.badge.stock")}</s-badge>
                     )}
                   </s-table-cell>
                 </s-table-row>
@@ -507,12 +500,11 @@ export default function Index() {
         </s-section>
       )}
 
-      <s-section heading="Brug for hjælp?">
+      <s-section heading={t("home.help.heading")}>
         <s-paragraph>
-          Skriv til{" "}
-          <s-link href={`mailto:${supportEmail}`}>{supportEmail}</s-link>. Vi
-          svarer på hverdage, som regel samme dag. Skriv gerne butikkens navn
-          og, hvis det handler om en ordre, ordrenummeret.
+          {t("home.help.writeTo")}{" "}
+          <s-link href={`mailto:${supportEmail}`}>{supportEmail}</s-link>.{" "}
+          {t("home.help.text")}
         </s-paragraph>
       </s-section>
     </s-page>
@@ -521,28 +513,13 @@ export default function Index() {
 
 const STEP_TEXT: Record<
   "products" | "delivery" | "enable" | "block" | "cart",
-  { title: string; text: string }
+  { title: MessageKey; text: MessageKey }
 > = {
-  products: {
-    title: "Vælg de produkter, der skal kunne forudbestilles",
-    text: "Fx en vare, du venter en ny forsendelse af. Produkterne sælges som normalt fra lageret, indtil det er tomt.",
-  },
-  delivery: {
-    title: "Opret den første leverance",
-    text: "Åbn produktet, og skriv hvornår du forventer at sende varerne, og hvor mange du vil sælge på forudbestilling. Datoen er den, kunderne får lovet.",
-  },
-  enable: {
-    title: "Slå forudbestilling til",
-    text: "Slå «Forudbestilling, når lageret er tomt» til på varianten. Appen skifter selv til forudbestilling, når lageret rammer 0. Har varen stadig lager, ser kunderne ingen forudbestilling endnu — vil du se den med det samme, så slå «Tving forudbestilling» til på produktet.",
-  },
-  block: {
-    title: "Vis forudbestillingen på produktsiden",
-    text: "Tilføj PREAURA-blokken i dit tema. Knappen åbner temaeditoren med blokken klar — du skal kun trykke Gem.",
-  },
-  cart: {
-    title: "Vis i kurven, at der intet betales i dag",
-    text: "Slå «PREAURA kurv» til under App-integrationer. Så står der under hver forudbestilt vare i kurven, at der intet betales i dag, og over knappen til kassen, hvad der trækkes ved afsendelse. Knappen åbner temaeditoren med den slået til — du skal kun trykke Gem.",
-  },
+  products: { title: "guide.products.title", text: "guide.products.text" },
+  delivery: { title: "guide.delivery.title", text: "guide.delivery.text" },
+  enable: { title: "guide.enable.title", text: "guide.enable.text" },
+  block: { title: "guide.block.title", text: "guide.block.text" },
+  cart: { title: "guide.cart.title", text: "guide.cart.text" },
 };
 
 /**
@@ -576,26 +553,31 @@ function SetupGuide({
   firstProduct: string | null;
 }) {
   const guide = setupSteps(state);
+  const { t } = useT();
   const action = (id: keyof typeof STEP_TEXT) => {
     switch (id) {
       case "products":
-        return <s-button onClick={onSelectProducts}>Vælg produkter</s-button>;
+        return (
+          <s-button onClick={onSelectProducts}>
+            {t("home.selectProducts")}
+          </s-button>
+        );
       case "delivery":
       case "enable":
         return firstProduct ? (
           <s-button href={`/app/products/${firstProduct}`}>
-            Åbn produktet
+            {t("guide.openProduct")}
           </s-button>
         ) : null;
       case "block":
         return (
           <s-stack direction="inline" gap="small-200">
             <s-button href={themeBlockUrl} target="_top">
-              Tilføj blokken
+              {t("guide.addBlock")}
             </s-button>
             {state.block === "unknown" && (
               <s-button variant="tertiary" onClick={onConfirmBlock}>
-                Jeg har tilføjet blokken
+                {t("guide.confirmBlock")}
               </s-button>
             )}
           </s-stack>
@@ -604,11 +586,11 @@ function SetupGuide({
         return (
           <s-stack direction="inline" gap="small-200">
             <s-button href={cartEmbedUrl} target="_top">
-              Slå til i kurven
+              {t("guide.enableCart")}
             </s-button>
             {(state.cart ?? "unknown") === "unknown" && (
               <s-button variant="tertiary" onClick={onConfirmCart}>
-                Jeg har slået den til
+                {t("guide.confirmCart")}
               </s-button>
             )}
           </s-stack>
@@ -626,15 +608,15 @@ function SetupGuide({
         >
           <s-stack gap="small-300">
             <s-heading>
-              {guide.complete ? "PREAURA er sat op" : "Kom i gang med PREAURA"}
+              {guide.complete ? t("guide.headingDone") : t("guide.heading")}
             </s-heading>
             <s-text color="subdued">
-              {guide.done} af {guide.total} trin gjort
-              {guide.complete ? " — dine kunder kan nu forudbestille." : ""}
+              {t("guide.progress", { done: guide.done, total: guide.total })}
+              {guide.complete ? t("guide.progressDone") : ""}
             </s-text>
           </s-stack>
           <s-button variant="tertiary" onClick={() => onToggle(!hidden)}>
-            {hidden ? "Vis trin" : "Skjul"}
+            {hidden ? t("guide.show") : t("guide.hide")}
           </s-button>
         </s-stack>
         {!hidden &&
@@ -643,15 +625,19 @@ function SetupGuide({
               key={step.id}
               done={step.done}
               highlighted={step.id === guide.next}
-              title={`${i + 1}. ${STEP_TEXT[step.id].title}`}
+              title={`${i + 1}. ${t(STEP_TEXT[step.id].title)}`}
               text={
                 step.id === "block" && state.block === "unknown" && !step.done
-                  ? `${STEP_TEXT.block.text} Shopify kan ikke fortælle os, om blokken er tilføjet${blockReason ? ` (${blockReason})` : ""}. Har du tilføjet den og trykket Gem, så markér trinnet som gjort.`
+                  ? `${t("guide.block.text")} ${t("guide.block.unknown", {
+                      reason: blockReason ? ` (${blockReason})` : "",
+                    })}`
                   : step.id === "cart" &&
                       (state.cart ?? "unknown") === "unknown" &&
                       !step.done
-                    ? `${STEP_TEXT.cart.text} Shopify kan ikke fortælle os, om den er slået til${cartReason ? ` (${cartReason})` : ""}. Har du slået den til og trykket Gem, så markér trinnet som gjort.`
-                    : STEP_TEXT[step.id].text
+                    ? `${t("guide.cart.text")} ${t("guide.cart.unknown", {
+                        reason: cartReason ? ` (${cartReason})` : "",
+                      })}`
+                    : t(STEP_TEXT[step.id].text)
               }
             >
               {action(step.id)}
