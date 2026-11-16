@@ -9,7 +9,8 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "../extensions/preaura-preorder");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
-const json = (path: string) => JSON.parse(read(path)) as Record<string, unknown>;
+const json = (path: string) =>
+  JSON.parse(read(path)) as Record<string, unknown>;
 
 /** Alle nøgler i en indlejret oversættelsesfil, fx "preorder.button_text". */
 function keys(obj: unknown, prefix = ""): string[] {
@@ -42,17 +43,20 @@ describe("tekster i butikken", () => {
   it("hver tekst, blokkene slår op, findes", () => {
     const all = new Set(keys(en));
     for (const block of blocks) {
-      const used = [...read(`blocks/${block}`).matchAll(/'([\w.]+)' \| t\b/g)].map(
-        (m) => m[1],
-      );
-      for (const key of used) expect(all.has(key), `${block}: ${key}`).toBe(true);
+      const used = [
+        ...read(`blocks/${block}`).matchAll(/'([\w.]+)' \| t\b/g),
+      ].map((m) => m[1]);
+      for (const key of used)
+        expect(all.has(key), `${block}: ${key}`).toBe(true);
     }
   });
 
   it("standardtekster står kun i sprogfilerne — ikke som fast tekst i indstillingerne", () => {
     for (const block of blocks) {
       const schema = JSON.parse(
-        read(`blocks/${block}`).split("{% schema %}")[1].split("{% endschema %}")[0],
+        read(`blocks/${block}`)
+          .split("{% schema %}")[1]
+          .split("{% endschema %}")[0],
       ) as { settings: { type: string; default?: unknown }[] };
       for (const s of schema.settings) {
         if (s.type === "text" || s.type === "textarea") {
@@ -77,7 +81,8 @@ describe("tekster i temaeditoren", () => {
       const schema = read(`blocks/${block}`).split("{% schema %}")[1];
       const used = [...schema.matchAll(/"t:([\w.]+)"/g)].map((m) => m[1]);
       expect(used.length, block).toBeGreaterThan(0);
-      for (const key of used) expect(all.has(key), `${block}: ${key}`).toBe(true);
+      for (const key of used)
+        expect(all.has(key), `${block}: ${key}`).toBe(true);
     }
   });
 });

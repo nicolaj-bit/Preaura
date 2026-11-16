@@ -100,6 +100,48 @@ describe("forespørgsler mod Shopifys skema", () => {
     );
   });
 
+  it("butikkens sprog og oversættelser af planer", async () => {
+    expectValid(await capture((g) => g.shopLocales()));
+    // Oversættelse er to kald: læs tekstens digest, og registrér så.
+    const calls: Call[] = [];
+    const gateway = createShopifyGateway(async (query, options) => {
+      calls.push({ query, variables: options?.variables ?? {} });
+      return new Response(
+        JSON.stringify(
+          calls.length === 1
+            ? {
+                data: {
+                  translatableResourcesByIds: {
+                    nodes: [
+                      {
+                        resourceId: "gid://shopify/SellingPlan/1",
+                        translatableContent: [{ key: "name", digest: "abc" }],
+                      },
+                    ],
+                  },
+                },
+              }
+            : { data: { translationsRegister: { userErrors: [] } } },
+        ),
+      );
+    });
+    await gateway.translate("gid://shopify/SellingPlan/1", [
+      { locale: "en", key: "name", value: "Pre-order" },
+      // Felter uden digest springes over.
+      { locale: "en", key: "option1", value: "Delivery" },
+    ]);
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expectValid(call);
+    expect(calls[1].variables.translations).toEqual([
+      {
+        locale: "en",
+        key: "name",
+        value: "Pre-order",
+        translatableContentDigest: "abc",
+      },
+    ]);
+  });
+
   it("opret og udfas planer", async () => {
     expectValid(await capture((g) => g.createPlans(GROUP, plans)));
     expectValid(

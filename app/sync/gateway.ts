@@ -44,7 +44,23 @@ export interface ShopifyGateway {
     variantId: string;
     merchantCode: string;
     plans: DesiredPlan[];
+    /** Gruppens navn og valg på butikkens hovedsprog. */
+    group?: { name: string; option: string };
   }): Promise<{ groupId: string; plans: CreatedPlan[] }>;
+
+  /** Butikkens sprog (kræver read_locales). */
+  shopLocales(): Promise<
+    { locale: string; primary: boolean; published: boolean }[]
+  >;
+
+  /**
+   * Lægger oversættelser på en selling plan eller gruppe (kræver
+   * write_translations). key er Shopifys felt: "name" eller "option1".
+   */
+  translate(
+    resourceId: string,
+    translations: { locale: string; key: string; value: string }[],
+  ): Promise<void>;
 
   createPlans(groupId: string, plans: DesiredPlan[]): Promise<CreatedPlan[]>;
   deletePlans(groupId: string, planIds: string[]): Promise<void>;

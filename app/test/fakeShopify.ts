@@ -33,6 +33,17 @@ export function createFakeShopify() {
   /** requiresSellingPlan pr. produkt. */
   const products = new Map<string, { requiresSellingPlan: boolean }>();
   const failures = new Map<string, string>();
+  /** Butikkens sprog. Standard: kun dansk. */
+  let locales: { locale: string; primary: boolean; published: boolean }[] = [
+    { locale: "da", primary: true, published: true },
+  ];
+  /** Oversættelser pr. ressource: locale → felt → tekst. */
+  const translations = new Map<
+    string,
+    Record<string, Record<string, string>>
+  >();
+  /** Gruppernes navn og valg. */
+  const groupTexts = new Map<string, { name: string; option: string }>();
 
   const id = (type: string) => `gid://shopify/${type}/${nextId++}`;
 
@@ -220,7 +231,7 @@ export function createFakeShopify() {
           : null,
       };
     },
-    async createGroup({ variantId, merchantCode, plans }) {
+    async createGroup({ variantId, merchantCode, plans, group: texts }) {
       write("createGroup", [variantId, merchantCode, plans]);
       const group: Group = {
         id: id("SellingPlanGroup"),
@@ -228,7 +239,22 @@ export function createFakeShopify() {
         plans: [],
       };
       groups.set(group.id, group);
+      groupTexts.set(
+        group.id,
+        texts ?? { name: "Forudbestilling", option: "Leverance" },
+      );
       return { groupId: group.id, plans: addPlans(group, plans) };
+    },
+    async shopLocales() {
+      return locales.map((l) => ({ ...l }));
+    },
+    async translate(resourceId, list) {
+      write("translate", [resourceId, list]);
+      const byLocale = translations.get(resourceId) ?? {};
+      for (const t of list) {
+        byLocale[t.locale] = { ...byLocale[t.locale], [t.key]: t.value };
+      }
+      translations.set(resourceId, byLocale);
     },
     async createPlans(groupId, plans) {
       write("createPlans", [groupId, plans]);
@@ -311,6 +337,12 @@ export function createFakeShopify() {
       });
     },
     groups,
+    groupTexts,
+    translations,
+    /** Sætter butikkens sprog, som shopLocales() returnerer. */
+    setLocales(next: typeof locales) {
+      locales = next;
+    },
     variants,
     addVariant(variantId: string, state: Partial<Variant> = {}) {
       variants.set(variantId, {

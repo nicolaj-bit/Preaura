@@ -77,20 +77,21 @@
   // --- Kurven ---------------------------------------------------------------
 
   /**
-   * PREAURAs egne planer. Skal svare til PLAN_NAME og GROUP_OPTION i
-   * app/sync/plans.ts (en test holder dem ens). Shopifys /cart.js oplyser
-   * ikke, hvad der trækkes i dag, så planen genkendes på navn og valg.
-   * Vores planer trækker intet ved køb og hele beløbet ved afsendelse.
+   * PREAURAs egne planer på alle de sprog, appen opretter og oversætter dem
+   * på. Skal svare til PLAN_LANGUAGES i app/sync/plans.ts (en test holder
+   * dem ens). Shopifys /cart.js oplyser ikke, hvad der trækkes i dag, så
+   * planen genkendes på navn og valg. Vores planer trækker intet ved køb og
+   * hele beløbet ved afsendelse.
    */
-  var PLAN_NAME = "Forudbestilling";
-  var PLAN_OPTION = "Leverance";
+  var PLAN_NAMES = ["Forudbestilling", "Pre-order"];
+  var PLAN_OPTIONS = ["Leverance", "Delivery"];
 
   function isOurs(plan) {
     return (
       plan.fixed_selling_plan === true &&
-      plan.name === PLAN_NAME &&
+      PLAN_NAMES.indexOf(plan.name) >= 0 &&
       (plan.options || []).some(function (o) {
-        return o && o.name === PLAN_OPTION;
+        return o && PLAN_OPTIONS.indexOf(o.name) >= 0;
       })
     );
   }
