@@ -57,12 +57,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { apiKey, billingError: null };
 };
 
+// Shopifys typer kender ikke rel på s-link, men s-app-nav læser det
+// (https://shopify.dev/docs/api/app-home/app-bridge-web-components/app-nav).
+const HOME_REL = { rel: "home" } as object;
+
 export default function App() {
   const { apiKey, billingError } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider apiKey={apiKey}>
       <s-app-nav>
+        {/* Appens hjem: hvor et klik på appens navn i Shopify Admin fører
+            hen. Vises ikke i menuen. Uden den bruger Shopify appens rod,
+            som er startsiden for besøgende udefra. */}
+        <s-link href="/app" {...HOME_REL}>
+          PREAURA
+        </s-link>
         <s-link href="/app">Produkter</s-link>
         <s-link href="/app/queue">Ordrebehandling</s-link>
         <s-link href="/app/releases">Annulleringer</s-link>
