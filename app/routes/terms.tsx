@@ -6,7 +6,8 @@ import type { MetaFunction } from "react-router";
 // På engelsk og dansk. Den engelske version gælder ved uoverensstemmelse
 // (App Store-siden og de fleste butikker uden for Danmark er engelske).
 //
-// UDKAST — skal gennemgås af en jurist, før det tages i brug.
+// Gennemgået og godkendt af jurist i november 2026. Ændres indholdet, skal
+// det gennemgås igen.
 //
 // Teksten skal passe til, hvad appen faktisk gør: ét abonnement uden planer,
 // pris og prøveperiode i Shopify, ingen udbetalinger, ingen sletning ved
@@ -39,12 +40,6 @@ const styles = {
     background: "#fff",
   },
   muted: { color: "#6d7175" },
-  draft: {
-    background: "#fff5ea",
-    border: "1px solid #e8a33d",
-    borderRadius: 8,
-    padding: "12px 16px",
-  },
   divider: { border: 0, borderTop: "1px solid #d2d5d8", margin: "56px 0" },
 };
 
@@ -53,12 +48,6 @@ const Mail = () => <a href={`mailto:${PROVIDER.email}`}>{PROVIDER.email}</a>;
 export default function Terms() {
   return (
     <main style={styles.page}>
-      <p style={styles.draft}>
-        <strong>Draft / Udkast.</strong> These terms have not yet been reviewed
-        by a lawyer and do not apply in their current form. Betingelserne er
-        endnu ikke gennemgået af en jurist og gælder ikke i deres nuværende
-        form.
-      </p>
       <p>
         <a href="#en">English</a> · <a href="#da">Dansk</a>
       </p>

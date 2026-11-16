@@ -247,3 +247,71 @@ describe("opbevaringsperiode", () => {
     expect(await client.dataRequest.count()).toBe(2);
   });
 });
+
+describe("adgangslog", () => {
+  const log = () =>
+    client.accessLog.findMany({
+      where: { shop: SHOP },
+      orderBy: { at: "asc" },
+    });
+
+  it("dataanmodning, visning i admin og sletning af kunden logges — uden persondata", async () => {
+    await shopWithOrder();
+    await webhook("CUSTOMERS_DATA_REQUEST", {
+      customer,
+      orders_requested: [1],
+    });
+    await run();
+    await complianceFor(SHOP, client).dataRequests();
+    await webhook("CUSTOMERS_REDACT", { customer, orders_to_redact: [1] });
+    await run();
+
+    const rows = await log();
+    expect(rows.map((r) => [r.action, r.actor, r.subject])).toEqual([
+      ["export_customer_data", "system", "customer 7"],
+      ["view_data_request", "admin", "customer 7"],
+      ["erase_customer", "system", "customer 7"],
+    ]);
+    expect(JSON.stringify(rows)).not.toContain("@");
+  });
+
+  it("slettes efter 365 dage og med butikken ved shop/redact", async () => {
+    const old = new Date("2025-01-01T00:00:00Z");
+    await client.accessLog.createMany({
+      data: [
+        {
+          shop: SHOP,
+          at: old,
+          actor: "system",
+          action: "erase_customer",
+          subject: "customer 1",
+          purpose: "x",
+        },
+        {
+          shop: SHOP,
+          actor: "system",
+          action: "erase_customer",
+          subject: "customer 2",
+          purpose: "x",
+        },
+        {
+          shop: OTHER,
+          actor: "system",
+          action: "erase_customer",
+          subject: "customer 3",
+          purpose: "x",
+        },
+      ],
+    });
+    expect(
+      await purgeOldData(client, new Date("2026-11-16T00:00:00Z")),
+    ).toMatchObject({
+      accessLog: 1,
+    });
+    expect((await log()).map((r) => r.subject)).toEqual(["customer 2"]);
+
+    await complianceFor(SHOP, client).redactShop();
+    expect(await log()).toHaveLength(0);
+    expect(await client.accessLog.count({ where: { shop: OTHER } })).toBe(1);
+  });
+});

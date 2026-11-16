@@ -3,7 +3,8 @@ import type { MetaFunction } from "react-router";
 // Databehandleraftale (DPA) for PREAURA. Offentlig side (ingen login), som
 // vilkårene og App Store-siden linker til: https://preaura.onrender.com/dpa
 //
-// UDKAST — skal gennemgås af en jurist, før det tages i brug.
+// Gennemgået og godkendt af jurist i november 2026. Ændres indholdet, skal
+// det gennemgås igen.
 //
 // Som privatlivspolitikken skal teksten passe til, hvad koden faktisk gør.
 // Ændres det, appen gemmer, sletter eller sender videre, skal Bilag A–C
@@ -46,12 +47,6 @@ const styles = {
     textAlign: "left" as const,
   },
   muted: { color: "#6d7175" },
-  draft: {
-    background: "#fff5ea",
-    border: "1px solid #e8a33d",
-    borderRadius: 8,
-    padding: "12px 16px",
-  },
 };
 
 function Cell({ children }: { children: React.ReactNode }) {
@@ -63,11 +58,6 @@ export default function Dpa() {
     <main style={styles.page}>
       <h1>Databehandleraftale for PREAURA</h1>
       <p style={styles.muted}>Senest opdateret: {UPDATED}</p>
-
-      <p style={styles.draft}>
-        <strong>Udkast.</strong> Aftalen er endnu ikke gennemgået af en jurist
-        og gælder ikke i sin nuværende form.
-      </p>
 
       <h2>1. Parterne</h2>
       <p>

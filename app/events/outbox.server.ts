@@ -1,3 +1,4 @@
+import { accessLogFor } from "../models/accessLog.server";
 import { coded } from "../i18n";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
@@ -66,6 +67,7 @@ export async function processOutbox({
   if (!(await lock.acquireLock(holder))) return { ran: false as const };
 
   const outbox = outboxFor(shop, client);
+  const access = accessLogFor(shop, client);
   const totals = { built: 0, sent: 0, failed: 0 };
   try {
     // --- 1. Byg ------------------------------------------------------------
@@ -111,6 +113,13 @@ export async function processOutbox({
         } else {
           const orderId = intent.orderId ?? "";
           if (!details.has(orderId)) {
+            if (orderId) {
+              await access.record({
+                action: "read_customer_contact",
+                subject: orderId,
+                purpose: `event ${intent.type}`,
+              });
+            }
             details.set(
               orderId,
               orderId ? await deps.readOrderDetails(orderId) : null,
