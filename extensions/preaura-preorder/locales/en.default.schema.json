@@ -11,26 +11,31 @@
       },
       "shipping_label": {
         "label": "Name for expected shipping",
-        "info": "Shown in the message and as a line item property in cart, checkout, order confirmation and on the order. Leave empty to use the default text in the customer's language."
+        "info": "Shown in the message and as a line item property in cart, checkout, order confirmation and on the order. Empty: the grey default text, in the customer's language.",
+        "placeholder": "Expected to ship"
       },
       "delivery_label": {
         "label": "Name for expected delivery",
-        "info": "Used when the app is set to expected delivery. Leave empty to use the default text in the customer's language."
+        "info": "Used when the app is set to expected delivery. Empty: the grey default text, in the customer's language.",
+        "placeholder": "Expected delivery"
       },
       "message": {
         "label": "Message",
-        "info": "{label} becomes the name above, {date} the delivery date. Leave empty to use the default text in the customer's language."
+        "info": "{label} becomes the name above, {date} the delivery date. Empty: the grey default text, in the customer's language.",
+        "placeholder": "{label}: {date}"
       },
       "show_note": {
         "label": "Show explanation"
       },
       "note": {
         "label": "Explanation",
-        "info": "Makes the terms clear before purchase. Leave empty to use the default text in the customer's language."
+        "info": "Makes the terms clear before purchase. Empty: the grey default text, in the customer's language.",
+        "placeholder": "This item is on pre-order. You won't be charged until it ships."
       },
       "sold_out_message": {
         "label": "Message when everything is sold out",
-        "info": "Leave empty to use the default text in the customer's language."
+        "info": "Empty: the grey default text, in the customer's language.",
+        "placeholder": "Sold out – all deliveries are sold out."
       },
       "change_button_text": {
         "label": "Change the buy button text",
@@ -38,7 +43,8 @@
       },
       "button_text": {
         "label": "Buy button text",
-        "info": "Leave empty to use the default text in the customer's language."
+        "info": "Empty: the grey default text, in the customer's language.",
+        "placeholder": "Pre-order"
       },
       "remaining_header": {
         "content": "Remaining"
@@ -53,7 +59,8 @@
       },
       "remaining_text": {
         "label": "Text",
-        "info": "{count} becomes the number. Leave empty to use the default text in the customer's language."
+        "info": "{count} becomes the number. Empty: the grey default text, in the customer's language.",
+        "placeholder": "Only {count} left in this delivery."
       },
       "timeline_header": {
         "content": "Timeline"
@@ -63,14 +70,17 @@
         "info": "Shows the current plan with expected dates and whether each delivery is sold out, the one being bought into now, or upcoming. No counts per delivery."
       },
       "timeline_sold_out": {
-        "label": "Sold-out delivery"
+        "label": "Sold-out delivery",
+        "placeholder": "sold out"
       },
       "timeline_current": {
         "label": "The delivery being bought into now",
-        "info": "Short text looks best. Leave empty to use the default text in the customer's language."
+        "info": "Short text looks best. Empty: the grey default text, in the customer's language.",
+        "placeholder": "current"
       },
       "timeline_upcoming": {
-        "label": "Upcoming delivery"
+        "label": "Upcoming delivery",
+        "placeholder": "upcoming"
       },
       "waitlist_header": {
         "content": "Waitlist"
@@ -82,29 +92,36 @@
         "label": "Show waitlist sign-up"
       },
       "waitlist_heading": {
-        "label": "Heading"
+        "label": "Heading",
+        "placeholder": "Get notified when it's available"
       },
       "waitlist_email_label": {
-        "label": "Field name"
+        "label": "Field name",
+        "placeholder": "Your email"
       },
       "waitlist_button": {
-        "label": "Button text"
+        "label": "Button text",
+        "placeholder": "Notify me"
       },
       "waitlist_success": {
         "label": "Reply after sign-up",
-        "info": "Always shown after a sign-up — also if the email was already on the list. Leave empty to use the default text in the customer's language."
+        "info": "Always shown after a sign-up — also if the email was already on the list. Empty: the grey default text, in the customer's language.",
+        "placeholder": "Thanks. We'll let you know when it's available."
       },
       "waitlist_invalid": {
-        "label": "Reply for an invalid email"
+        "label": "Reply for an invalid email",
+        "placeholder": "Enter a valid email."
       },
       "waitlist_error": {
-        "label": "Reply on error"
+        "label": "Reply on error",
+        "placeholder": "That didn't work. Please try again shortly."
       },
       "waitlist_privacy": {
-        "label": "How the email is used"
+        "label": "How the email is used",
+        "placeholder": "We only use your email to notify you about this item. You won't be subscribed to our newsletter."
       },
       "texts_info": {
-        "content": "Text fields left empty use PREAURA's standard text in the customer's language (Danish and English for now)."
+        "content": "The grey text in the fields is PREAURA's standard text. Leave a field empty to show it in the customer's language (Danish or English). Your own text is shown as written in every language."
       }
     }
   },
@@ -112,19 +129,22 @@
     "name": "PREAURA cart",
     "settings": {
       "intro": {
-        "content": "Shows in the cart that pre-ordered items cost nothing today. Only shown when there is a pre-order in the cart. Text fields left empty use the standard text in the customer's language."
+        "content": "Shows in the cart that pre-ordered items cost nothing today. Only shown when there is a pre-order in the cart. The grey text in the fields is the standard text. Leave a field empty to show it in the customer's language. Your own text is shown as written in every language."
       },
       "line_note": {
-        "label": "Text under the item"
+        "label": "Text under the item",
+        "placeholder": "Nothing due today. The amount is charged when the item ships."
       },
       "show_totals": {
         "label": "Show amounts above the checkout button"
       },
       "later_label": {
-        "label": "Amount charged later"
+        "label": "Amount charged later",
+        "placeholder": "Charged when the item ships"
       },
       "today_label": {
-        "label": "Amount today"
+        "label": "Amount today",
+        "placeholder": "Due today"
       }
     }
   }

@@ -11,26 +11,31 @@
       },
       "shipping_label": {
         "label": "Navn for forventet afsendelse",
-        "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren. Tom: standardteksten på kundens sprog."
+        "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Forventet afsendelse"
       },
       "delivery_label": {
         "label": "Navn for forventet levering",
-        "info": "Bruges, når appens indstilling står til forventet levering. Tom: standardteksten på kundens sprog."
+        "info": "Bruges, når appens indstilling står til forventet levering. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Forventet levering"
       },
       "message": {
         "label": "Besked",
-        "info": "{label} bliver til navnet ovenfor, {date} til leverancens dato. Tom: standardteksten på kundens sprog."
+        "info": "{label} bliver til navnet ovenfor, {date} til leverancens dato. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "{label}: {date}"
       },
       "show_note": {
         "label": "Vis forklaring"
       },
       "note": {
         "label": "Forklaring",
-        "info": "Gør vilkårene tydelige før køb. Tom: standardteksten på kundens sprog."
+        "info": "Gør vilkårene tydelige før køb. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Varen er på forudbestilling. Du betaler først, når varen sendes."
       },
       "sold_out_message": {
         "label": "Besked, når alt er udsolgt",
-        "info": "Tom: standardteksten på kundens sprog."
+        "info": "Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Udsolgt – alle leverancer er udsolgt."
       },
       "change_button_text": {
         "label": "Skift teksten på købsknappen",
@@ -38,7 +43,8 @@
       },
       "button_text": {
         "label": "Tekst på købsknappen",
-        "info": "Tom: standardteksten på kundens sprog."
+        "info": "Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Forudbestil"
       },
       "remaining_header": {
         "content": "Antal tilbage"
@@ -53,7 +59,8 @@
       },
       "remaining_text": {
         "label": "Tekst",
-        "info": "{count} bliver til antallet. Tom: standardteksten på kundens sprog."
+        "info": "{count} bliver til antallet. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Kun {count} tilbage i denne leverance."
       },
       "timeline_header": {
         "content": "Tidslinje"
@@ -63,14 +70,17 @@
         "info": "Viser den aktuelle plan med forventede datoer og om hver leverance er udsolgt, den man køber ind i nu, eller kommende. Ingen antal pr. leverance."
       },
       "timeline_sold_out": {
-        "label": "Udsolgt leverance"
+        "label": "Udsolgt leverance",
+        "placeholder": "udsolgt"
       },
       "timeline_current": {
         "label": "Leverancen, kunden køber ind i nu",
-        "info": "Kort tekst står pænest. Tom: standardteksten på kundens sprog."
+        "info": "Kort tekst står pænest. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "nuværende"
       },
       "timeline_upcoming": {
-        "label": "Kommende leverance"
+        "label": "Kommende leverance",
+        "placeholder": "kommende"
       },
       "waitlist_header": {
         "content": "Venteliste"
@@ -82,29 +92,36 @@
         "label": "Vis tilmelding til venteliste"
       },
       "waitlist_heading": {
-        "label": "Overskrift"
+        "label": "Overskrift",
+        "placeholder": "Få besked, når varen kan købes"
       },
       "waitlist_email_label": {
-        "label": "Navn på feltet"
+        "label": "Navn på feltet",
+        "placeholder": "Din e-mail"
       },
       "waitlist_button": {
-        "label": "Tekst på knappen"
+        "label": "Tekst på knappen",
+        "placeholder": "Giv mig besked"
       },
       "waitlist_success": {
         "label": "Svar efter tilmelding",
-        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Tom: standardteksten på kundens sprog."
+        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Tom: den grå standardtekst, på kundens sprog.",
+        "placeholder": "Tak. Vi giver dig besked, når varen kan købes."
       },
       "waitlist_invalid": {
-        "label": "Svar ved ugyldig e-mail"
+        "label": "Svar ved ugyldig e-mail",
+        "placeholder": "Skriv en gyldig e-mail."
       },
       "waitlist_error": {
-        "label": "Svar ved fejl"
+        "label": "Svar ved fejl",
+        "placeholder": "Det lykkedes ikke. Prøv igen om lidt."
       },
       "waitlist_privacy": {
-        "label": "Oplysning om brug af e-mail"
+        "label": "Oplysning om brug af e-mail",
+        "placeholder": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev."
       },
       "texts_info": {
-        "content": "Tekstfelter, der står tomme, bruger PREAURAs standardtekst på kundens sprog (indtil videre dansk og engelsk)."
+        "content": "Den grå tekst i felterne er PREAURAs standardtekst. Lader du et felt stå tomt, vises den på kundens sprog (dansk eller engelsk). Skriver du din egen, vises den som den er på alle sprog."
       }
     }
   },
@@ -112,19 +129,22 @@
     "name": "PREAURA kurv",
     "settings": {
       "intro": {
-        "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven. Tekstfelter, der står tomme, bruger standardteksten på kundens sprog."
+        "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven. Den grå tekst i felterne er standardteksten. Lader du et felt stå tomt, vises den på kundens sprog. Skriver du din egen, vises den som den er på alle sprog."
       },
       "line_note": {
-        "label": "Tekst under varen"
+        "label": "Tekst under varen",
+        "placeholder": "Intet at betale i dag. Beløbet trækkes, når varen sendes."
       },
       "show_totals": {
         "label": "Vis beløb over knappen til kassen"
       },
       "later_label": {
-        "label": "Beløb, der trækkes senere"
+        "label": "Beløb, der trækkes senere",
+        "placeholder": "Trækkes ved afsendelse"
       },
       "today_label": {
-        "label": "Beløb i dag"
+        "label": "Beløb i dag",
+        "placeholder": "Betales i dag"
       }
     }
   }
