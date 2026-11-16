@@ -176,6 +176,20 @@ export type PlanTexts = {
  * Ønskede planer for leverancerne. Kun åbne leverancer får en plan; en
  * annulleret leverance tages ud af brug.
  */
+/**
+ * Planens navn. Shopify kræver, at planerne i en gruppe har hvert sit navn
+ * (fundet i testbutikken: «Cannot have multiple selling plans with the same
+ * name»). Leverance 1 hedder bare «Forudbestilling», de næste får deres
+ * nummer på: «Forudbestilling (leverance 2)». Leverancens nummer er fast og
+ * unikt for varianten, så navnet er det også. Datoen står i linjeegenskaben.
+ */
+export function planName(language: PlanLanguage, position: number) {
+  const t = PLAN_LANGUAGES[language];
+  return position <= 1
+    ? t.planName
+    : `${t.planName} (${t.nth.replace("{n}", String(position))})`;
+}
+
 export function desiredPlans(
   deliveries: { id: string; position: number; date: string; status: string }[],
   texts: PlanTexts,
@@ -220,12 +234,12 @@ export function desiredPlans(
   }));
   return open.map((d, i) => ({
     deliveryId: d.id,
-    name: PLAN_LANGUAGES[locales.primary].planName,
+    name: planName(locales.primary, d.position),
     option: primary[i],
     fulfillmentExactTime: fulfillmentTime(d.date),
     translations: other.map((o) => ({
       locale: o.locale,
-      name: PLAN_LANGUAGES[o.language].planName,
+      name: planName(o.language, d.position),
       ...(o.options ? { option: o.options[i] } : {}),
     })),
   }));

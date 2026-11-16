@@ -89,7 +89,11 @@
   function isOurs(plan) {
     return (
       plan.fixed_selling_plan === true &&
-      PLAN_NAMES.indexOf(plan.name) >= 0 &&
+      // «Forudbestilling» eller «Forudbestilling (leverance 2)».
+      PLAN_NAMES.some(function (n) {
+        var name = String(plan.name || "");
+        return name === n || name.indexOf(n + " (") === 0;
+      }) &&
       (plan.options || []).some(function (o) {
         return o && PLAN_OPTIONS.indexOf(o.name) >= 0;
       })

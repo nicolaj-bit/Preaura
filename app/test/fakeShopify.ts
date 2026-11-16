@@ -78,17 +78,31 @@ export function createFakeShopify() {
     writes.push({ method, args });
   }
 
+  /** Hver plans navn (ShopifyPlan har det ikke). */
+  const planNames = new Map<string, string>();
+
   function addPlans(group: Group, plans: DesiredPlan[]) {
     const created = plans.map(toShopifyPlan);
-    for (const plan of created) {
+    created.forEach((plan, i) => {
       // Som i Shopify: options skal være unikke inden for gruppen.
       if (group.plans.some((p) => p.options[0] === plan.options[0])) {
         throw new ShopifyUserError("createPlans", [
           { message: "Selling plan options must be unique" },
         ]);
       }
+      // Som i Shopify: navnene skal også være unikke inden for gruppen
+      // (fundet i testbutikken).
+      if (group.plans.some((p) => planNames.get(p.id) === plans[i].name)) {
+        throw new ShopifyUserError("createPlans", [
+          {
+            message:
+              "Name Cannot have multiple selling plans with the same name",
+          },
+        ]);
+      }
+      planNames.set(plan.id, plans[i].name);
       group.plans.push(plan);
-    }
+    });
     return created.map((plan) => ({ id: plan.id, option: plan.options[0] }));
   }
 
@@ -338,6 +352,7 @@ export function createFakeShopify() {
     },
     groups,
     groupTexts,
+    planNames,
     translations,
     /** Sætter butikkens sprog, som shopLocales() returnerer. */
     setLocales(next: typeof locales) {
