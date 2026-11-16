@@ -200,13 +200,12 @@ export default function Settings() {
             name="dateMode"
             values={[values.dateMode]}
             error={errors.dateMode}
-            onChange={(event) =>
-              setValues((current) => ({
-                ...current,
-                dateMode: (event.currentTarget.values[0] ??
-                  "SHIPPING") as DateMode,
-              }))
-            }
+            onChange={(event) => {
+              // Læses før opdateringen — se kommentaren ved set().
+              const dateMode = (event.currentTarget.values[0] ??
+                "SHIPPING") as DateMode;
+              setValues((current) => ({ ...current, dateMode }));
+            }}
           >
             <s-choice value="SHIPPING">
               {t("settings.date.shipping")}
