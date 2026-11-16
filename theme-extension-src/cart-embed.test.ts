@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { GROUP_OPTION, PLAN_NAME } from "../app/sync/plans";
 
 // Tester kurvens app embed i en rigtig DOM med den samme fil, som Shopify
 // serverer. Kurvene er forenklede udgaver af Dawns og Horizons.
@@ -21,13 +22,31 @@ const config = {
   count: 2,
 };
 
+// Som Shopifys /cart.js faktisk svarer (set i testbutikken): ingen beløb for
+// i dag og senere — planen genkendes på navn og valg, som appen opretter dem.
 const preorderLine = (price: number, quantity = 1) => ({
   quantity,
   final_line_price: price * quantity,
   selling_plan_allocation: {
-    checkout_charge_amount: 0,
-    remaining_balance_charge_amount: price,
-    selling_plan: { name: "Forudbestilling" },
+    price_adjustments: [],
+    price,
+    compare_at_price: null,
+    per_delivery_price: price,
+    selling_plan: {
+      id: 724582400331,
+      name: PLAN_NAME,
+      description: null,
+      options: [
+        {
+          name: GROUP_OPTION,
+          position: 1,
+          value: "Forventet afsendelse: 2. december 2026",
+        },
+      ],
+      recurring_deliveries: false,
+      fixed_selling_plan: true,
+      price_adjustments: [],
+    },
   },
 });
 const normalLine = (price: number) => ({
@@ -183,6 +202,50 @@ describe("kurvens app embed", () => {
     });
     expect(p.notes()).toEqual(["Nothing due today."]);
     expect(p.totals()).toEqual([]);
+  });
+});
+
+describe("hvilke planer tæller med", () => {
+  const summarize = () =>
+    (
+      window as unknown as {
+        PreauraCart: {
+          summarize: (c: unknown) => { later: number; today: number } | null;
+        };
+      }
+    ).PreauraCart.summarize;
+
+  it("andre apps' planer tæller ikke med (fx abonnement)", async () => {
+    await page("", cartJson([]), { count: 0 });
+    const other = {
+      quantity: 1,
+      final_line_price: 10000,
+      selling_plan_allocation: {
+        selling_plan: {
+          name: "Hver måned",
+          options: [{ name: "Levering", value: "1 måned" }],
+          fixed_selling_plan: false,
+        },
+      },
+    };
+    expect(summarize()(cartJson([other]))).toBeNull();
+  });
+
+  it("oplyser Shopify selv fordelingen, bruges den — også for andre planer", async () => {
+    await page("", cartJson([]), { count: 0 });
+    const deposit = {
+      quantity: 1,
+      final_line_price: 10000,
+      selling_plan_allocation: {
+        checkout_charge_amount: 2500,
+        remaining_balance_charge_amount: 7500,
+        selling_plan: { name: "Depositum", options: [] },
+      },
+    };
+    expect(summarize()(cartJson([deposit]))).toMatchObject({
+      later: 7500,
+      today: 2500,
+    });
   });
 });
 
