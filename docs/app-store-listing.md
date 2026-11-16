@@ -113,12 +113,10 @@ undertitlen.
 
 ---
 
-## Sprog — skal afgøres før indsendelse
+## Sprog
 
-Appens egne sider i Shopify Admin er kun på **dansk**. Efter Shopifys regel
-4.3.2 må siden derfor kun angive dansk under «Languages». Butikkens kunder
-ser derimod dansk eller engelsk efter eget sprog (blok, kurv og planer), og
-det må gerne stå i beskrivelsen.
-
-Skal appen sælges til butikker uden for Danmark, skal appens sider også
-oversættes til engelsk, før engelsk må angives.
+**Languages: Danish, English.** Appens sider i Shopify Admin følger
+butiksejerens sprog (dansk eller engelsk; andre sprog får engelsk), så begge
+må angives efter Shopifys regel 4.3.2. Butikkens kunder ser også dansk eller
+engelsk efter eget sprog: blokken på produktsiden, kurven, planerne i kurv og
+checkout og siden til annullering. Det må gerne nævnes i beskrivelsen.
