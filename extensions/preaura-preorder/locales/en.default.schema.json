@@ -34,8 +34,8 @@
       },
       "sold_out_message": {
         "label": "Message when everything is sold out",
-        "info": "Default: “Sold out – all deliveries are sold out.” Leave empty to use the default text in the customer’s language.",
-        "placeholder": "Sold out – all deliveries are sold out."
+        "info": "Default: “Sold out, all deliveries are sold out.” Leave empty to use the default text in the customer’s language.",
+        "placeholder": "Sold out, all deliveries are sold out."
       },
       "change_button_text": {
         "label": "Change the buy button text",
@@ -55,7 +55,7 @@
       },
       "remaining_threshold": {
         "label": "Only show the number at or below",
-        "info": "E.g. 25: «Only 480 left» creates no urgency — it's just noise."
+        "info": "E.g. 25: «Only 480 left» creates no urgency. It's just noise."
       },
       "remaining_text": {
         "label": "Text",
@@ -88,7 +88,7 @@
         "content": "Waitlist"
       },
       "waitlist_intro": {
-        "content": "If the variant can neither be bought from stock nor pre-ordered, the customer can sign up to be notified when it can be bought. The notification is sent as an event to Shopify Flow, Klaviyo or your webhook. It may only be about the item — offers, other products and discount codes require consent."
+        "content": "If the variant can neither be bought from stock nor pre-ordered, the customer can sign up to be notified when it can be bought. The notification is sent as an event to Shopify Flow, Klaviyo or your webhook. It may only be about the item. Offers, other products and discount codes require consent."
       },
       "waitlist_enabled": {
         "label": "Show waitlist sign-up"
@@ -110,7 +110,7 @@
       },
       "waitlist_success": {
         "label": "Reply after sign-up",
-        "info": "Always shown after a sign-up — also if the email was already on the list. Default: “Thanks. We'll let you know when it's available.” Leave empty to use the default text in the customer’s language.",
+        "info": "Always shown after a sign-up, also if the email was already on the list. Default: “Thanks. We'll let you know when it's available.” Leave empty to use the default text in the customer’s language.",
         "placeholder": "Thanks. We'll let you know when it's available."
       },
       "waitlist_invalid": {

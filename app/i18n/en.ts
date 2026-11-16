@@ -35,7 +35,7 @@ export const en: Record<MessageKey, string> = {
   "themeBlock.consequence":
     "Pre-orders aren’t shown to customers until the PREAURA block is added to the product page in your theme. Without it, customers see neither the delivery date nor the terms, and the date isn’t added to the cart and the order.",
   "themeBlock.howTo":
-    "The button opens the theme editor with the block ready — click Save. Shopify only checks your published theme, so the block must be in that one. If the button doesn’t open the block, your theme probably doesn’t support app blocks (that needs an Online Store 2.0 theme). Write to us and we’ll help.",
+    "The button opens the theme editor with the block ready. Click Save. Shopify only checks your published theme, so the block must be in that one. If the button doesn’t open the block, your theme probably doesn’t support app blocks (that needs an Online Store 2.0 theme). Write to us and we’ll help.",
   "themeBlock.button": "Add the block to the theme",
 
   // Home page
@@ -67,7 +67,7 @@ export const en: Record<MessageKey, string> = {
     "{count} orders in the last 7 days bought an item on pre-order without choosing pre-order. The app counted them, but it may mean something in the setup is wrong.",
   "home.products.heading": "Products",
   "home.products.empty":
-    "You haven’t selected any products yet. Select the products that should be available for pre-order when they sell out — for example an item you’re expecting a new shipment of. The products are sold from stock as usual until stock reaches 0.",
+    "You haven’t selected any products yet. Select the products that should be available for pre-order when they sell out, for example an item you’re expecting a new shipment of. The products are sold from stock as usual until stock reaches 0.",
   "home.overview.heading": "Overview",
   "home.overview.intro": "Pre-orders from orders in the period. Amounts in the store’s currency.",
   "home.period.days": "{count} days",
@@ -110,7 +110,7 @@ export const en: Record<MessageKey, string> = {
   "guide.headingDone": "PREAURA is set up",
   "guide.heading": "Get started with PREAURA",
   "guide.progress": "{done} of {total} steps done",
-  "guide.progressDone": " — your customers can now pre-order.",
+  "guide.progressDone": ", your customers can now pre-order.",
   "guide.show": "Show steps",
   "guide.hide": "Hide",
   "guide.openProduct": "Open the product",
@@ -126,15 +126,15 @@ export const en: Record<MessageKey, string> = {
     "Open the product and enter when you expect to ship the goods and how many you’ll sell on pre-order. The date is the one customers are promised.",
   "guide.enable.title": "Turn on pre-order",
   "guide.enable.text":
-    "Turn on «Pre-order when out of stock» for the variant. The app switches to pre-order by itself when stock reaches 0. If the item is still in stock, customers won’t see the pre-order yet — to see it right away, turn on «Force pre-order» for the product.",
+    "Turn on «Pre-order when out of stock» for the variant. The app switches to pre-order by itself when stock reaches 0. If the item is still in stock, customers won’t see the pre-order yet. To see it right away, turn on «Force pre-order» for the product.",
   "guide.block.title": "Show the pre-order on the product page",
   "guide.block.text":
-    "Add the PREAURA block to your theme. The button opens the theme editor with the block ready — you just click Save.",
+    "Add the PREAURA block to your theme. The button opens the theme editor with the block ready. You just click Save.",
   "guide.block.unknown":
     "Shopify can’t tell us whether the block has been added{reason}. If you’ve added it and clicked Save, mark the step as done.",
   "guide.cart.title": "Show in the cart that nothing is due today",
   "guide.cart.text":
-    "Turn on «PREAURA cart» under App embeds. Each pre-ordered item in the cart then says that nothing is due today, and above the checkout button it shows what is charged when the item ships. The button opens the theme editor with it turned on — you just click Save.",
+    "Turn on «PREAURA cart» under App embeds. Each pre-ordered item in the cart then says that nothing is due today, and above the checkout button it shows what is charged when the item ships. The button opens the theme editor with it turned on. You just click Save.",
   "guide.cart.unknown":
     "Shopify can’t tell us whether it’s turned on{reason}. If you’ve turned it on and clicked Save, mark the step as done.",
 
@@ -196,7 +196,7 @@ export const en: Record<MessageKey, string> = {
     "Shopify hasn’t been updated yet. Click «Sync» on one of the variants.",
   "product.modeMixed.heading": "Mixed: some variants are sold as usual",
   "product.modeMixed.text1":
-    "Only some variants are on pre-order. Shopify can only require pre-order for the whole product, which would block the regular variants — so it isn’t turned on.",
+    "Only some variants are on pre-order. Shopify can only require pre-order for the whole product, which would block the regular variants, so it isn’t turned on.",
   "product.modeMixed.text2":
     "Instead, the PREAURA block on the product page makes sure the variants on pre-order are bought as pre-orders. If someone buys without it anyway (for example on a draft order or in POS), the app counts the sale in the active delivery and shows it under Order processing.",
   "product.deliveries": "Deliveries",
@@ -220,7 +220,7 @@ export const en: Record<MessageKey, string> = {
   "product.mode.forcedText":
     "You’ve forced the variant into pre-order, even though there may be items in stock. The app manages the stock until you turn forcing off.",
   "product.mode.autoText":
-    "Stock is empty. Customers can pre-order, and the app manages the stock from the deliveries. If you add stock (as an adjustment, for example +20), the variant switches back by itself — once the pre-orders are covered.",
+    "Stock is empty. Customers can pre-order, and the app manages the stock from the deliveries. If you add stock (as an adjustment, for example +20), the variant switches back by itself once the pre-orders are covered.",
   "product.mode.lastChanged": "Last changed {date}: {reason}",
   "product.mode.neverChanged": "Hasn’t changed mode yet.",
   "product.force.label": "Force pre-order",
@@ -275,7 +275,7 @@ export const en: Record<MessageKey, string> = {
   "delivery.readyNone": "All pre-orders were already ready",
   "delivery.ready.one": "1 pre-order marked ready to ship",
   "delivery.ready.other": "{count} pre-orders marked ready to ship",
-  "delivery.arrived": "The goods have arrived — ready to ship",
+  "delivery.arrived": "The goods have arrived, ready to ship",
   "delivery.activeLines": "Active order lines",
   "delivery.orders": "Orders",
   "delivery.noOrders": "No orders in this delivery yet.",
@@ -292,9 +292,9 @@ export const en: Record<MessageKey, string> = {
   "validation.dateInvalid":
     "The date can’t be read. Pick it in the calendar, or write it as YYYY-MM-DD, for example 2027-01-15.",
   "validation.dateNotFuture":
-    "The date is today or has passed. Choose a date from tomorrow onwards — it’s the date customers are promised.",
+    "The date is today or has passed. Choose a date from tomorrow onwards. It’s the date customers are promised.",
   "validation.quantityInvalid":
-    "Write the quantity as a whole number, for example 50 — without commas, spaces or «units».",
+    "Write the quantity as a whole number, for example 50, without commas, spaces or «units».",
   "validation.quantityNotPositive":
     "The quantity must be at least 1: it’s how many you can sell on pre-order in the delivery. To stop selling, cancel the delivery instead.",
   "validation.quantityBelowAllocated":
@@ -426,9 +426,9 @@ export const en: Record<MessageKey, string> = {
   "queue.withoutPlan.heading": "Sold without a pre-order plan",
   "queue.withoutPlan.none": "All pre-orders were bought as pre-orders.",
   "queue.withoutPlan.intro.one":
-    "1 order in the last 30 days bought an item on pre-order without choosing pre-order — for example a draft order, a POS sale, an order from another app, or because the PREAURA block is missing from the product page. The app counted it in the active delivery so the item isn’t oversold. If it happens often, something in the setup is usually wrong.",
+    "1 order in the last 30 days bought an item on pre-order without choosing pre-order, for example a draft order, a POS sale, an order from another app, or because the PREAURA block is missing from the product page. The app counted it in the active delivery so the item isn’t oversold. If it happens often, something in the setup is usually wrong.",
   "queue.withoutPlan.intro.other":
-    "{count} orders in the last 30 days bought an item on pre-order without choosing pre-order — for example a draft order, a POS sale, an order from another app, or because the PREAURA block is missing from the product page. The app counted them in the active delivery so the item isn’t oversold. If it happens often, something in the setup is usually wrong.",
+    "{count} orders in the last 30 days bought an item on pre-order without choosing pre-order, for example a draft order, a POS sale, an order from another app, or because the PREAURA block is missing from the product page. The app counted them in the active delivery so the item isn’t oversold. If it happens often, something in the setup is usually wrong.",
   "queue.failed.heading": "Events that failed",
   "queue.failed.none": "No errors.",
   "queue.retry": "Try again",
@@ -489,13 +489,13 @@ export const en: Record<MessageKey, string> = {
   "releases.rules.autoDetails": "Later cancellations wait for your approval.",
   "releases.rules.grace": "Days to pay if the payment is declined",
   "releases.rules.graceDetails":
-    "The customer only pays when you ship the item. If the payment is declined then — for example because the card has expired — the customer gets this many days to pay. If the customer doesn’t pay by then, the pre-order is cancelled and the item goes back into the delivery so someone else can buy it.",
+    "The customer only pays when you ship the item. If the payment is declined then, for example because the card has expired, the customer gets this many days to pay. If the customer doesn’t pay by then, the pre-order is cancelled and the item goes back into the delivery so someone else can buy it.",
   "releases.rules.link":
     "The customer’s cancellation link is on the order as the metafield {field} and in the events to Klaviyo, Shopify Flow and webhook.",
   "releases.history": "History",
-  "releases.history.request": "{order}: {count} units, {date} —",
+  "releases.history.request": "{order}: {count} units, {date}",
   "releases.history.retrying": "Retrying: ",
-  "releases.history.issue": "{order}: payment declined {date} —",
+  "releases.history.issue": "{order}: payment declined {date}",
   // Waitlist
   "waitlist.heading": "Waitlist",
   "waitlist.saved": "Settings saved",
@@ -506,14 +506,14 @@ export const en: Record<MessageKey, string> = {
     "Sign-ups are collected, but no notifications are sent until at least one recipient is turned on under",
   "waitlist.waiting.heading": "Waiting to be notified ({count})",
   "waitlist.empty":
-    "Nobody has signed up yet. The field is shown on the product page when a variant can neither be bought from stock nor pre-ordered — turn it on in the «Pre-order» block in the theme editor.",
+    "Nobody has signed up yet. The field is shown on the product page when a variant can neither be bought from stock nor pre-ordered. Turn it on in the «Pre-order» block in the theme editor.",
   "waitlist.col.product": "Product",
   "waitlist.col.variant": "Variant",
   "waitlist.col.waiting": "Waiting now",
   "waitlist.col.notified": "Notified",
   "waitlist.how.heading": "How notifications are sent",
   "waitlist.how.text":
-    "When a variant can be bought again — because it’s back in stock, or because a delivery with room has opened — the people who signed up are notified in the order they signed up. Each sign-up gets one notification and is then closed. You send the actual message through Shopify Flow or Klaviyo.",
+    "When a variant can be bought again, because it’s back in stock, or because a delivery with room has opened, the people who signed up are notified in the order they signed up. Each sign-up gets one notification and is then closed. You send the actual message through Shopify Flow or Klaviyo.",
   "waitlist.stable.label": "Waiting time (minutes)",
   "waitlist.stable.details":
     "The item must have been available this long before anything is sent, so a brief change in stock doesn’t trigger notifications.",
@@ -525,7 +525,7 @@ export const en: Record<MessageKey, string> = {
     "Time between two batches. Before each batch, the app checks that the item can still be bought.",
   "waitlist.only.heading": "Only about the item",
   "waitlist.only.text":
-    "The customer asked for the notification, so it may be sent without consent — but only if it’s about the item. If you add offers, other products or discount codes, it becomes marketing and needs consent (in Denmark, section 10 of the Marketing Practices Act). The sign-up must not be used for newsletters.",
+    "The customer asked for the notification, so it may be sent without consent, but only if it’s about the item. If you add offers, other products or discount codes, it becomes marketing and needs consent (in Denmark, section 10 of the Marketing Practices Act). The sign-up must not be used for newsletters.",
   // Events
   "events.heading": "Events",
   "events.toast.confirmed": "Confirmed",
@@ -548,16 +548,16 @@ export const en: Record<MessageKey, string> = {
   "events.status.PENDING": "Waiting",
   "events.waitlistRef": "Waitlist",
   "events.intro":
-    "PREAURA sends an event when something happens to a pre-order: created, delayed, ready to ship, cancelled or payment declined — and when an item on the waitlist can be bought again. Each event contains the store, the customer’s name and email, order number, product and variant, quantity, the delivery date, the previous date if it changed, and a unique id. The content is the same for every recipient — you build the email.",
+    "PREAURA sends an event when something happens to a pre-order: created, delayed, ready to ship, cancelled or payment declined, and when an item on the waitlist can be bought again. Each event contains the store, the customer’s name and email, order number, product and variant, quantity, the delivery date, the previous date if it changed, and a unique id. The content is the same for every recipient, you build the email.",
   "events.responsibility.heading": "Responsibility for customer data",
   "events.responsibility.warning":
-    "Webhook and Klaviyo pass the customer’s name and email on to a third party. The store is responsible for having a lawful basis for this (for example consent or the customer’s order) and for its own agreement with the recipient. PREAURA only sends on the store’s instructions and is a data processor — not the sender.",
+    "Webhook and Klaviyo pass the customer’s name and email on to a third party. The store is responsible for having a lawful basis for this (for example consent or the customer’s order) and for its own agreement with the recipient. PREAURA only sends on the store’s instructions and is a data processor, not the sender.",
   "events.responsibility.label":
     "The store has a basis for sending customer data to the recipients it turns on below",
   "events.responsibility.accepted":
     "Confirmed {date}. If the confirmation is removed, webhook and Klaviyo are turned off.",
   "events.responsibility.required":
-    "Required to turn on webhook and Klaviyo. Shopify Flow doesn’t require it — the data stays in Shopify.",
+    "Required to turn on webhook and Klaviyo. Shopify Flow doesn’t require it, because the data stays in Shopify.",
   "events.flow.label": "Send events to Shopify Flow",
   "events.flow.details":
     "Each event is a trigger in Flow, for example «Pre-order created» and «Pre-order ready to ship». Build a workflow in the Flow app, for example an email or a tag when the order is ready.",
@@ -571,7 +571,7 @@ export const en: Record<MessageKey, string> = {
   "events.webhook.label": "Send events to the webhook",
   "events.webhook.secret": "Signing key",
   "events.webhook.signature":
-    "Every call has the header {header}: HMAC-SHA256 of the raw body of the call with this key, base64-encoded. Compute it yourself and compare — then you know the call comes from PREAURA. The header X-Preaura-Event-Id is the event’s id; use it to ignore repeats.",
+    "Every call has the header {header}: HMAC-SHA256 of the raw body of the call with this key, base64-encoded. Compute it yourself and compare. Then you know the call comes from PREAURA. The header X-Preaura-Event-Id is the event’s id; use it to ignore repeats.",
   "events.webhook.newSecret": "Create a new signing key",
   "events.klaviyo.intro":
     "Events are sent to Klaviyo as metrics, for example «PREAURA: Forudbestilling klar til afsendelse», on the customer’s profile. Klaviyo creates the metric the first time, and it can be used as a trigger in a flow. Use a private API key with access to Events (Settings → API keys in Klaviyo).",
@@ -667,7 +667,7 @@ export const en: Record<MessageKey, string> = {
   "action.variantMissing": "The variant isn’t in the app.",
   "action.cancelledNoEdit": "A cancelled delivery can’t be edited.",
   "action.hasOrders":
-    "The delivery has allocated orders and can’t be deleted. Cancel it instead — then you can see which orders are affected.",
+    "The delivery has allocated orders and can’t be deleted. Cancel it instead, then you can see which orders are affected.",
   "integration.urlCredentials":
     "The address must not contain a username or password.",
   "integration.urlPublic":
@@ -676,9 +676,9 @@ export const en: Record<MessageKey, string> = {
     "This doesn’t look like a private Klaviyo key. It starts with pk_ and is found under Settings → API keys in Klaviyo.",
   // Notes on the order in Shopify
   "orderNote.cancelled":
-    "Cancelled by PREAURA. Nothing has been refunded — refund in Shopify if the customer has paid.",
+    "Cancelled by PREAURA. Nothing has been refunded. Refund in Shopify if the customer has paid.",
   "orderNote.reduced":
-    "Quantity reduced by PREAURA (cancellation). Nothing has been refunded — refund in Shopify if the customer has paid.",
+    "Quantity reduced by PREAURA (cancellation). Nothing has been refunded. Refund in Shopify if the customer has paid.",
   // Customer’s cancellation page (in the store)
   "cancelPage.heading": "Cancel pre-order",
   "cancelPage.invalid":
