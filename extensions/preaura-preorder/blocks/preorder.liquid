@@ -28,6 +28,44 @@
   assign preaura_product = closest.product | default: product
 -%}
 {%- if preaura_product -%}
+{%- liquid
+  # Tekster: butikkens egen tekst, ellers standardteksten på kundens sprog
+  # (locales/*.json).
+  assign preaura_d_shipping_label = 'preorder.shipping_label' | t
+  assign preaura_d_delivery_label = 'preorder.delivery_label' | t
+  assign preaura_d_message = 'preorder.message' | t
+  assign preaura_d_note = 'preorder.note' | t
+  assign preaura_d_sold_out_message = 'preorder.sold_out_message' | t
+  assign preaura_d_button_text = 'preorder.button_text' | t
+  assign preaura_d_remaining_text = 'preorder.remaining_text' | t
+  assign preaura_d_timeline_sold_out = 'preorder.timeline_sold_out' | t
+  assign preaura_d_timeline_current = 'preorder.timeline_current' | t
+  assign preaura_d_timeline_upcoming = 'preorder.timeline_upcoming' | t
+  assign preaura_d_waitlist_heading = 'preorder.waitlist_heading' | t
+  assign preaura_d_waitlist_email_label = 'preorder.waitlist_email_label' | t
+  assign preaura_d_waitlist_button = 'preorder.waitlist_button' | t
+  assign preaura_d_waitlist_success = 'preorder.waitlist_success' | t
+  assign preaura_d_waitlist_invalid = 'preorder.waitlist_invalid' | t
+  assign preaura_d_waitlist_error = 'preorder.waitlist_error' | t
+  assign preaura_d_waitlist_privacy = 'preorder.waitlist_privacy' | t
+  assign preaura_t_shipping_label = block.settings.shipping_label | default: preaura_d_shipping_label
+  assign preaura_t_delivery_label = block.settings.delivery_label | default: preaura_d_delivery_label
+  assign preaura_t_message = block.settings.message | default: preaura_d_message
+  assign preaura_t_note = block.settings.note | default: preaura_d_note
+  assign preaura_t_sold_out_message = block.settings.sold_out_message | default: preaura_d_sold_out_message
+  assign preaura_t_button_text = block.settings.button_text | default: preaura_d_button_text
+  assign preaura_t_remaining_text = block.settings.remaining_text | default: preaura_d_remaining_text
+  assign preaura_t_timeline_sold_out = block.settings.timeline_sold_out | default: preaura_d_timeline_sold_out
+  assign preaura_t_timeline_current = block.settings.timeline_current | default: preaura_d_timeline_current
+  assign preaura_t_timeline_upcoming = block.settings.timeline_upcoming | default: preaura_d_timeline_upcoming
+  assign preaura_t_waitlist_heading = block.settings.waitlist_heading | default: preaura_d_waitlist_heading
+  assign preaura_t_waitlist_email_label = block.settings.waitlist_email_label | default: preaura_d_waitlist_email_label
+  assign preaura_t_waitlist_button = block.settings.waitlist_button | default: preaura_d_waitlist_button
+  assign preaura_t_waitlist_success = block.settings.waitlist_success | default: preaura_d_waitlist_success
+  assign preaura_t_waitlist_invalid = block.settings.waitlist_invalid | default: preaura_d_waitlist_invalid
+  assign preaura_t_waitlist_error = block.settings.waitlist_error | default: preaura_d_waitlist_error
+  assign preaura_t_waitlist_privacy = block.settings.waitlist_privacy | default: preaura_d_waitlist_privacy
+-%}
   <style>
     .preaura{display:flex;flex-direction:column;gap:.75em;margin:1.25em 0;padding:1.1em 1.25em;border:1px solid;border-color:color-mix(in srgb,currentColor 18%,transparent);border-radius:.6em}
     .preaura--plain{padding:0;border:0;border-radius:0}
@@ -71,16 +109,14 @@
         <ol aria-labelledby="{{ preaura_timeline_id }}" data-preaura-timeline-list></ol>
       </div>
     {%- endif -%}
-    {%- if block.settings.note != blank -%}
-      <p class="preaura__note" data-preaura-note>{{ block.settings.note | escape }}</p>
+    {%- if block.settings.show_note -%}
+      <p class="preaura__note" data-preaura-note>{{ preaura_t_note | escape }}</p>
     {%- endif -%}
     {%- if block.settings.waitlist_enabled -%}
       {%- assign preaura_field_id = 'preaura-waitlist-email-' | append: block.id -%}
       <div class="preaura__waitlist" data-preaura-waitlist hidden>
-        {%- if block.settings.waitlist_heading != blank -%}
-          <p class="preaura__waitlist-heading">{{ block.settings.waitlist_heading | escape }}</p>
-        {%- endif -%}
-        <label class="preaura__label" for="{{ preaura_field_id }}">{{ block.settings.waitlist_email_label | escape }}</label>
+        <p class="preaura__waitlist-heading">{{ preaura_t_waitlist_heading | escape }}</p>
+        <label class="preaura__label" for="{{ preaura_field_id }}">{{ preaura_t_waitlist_email_label | escape }}</label>
         <input
           class="preaura__input"
           id="{{ preaura_field_id }}"
@@ -94,12 +130,10 @@
         >
         <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" hidden data-preaura-waitlist-trap>
         <button type="button" class="button preaura__submit" data-preaura-waitlist-submit>
-          {{- block.settings.waitlist_button | escape -}}
+          {{- preaura_t_waitlist_button | escape -}}
         </button>
         <p class="preaura__status" role="status" aria-live="polite" data-preaura-waitlist-status></p>
-        {%- if block.settings.waitlist_privacy != blank -%}
-          <p class="preaura__privacy">{{ block.settings.waitlist_privacy | escape }}</p>
-        {%- endif -%}
+        <p class="preaura__privacy">{{ preaura_t_waitlist_privacy | escape }}</p>
       </div>
     {%- endif -%}
     <script type="application/json" data-preaura-data>
@@ -109,23 +143,23 @@
         "extras": {{ 'preaura-preorder-extras.js' | asset_url | json }},
         "locale": {{ request.locale.iso_code | json }},
         "settings": {
-          "shippingLabel": {{ block.settings.shipping_label | json }},
-          "deliveryLabel": {{ block.settings.delivery_label | json }},
-          "message": {{ block.settings.message | json }},
-          "soldOutMessage": {{ block.settings.sold_out_message | json }},
+          "shippingLabel": {{ preaura_t_shipping_label | json }},
+          "deliveryLabel": {{ preaura_t_delivery_label | json }},
+          "message": {{ preaura_t_message | json }},
+          "soldOutMessage": {{ preaura_t_sold_out_message | json }},
           "changeButtonText": {{ block.settings.change_button_text | json }},
-          "buttonText": {{ block.settings.button_text | json }},
+          "buttonText": {{ preaura_t_button_text | json }},
           "showRemaining": {{ block.settings.show_remaining | json }},
           "remainingThreshold": {{ block.settings.remaining_threshold | json }},
-          "remainingText": {{ block.settings.remaining_text | json }},
+          "remainingText": {{ preaura_t_remaining_text | json }},
           "timeline": {{ block.settings.show_timeline | json }},
-          "timelineSoldOut": {{ block.settings.timeline_sold_out | json }},
-          "timelineCurrent": {{ block.settings.timeline_current | json }},
-          "timelineUpcoming": {{ block.settings.timeline_upcoming | json }},
+          "timelineSoldOut": {{ preaura_t_timeline_sold_out | json }},
+          "timelineCurrent": {{ preaura_t_timeline_current | json }},
+          "timelineUpcoming": {{ preaura_t_timeline_upcoming | json }},
           "waitlist": {{ block.settings.waitlist_enabled | json }},
-          "waitlistSuccess": {{ block.settings.waitlist_success | json }},
-          "waitlistError": {{ block.settings.waitlist_error | json }},
-          "waitlistInvalid": {{ block.settings.waitlist_invalid | json }}
+          "waitlistSuccess": {{ preaura_t_waitlist_success | json }},
+          "waitlistError": {{ preaura_t_waitlist_error | json }},
+          "waitlistInvalid": {{ preaura_t_waitlist_invalid | json }}
         },
         "available": {
           {%- for variant in preaura_product.variants -%}
@@ -144,182 +178,179 @@
 
 {% schema %}
 {
-  "name": "Forudbestilling",
+  "name": "t:preorder.name",
   "target": "content",
   "javascript": "preaura-preorder.js",
   "enabled_on": {
-    "templates": ["product"]
+    "templates": [
+      "product"
+    ]
   },
   "settings": [
     {
       "type": "paragraph",
-      "content": "Placér blokken i produktsektionen, gerne lige over købsknappen. Datoen og teksterne vises kun for varianter på forudbestilling."
+      "content": "t:preorder.settings.intro.content"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:preorder.settings.texts_info.content"
     },
     {
       "type": "checkbox",
       "id": "boxed",
-      "label": "Vis i en boks",
-      "info": "En tynd ramme i temaets tekstfarve rundt om dato, antal, tidslinje og venteliste. Slået fra: samme indhold uden ramme.",
+      "label": "t:preorder.settings.boxed.label",
+      "info": "t:preorder.settings.boxed.info",
       "default": true
     },
     {
       "type": "text",
       "id": "shipping_label",
-      "label": "Navn for forventet afsendelse",
-      "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren.",
-      "default": "Forventet afsendelse"
+      "label": "t:preorder.settings.shipping_label.label",
+      "info": "t:preorder.settings.shipping_label.info"
     },
     {
       "type": "text",
       "id": "delivery_label",
-      "label": "Navn for forventet levering",
-      "info": "Bruges, når appens indstilling står til forventet levering.",
-      "default": "Forventet levering"
+      "label": "t:preorder.settings.delivery_label.label",
+      "info": "t:preorder.settings.delivery_label.info"
     },
     {
       "type": "text",
       "id": "message",
-      "label": "Besked",
-      "info": "{label} bliver til navnet ovenfor, {dato} til leverancens dato.",
-      "default": "{label}: {dato}"
+      "label": "t:preorder.settings.message.label",
+      "info": "t:preorder.settings.message.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_note",
+      "label": "t:preorder.settings.show_note.label",
+      "default": true
     },
     {
       "type": "textarea",
       "id": "note",
-      "label": "Forklaring",
-      "info": "Gør vilkårene tydelige før køb. Lad feltet stå tomt for at skjule det.",
-      "default": "Varen er på forudbestilling. Du betaler først, når varen sendes."
+      "label": "t:preorder.settings.note.label",
+      "info": "t:preorder.settings.note.info"
     },
     {
       "type": "text",
       "id": "sold_out_message",
-      "label": "Besked, når alt er udsolgt",
-      "default": "Udsolgt – alle leverancer er udsolgt."
+      "label": "t:preorder.settings.sold_out_message.label",
+      "info": "t:preorder.settings.sold_out_message.info"
     },
     {
       "type": "checkbox",
       "id": "change_button_text",
-      "label": "Skift teksten på købsknappen",
-      "info": "Slået fra: blokken viser sin egen besked over knappen, og temaets knap røres ikke.",
+      "label": "t:preorder.settings.change_button_text.label",
+      "info": "t:preorder.settings.change_button_text.info",
       "default": false
     },
     {
       "type": "text",
       "id": "button_text",
-      "label": "Tekst på købsknappen",
-      "default": "Forudbestil"
+      "label": "t:preorder.settings.button_text.label",
+      "info": "t:preorder.settings.button_text.info"
     },
     {
       "type": "header",
-      "content": "Antal tilbage"
+      "content": "t:preorder.settings.remaining_header.content"
     },
     {
       "type": "checkbox",
       "id": "show_remaining",
-      "label": "Vis antal tilbage i den aktuelle leverance",
-      "info": "Tallet hentes frisk fra appen, når siden er indlæst. Det er altid antallet i den leverance, kunden køber ind i nu.",
+      "label": "t:preorder.settings.show_remaining.label",
+      "info": "t:preorder.settings.show_remaining.info",
       "default": true
     },
     {
       "type": "number",
       "id": "remaining_threshold",
-      "label": "Vis først tallet, når der er højst",
-      "info": "Fx 25: «Kun 480 tilbage» skaber ingen hast — det er bare støj.",
+      "label": "t:preorder.settings.remaining_threshold.label",
+      "info": "t:preorder.settings.remaining_threshold.info",
       "default": 25
     },
     {
       "type": "text",
       "id": "remaining_text",
-      "label": "Tekst",
-      "info": "{antal} bliver til antallet.",
-      "default": "Kun {antal} tilbage i denne leverance."
+      "label": "t:preorder.settings.remaining_text.label",
+      "info": "t:preorder.settings.remaining_text.info"
     },
     {
       "type": "header",
-      "content": "Tidslinje"
+      "content": "t:preorder.settings.timeline_header.content"
     },
     {
       "type": "checkbox",
       "id": "show_timeline",
-      "label": "Vis tidslinje over leverancerne",
-      "info": "Viser den aktuelle plan med forventede datoer og om hver leverance er udsolgt, den man køber ind i nu, eller kommende. Ingen antal pr. leverance.",
+      "label": "t:preorder.settings.show_timeline.label",
+      "info": "t:preorder.settings.show_timeline.info",
       "default": true
     },
     {
       "type": "text",
       "id": "timeline_sold_out",
-      "label": "Udsolgt leverance",
-      "default": "udsolgt"
+      "label": "t:preorder.settings.timeline_sold_out.label"
     },
     {
       "type": "text",
       "id": "timeline_current",
-      "label": "Leverancen, kunden køber ind i nu",
-      "info": "Kort tekst står pænest, fx «nuværende» eller «køb nu».",
-      "default": "nuværende"
+      "label": "t:preorder.settings.timeline_current.label",
+      "info": "t:preorder.settings.timeline_current.info"
     },
     {
       "type": "text",
       "id": "timeline_upcoming",
-      "label": "Kommende leverance",
-      "default": "kommende"
+      "label": "t:preorder.settings.timeline_upcoming.label"
     },
     {
       "type": "header",
-      "content": "Venteliste"
+      "content": "t:preorder.settings.waitlist_header.content"
     },
     {
       "type": "paragraph",
-      "content": "Kan varianten hverken købes på lager eller forudbestilles, kan kunden skrive sig op og få besked, når den kan købes. Beskeden sendes som hændelse til Shopify Flow, Klaviyo eller din webhook. Den må kun handle om varen — tilbud, andre varer og rabatkoder kræver samtykke."
+      "content": "t:preorder.settings.waitlist_intro.content"
     },
     {
       "type": "checkbox",
       "id": "waitlist_enabled",
-      "label": "Vis tilmelding til venteliste",
+      "label": "t:preorder.settings.waitlist_enabled.label",
       "default": false
     },
     {
       "type": "text",
       "id": "waitlist_heading",
-      "label": "Overskrift",
-      "default": "Få besked, når varen kan købes"
+      "label": "t:preorder.settings.waitlist_heading.label"
     },
     {
       "type": "text",
       "id": "waitlist_email_label",
-      "label": "Navn på feltet",
-      "default": "Din e-mail"
+      "label": "t:preorder.settings.waitlist_email_label.label"
     },
     {
       "type": "text",
       "id": "waitlist_button",
-      "label": "Tekst på knappen",
-      "default": "Giv mig besked"
+      "label": "t:preorder.settings.waitlist_button.label"
     },
     {
       "type": "text",
       "id": "waitlist_success",
-      "label": "Svar efter tilmelding",
-      "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen.",
-      "default": "Tak. Vi giver dig besked, når varen kan købes."
+      "label": "t:preorder.settings.waitlist_success.label",
+      "info": "t:preorder.settings.waitlist_success.info"
     },
     {
       "type": "text",
       "id": "waitlist_invalid",
-      "label": "Svar ved ugyldig e-mail",
-      "default": "Skriv en gyldig e-mail."
+      "label": "t:preorder.settings.waitlist_invalid.label"
     },
     {
       "type": "text",
       "id": "waitlist_error",
-      "label": "Svar ved fejl",
-      "default": "Det lykkedes ikke. Prøv igen om lidt."
+      "label": "t:preorder.settings.waitlist_error.label"
     },
     {
       "type": "textarea",
       "id": "waitlist_privacy",
-      "label": "Oplysning om brug af e-mail",
-      "default": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev."
+      "label": "t:preorder.settings.waitlist_privacy.label"
     }
   ]
 }

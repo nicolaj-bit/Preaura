@@ -1,0 +1,26 @@
+{
+  "preorder": {
+    "shipping_label": "Forventet afsendelse",
+    "delivery_label": "Forventet levering",
+    "message": "{label}: {date}",
+    "note": "Varen er på forudbestilling. Du betaler først, når varen sendes.",
+    "sold_out_message": "Udsolgt – alle leverancer er udsolgt.",
+    "button_text": "Forudbestil",
+    "remaining_text": "Kun {count} tilbage i denne leverance.",
+    "timeline_sold_out": "udsolgt",
+    "timeline_current": "nuværende",
+    "timeline_upcoming": "kommende",
+    "waitlist_heading": "Få besked, når varen kan købes",
+    "waitlist_email_label": "Din e-mail",
+    "waitlist_button": "Giv mig besked",
+    "waitlist_success": "Tak. Vi giver dig besked, når varen kan købes.",
+    "waitlist_invalid": "Skriv en gyldig e-mail.",
+    "waitlist_error": "Det lykkedes ikke. Prøv igen om lidt.",
+    "waitlist_privacy": "Vi bruger kun din e-mail til at give dig besked om denne vare. Du bliver ikke tilmeldt vores nyhedsbrev."
+  },
+  "cart": {
+    "line_note": "Intet at betale i dag. Beløbet trækkes, når varen sendes.",
+    "later_label": "Trækkes ved afsendelse",
+    "today_label": "Betales i dag"
+  }
+}

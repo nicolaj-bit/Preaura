@@ -264,8 +264,22 @@ describe("blokken (Liquid)", () => {
     expect(setting).toMatchObject({ type: "checkbox", default: false });
   });
 
-  it("teksten lover kun besked om varen — ikke nyhedsbrev", () => {
-    const privacy = schema.settings.find((s) => s.id === "waitlist_privacy");
-    expect(String(privacy?.default)).toMatch(/ikke tilmeldt.*nyhedsbrev/);
+  it("teksten lover kun besked om varen — ikke nyhedsbrev — på alle sprog", () => {
+    const locale = (name: string) =>
+      JSON.parse(
+        readFileSync(
+          join(__dirname, "../extensions/preaura-preorder/locales", name),
+          "utf8",
+        ),
+      ) as { preorder: Record<string, string> };
+    expect(locale("da.json").preorder.waitlist_privacy).toMatch(
+      /ikke tilmeldt.*nyhedsbrev/,
+    );
+    expect(locale("en.default.json").preorder.waitlist_privacy).toMatch(
+      /won't be subscribed.*newsletter/,
+    );
+    // Teksten vises altid, også når butikken ikke selv har skrevet en.
+    expect(markup).toContain("preaura_t_waitlist_privacy");
+    expect(markup).not.toMatch(/if preaura_t_waitlist_privacy/);
   });
 });

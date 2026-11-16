@@ -168,8 +168,11 @@
       this.setText(
         el,
         show
-          ? String(s.remainingText || "Kun {antal} tilbage i denne leverance.")
+          ? // {count} og det ældre danske {antal} betyder det samme.
+            String(s.remainingText || "{count}")
               .split("{antal}")
+              .join(String(remaining))
+              .split("{count}")
               .join(String(remaining))
           : "",
       );

@@ -1,1 +1,26 @@
-{}
+{
+  "preorder": {
+    "shipping_label": "Expected to ship",
+    "delivery_label": "Expected delivery",
+    "message": "{label}: {date}",
+    "note": "This item is on pre-order. You won't be charged until it ships.",
+    "sold_out_message": "Sold out – all deliveries are sold out.",
+    "button_text": "Pre-order",
+    "remaining_text": "Only {count} left in this delivery.",
+    "timeline_sold_out": "sold out",
+    "timeline_current": "current",
+    "timeline_upcoming": "upcoming",
+    "waitlist_heading": "Get notified when it's available",
+    "waitlist_email_label": "Your email",
+    "waitlist_button": "Notify me",
+    "waitlist_success": "Thanks. We'll let you know when it's available.",
+    "waitlist_invalid": "Enter a valid email.",
+    "waitlist_error": "That didn't work. Please try again shortly.",
+    "waitlist_privacy": "We only use your email to notify you about this item. You won't be subscribed to our newsletter."
+  },
+  "cart": {
+    "line_note": "Nothing due today. The amount is charged when the item ships.",
+    "later_label": "Charged when the item ships",
+    "today_label": "Due today"
+  }
+}

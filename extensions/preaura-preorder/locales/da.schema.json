@@ -1,0 +1,131 @@
+{
+  "preorder": {
+    "name": "Forudbestilling",
+    "settings": {
+      "intro": {
+        "content": "Placér blokken i produktsektionen, gerne lige over købsknappen. Datoen og teksterne vises kun for varianter på forudbestilling."
+      },
+      "boxed": {
+        "label": "Vis i en boks",
+        "info": "En tynd ramme i temaets tekstfarve rundt om dato, antal, tidslinje og venteliste. Slået fra: samme indhold uden ramme."
+      },
+      "shipping_label": {
+        "label": "Navn for forventet afsendelse",
+        "info": "Vises i beskeden og som linjeegenskab i kurv, checkout, ordrebekræftelse og på ordren. Tom: standardteksten på kundens sprog."
+      },
+      "delivery_label": {
+        "label": "Navn for forventet levering",
+        "info": "Bruges, når appens indstilling står til forventet levering. Tom: standardteksten på kundens sprog."
+      },
+      "message": {
+        "label": "Besked",
+        "info": "{label} bliver til navnet ovenfor, {date} til leverancens dato. Tom: standardteksten på kundens sprog."
+      },
+      "show_note": {
+        "label": "Vis forklaring"
+      },
+      "note": {
+        "label": "Forklaring",
+        "info": "Gør vilkårene tydelige før køb. Tom: standardteksten på kundens sprog."
+      },
+      "sold_out_message": {
+        "label": "Besked, når alt er udsolgt",
+        "info": "Tom: standardteksten på kundens sprog."
+      },
+      "change_button_text": {
+        "label": "Skift teksten på købsknappen",
+        "info": "Slået fra: blokken viser sin egen besked over knappen, og temaets knap røres ikke."
+      },
+      "button_text": {
+        "label": "Tekst på købsknappen",
+        "info": "Tom: standardteksten på kundens sprog."
+      },
+      "remaining_header": {
+        "content": "Antal tilbage"
+      },
+      "show_remaining": {
+        "label": "Vis antal tilbage i den aktuelle leverance",
+        "info": "Tallet hentes frisk fra appen, når siden er indlæst. Det er altid antallet i den leverance, kunden køber ind i nu."
+      },
+      "remaining_threshold": {
+        "label": "Vis først tallet, når der er højst",
+        "info": "Fx 25: «Kun 480 tilbage» skaber ingen hast — det er bare støj."
+      },
+      "remaining_text": {
+        "label": "Tekst",
+        "info": "{count} bliver til antallet. Tom: standardteksten på kundens sprog."
+      },
+      "timeline_header": {
+        "content": "Tidslinje"
+      },
+      "show_timeline": {
+        "label": "Vis tidslinje over leverancerne",
+        "info": "Viser den aktuelle plan med forventede datoer og om hver leverance er udsolgt, den man køber ind i nu, eller kommende. Ingen antal pr. leverance."
+      },
+      "timeline_sold_out": {
+        "label": "Udsolgt leverance"
+      },
+      "timeline_current": {
+        "label": "Leverancen, kunden køber ind i nu",
+        "info": "Kort tekst står pænest. Tom: standardteksten på kundens sprog."
+      },
+      "timeline_upcoming": {
+        "label": "Kommende leverance"
+      },
+      "waitlist_header": {
+        "content": "Venteliste"
+      },
+      "waitlist_intro": {
+        "content": "Kan varianten hverken købes på lager eller forudbestilles, kan kunden skrive sig op og få besked, når den kan købes. Beskeden sendes som hændelse til Shopify Flow, Klaviyo eller din webhook. Den må kun handle om varen — tilbud, andre varer og rabatkoder kræver samtykke."
+      },
+      "waitlist_enabled": {
+        "label": "Vis tilmelding til venteliste"
+      },
+      "waitlist_heading": {
+        "label": "Overskrift"
+      },
+      "waitlist_email_label": {
+        "label": "Navn på feltet"
+      },
+      "waitlist_button": {
+        "label": "Tekst på knappen"
+      },
+      "waitlist_success": {
+        "label": "Svar efter tilmelding",
+        "info": "Vises altid efter en tilmelding — også hvis e-mailen allerede stod på listen. Tom: standardteksten på kundens sprog."
+      },
+      "waitlist_invalid": {
+        "label": "Svar ved ugyldig e-mail"
+      },
+      "waitlist_error": {
+        "label": "Svar ved fejl"
+      },
+      "waitlist_privacy": {
+        "label": "Oplysning om brug af e-mail"
+      },
+      "texts_info": {
+        "content": "Tekstfelter, der står tomme, bruger PREAURAs standardtekst på kundens sprog (indtil videre dansk og engelsk)."
+      }
+    }
+  },
+  "cart": {
+    "name": "PREAURA kurv",
+    "settings": {
+      "intro": {
+        "content": "Viser i kurven, at forudbestilte varer intet koster i dag. Vises kun, når der er en forudbestilling i kurven. Tekstfelter, der står tomme, bruger standardteksten på kundens sprog."
+      },
+      "line_note": {
+        "label": "Tekst under varen"
+      },
+      "show_totals": {
+        "label": "Vis beløb over knappen til kassen"
+      },
+      "later_label": {
+        "label": "Beløb, der trækkes senere"
+      },
+      "today_label": {
+        "label": "Beløb i dag"
+      }
+    }
+  }
+}
