@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useT } from "../i18n";
+import { coded, useT } from "../i18n";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   BLOCK_HANDLE,
@@ -39,7 +39,7 @@ export function useBlockInfo(handle: string = BLOCK_HANDLE): {
     Promise.resolve()
       .then(() => {
         if (!app?.extensions) {
-          throw new Error("Shopify Admin tilbyder ikke app.extensions()");
+          throw new Error(coded("setupReason.noApi"));
         }
         return app.extensions();
       })

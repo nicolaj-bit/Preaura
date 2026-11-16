@@ -73,6 +73,58 @@ export function formatDateTime(
   }).format(typeof date === "string" ? new Date(date) : date);
 }
 
+// --- Beskeder, der gemmes og vises senere ---------------------------------
+//
+// En fejl, som serveren gemmer (fx på en variant eller en hændelse), skal
+// vises på sproget hos den, der ser den. Den gemmes derfor som en nøgle med
+// variabler («i18n:nøgle|{...}») og oversættes først, når den vises. En
+// variabel, der starter med «@», er selv en nøgle. Ældre beskeder uden
+// nøgle (dansk tekst, Shopifys egne fejl) vises, som de er.
+
+const CODED = "i18n:";
+
+/** En besked, der gemmes nu og oversættes, når den vises. */
+export function coded(key: MessageKey, vars?: Vars) {
+  return vars ? `${CODED}${key}|${JSON.stringify(vars)}` : `${CODED}${key}`;
+}
+
+function isKey(key: string): key is MessageKey {
+  return key in MESSAGES.en;
+}
+
+/** En gemt besked på sproget. Tekst uden nøgle vises uændret. */
+export function localizeStored(
+  locale: Locale,
+  text: string | null | undefined,
+): string {
+  if (text == null) return "";
+  // En besked kan være pakket ind i en anden (fx «Fejl: i18n:…»).
+  const start = text.indexOf(CODED);
+  if (start < 0) return text;
+  const body = text.slice(start + CODED.length);
+  const bar = body.indexOf("|");
+  const key = bar < 0 ? body : body.slice(0, bar);
+  if (!isKey(key)) return text;
+  let vars: Vars | undefined;
+  if (bar >= 0) {
+    try {
+      vars = JSON.parse(body.slice(bar + 1)) as Vars;
+    } catch {
+      return text;
+    }
+  }
+  const resolved: Vars = {};
+  for (const [name, value] of Object.entries(vars ?? {})) {
+    const nested = String(value);
+    resolved[name] = nested.startsWith("@")
+      ? isKey(nested.slice(1))
+        ? translate(locale, nested.slice(1) as MessageKey)
+        : nested.slice(1)
+      : localizeStored(locale, nested);
+  }
+  return text.slice(0, start) + translate(locale, key, resolved);
+}
+
 export const LocaleContext = createContext<Locale>("da");
 
 /** Til komponenter: t("nøgle"), tn("nøgle", antal) og sproget. */
@@ -85,5 +137,7 @@ export function useT() {
       translateCount(locale, key, count, vars),
     date: (date: string, timeZone?: string) =>
       formatDate(locale, date, timeZone),
+    /** En gemt besked (eller en teknisk forklaring) på sproget. */
+    stored: (text: string | null | undefined) => localizeStored(locale, text),
   };
 }

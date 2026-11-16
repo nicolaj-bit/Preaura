@@ -34,9 +34,6 @@ export const da = {
   "themeBlock.howTo":
     "Knappen åbner temaeditoren med blokken klar — tryk Gem. Shopify ser kun dit udgivne tema, så blokken skal ligge i det. Åbner knappen ikke blokken, understøtter dit tema sandsynligvis ikke app-blokke (det kræver et Online Store 2.0-tema). Skriv til os, så hjælper vi.",
   "themeBlock.button": "Tilføj blokken i temaet",
-  "themeBlock.reason.noAnswer": "intet svar fra Shopify",
-  "themeBlock.reason.noExtension":
-    "Shopify Admin tilbyder ikke app.extensions()",
 
   // Forsiden
   "home.heading": "Forudbestilling",
@@ -568,6 +565,101 @@ export const da = {
     "Brug webhooken. Med Zapier: opret en Zap med udløseren «Webhooks by Zapier → Catch Hook», og indsæt Zapiers adresse ovenfor. Send en forudbestilling igennem, så Zapier kan se felterne, og vælg derefter jeres mailsystem som næste trin, fx «Add/Update Subscriber» med customer.email, og en tag eller hændelse ud fra type (fx preorder.ready).",
   "events.others.make":
     "Med Make: opret et scenarie med modulet «Webhooks → Custom webhook», indsæt Makes adresse ovenfor, og fortsæt med jeres mailsystems modul. Felterne er de samme.",
+  // Gemte beskeder (fejl og årsager, vist senere)
+  "stored.shopifyError": "{action}: {details}",
+  "stored.shopifyRejected": "Shopify afviste forespørgslen: {details}",
+  "shopifyAction.removeTag": "Fjernelse af tag fra ordren",
+  "shopifyAction.removeVariant": "Fjernelse af variant fra selling plan group",
+  "shopifyAction.requireSellingPlan": "Krav om forudbestilling på produktet",
+  "shopifyAction.variantMetafield": "Metafelt på varianten",
+  "shopifyAction.orderMetafields": "Metafelter på ordren",
+  "shopifyAction.updateInventory": "Opdatering af lagerantal",
+  "shopifyAction.createGroup": "Oprettelse af selling plan group",
+  "shopifyAction.createPlan": "Oprettelse af selling plan",
+  "shopifyAction.inventoryTracking": "Opsætning af lagersporing",
+  "shopifyAction.translation": "Oversættelse",
+  "shopifyAction.editQuantity": "Rettelse af antal",
+  "shopifyAction.editOrder": "Rettelse af ordren",
+  "shopifyAction.flow": "Shopify Flow",
+  "shopifyAction.deleteGroup": "Sletning af selling plan group",
+  "shopifyAction.addTag": "Tag på ordren",
+  "shopifyAction.addVariant": "Tilknytning af variant til selling plan group",
+  "shopifyAction.deletePlans": "Udfasning af selling plan",
+  "stored.sync.variantGone": "Varianten findes ikke længere i Shopify.",
+  "stored.sync.noLocation":
+    "Varianten ligger ikke på noget lager i Shopify. Tilføj den til et lager, og synkronisér igen.",
+  "stored.sync.notActivated":
+    "Varianten er ikke aktiveret på sit lager i Shopify. Aktivér den på lageret, og synkronisér igen.",
+  "stored.sync.planNotCreated":
+    "Shopify oprettede ikke planen «{option}». Synkronisér igen.",
+  "stored.order.gone": "Ordren findes ikke længere i Shopify.",
+  "stored.order.noOrder": "Hændelsen indeholder ingen ordre.",
+  "stored.order.noCustomer": "Hændelsen indeholder ingen kunde.",
+  "stored.order.notWritten":
+    "Ordren er tildelt, men leveringsdato og tag kunne ikke skrives på ordren i Shopify: {details}",
+  "stored.mode.forced": "Tvunget i forudbestilling af webshopejeren.",
+  "stored.mode.empty": "Lageret ramte 0, og der er plads i en leverance.",
+  "stored.mode.unforced":
+    "Tvang slået fra. {count} stk. er sat tilbage på lager.",
+  "stored.mode.received": "Der kom {count} stk. på lager.",
+  "stored.mode.receivedSplit":
+    "Der kom {count} stk. på lager. {owed} går til forudbestillinger, {forSale} sælges som almindeligt lager.",
+  "stored.outbox.signupDeleted":
+    "Tilmeldingen er slettet, før beskeden kunne sendes.",
+  "stored.outbox.dataDeleted":
+    "Hændelsens data er slettet (efter 30 dage eller på kundens anmodning) og kan ikke sendes.",
+  "stored.outbox.flowOff": "Shopify Flow er slået fra.",
+  "stored.outbox.webhookOff": "Webhooken er slået fra.",
+  "stored.outbox.klaviyoOff": "Klaviyo er slået fra.",
+  "stored.outbox.unreachable": "Kunne ikke nå modtageren: {details}",
+  "stored.outbox.noEmail":
+    "Ordren har ingen e-mail, eller PREAURA har ikke adgang til kundens e-mail i Shopify. Klaviyo kræver en e-mail.",
+  "stored.outbox.klaviyoKey":
+    "Klaviyo afviste API-nøglen. Tjek, at det er en privat nøgle med adgang til Events.",
+  "action.deliveryMissing": "Leverancen findes ikke.",
+  "action.variantMissing": "Varianten findes ikke i appen.",
+  "action.cancelledNoEdit": "En annulleret leverance kan ikke rettes.",
+  "action.hasOrders":
+    "Leverancen har tildelte ordrer og kan ikke slettes. Annullér den i stedet — så kan du se, hvilke ordrer der er berørt.",
+  "integration.urlCredentials":
+    "Adressen må ikke indeholde brugernavn eller adgangskode.",
+  "integration.urlPublic":
+    "Adressen skal være offentlig tilgængelig på internettet.",
+  "integration.klaviyoKey":
+    "Det ligner ikke en privat Klaviyo-nøgle. Den starter med pk_ og findes under Settings → API keys i Klaviyo.",
+  // Noter på ordren i Shopify
+  "orderNote.cancelled":
+    "Annulleret af PREAURA. Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+  "orderNote.reduced":
+    "Antal nedsat af PREAURA (annullering). Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+  // Kundens side til annullering (i butikken)
+  "cancelPage.heading": "Annullér forudbestilling",
+  "cancelPage.invalid":
+    "Linket er ugyldigt eller udløbet. Kontakt butikken, hvis du vil annullere din forudbestilling.",
+  "cancelPage.unavailable":
+    "Annullering via link er ikke tilgængelig lige nu. Kontakt butikken, hvis du vil annullere din forudbestilling.",
+  "cancelPage.alreadyRequested":
+    "Vi har allerede modtaget din anmodning om at annullere. Du hører fra butikken.",
+  "cancelPage.alreadyCancelled": "Forudbestillingen er allerede annulleret.",
+  "cancelPage.windowClosed":
+    "Fristen for at annullere via linket er udløbet, eller varen er sendt. Kontakt butikken.",
+  "cancelPage.nothing":
+    "Der er ingen forudbestilte varer at annullere på ordren.",
+  "cancelPage.chooseSomething": "Vælg hvor mange du vil annullere.",
+  "cancelPage.approved":
+    "Din annullering er godkendt og gennemføres nu. Har du betalt noget, refunderer butikken det.",
+  "cancelPage.requested":
+    "Tak. Din anmodning om at annullere er sendt til butikken, som vender tilbage.",
+  "cancelPage.order": "Ordre {name}",
+  "cancelPage.expected": "Forventet: {date}",
+  "cancelPage.quantity": "Antal at annullere (af {count})",
+  "cancelPage.submit": "Annullér",
+  // Teknisk forklaring i opsætningsguiden
+  "setupReason.noAnswer": "intet svar fra Shopify",
+  "setupReason.noThemeExtension":
+    "ingen temaudvidelse i svaret ({count} udvidelser)",
+  "setupReason.otherName": "temaudvidelsen hedder {names}",
+  "setupReason.noApi": "Shopify Admin tilbyder ikke app.extensions()",
 };
 
 export type MessageKey = keyof typeof da;

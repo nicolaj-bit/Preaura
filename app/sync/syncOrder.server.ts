@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { forShop } from "../models/preorder.server";
@@ -32,7 +33,7 @@ export async function syncOrder({
   if (rows.length === 0) return;
 
   const order = await gateway.readOrder(orderId);
-  if (!order) throw new Error("Ordren findes ikke længere i Shopify.");
+  if (!order) throw new Error(coded("stored.order.gone"));
 
   // Kundens annulleringslink (preaura.cancel_url), så butikken kan vise det
   // i sine notifikationer og på ordrestatussiden. Kun mens der er

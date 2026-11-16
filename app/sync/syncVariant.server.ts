@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import { forShop } from "../models/preorder.server";
@@ -80,7 +81,7 @@ async function reconcile(
   gateway: ShopifyGateway,
 ): Promise<{ available: number | null; product: ProductState }> {
   const plan = await data.syncState.getVariant(variantId);
-  if (!plan) throw new SyncError("Varianten findes ikke i appen.");
+  if (!plan) throw new SyncError(coded("action.variantMissing"));
 
   const state = await gateway.read({
     variantId,
@@ -88,7 +89,7 @@ async function reconcile(
     locationId: plan.locationId,
   });
   if (!state.variant) {
-    throw new SyncError("Varianten findes ikke længere i Shopify.");
+    throw new SyncError(coded("stored.sync.variantGone"));
   }
   const product: ProductState = {
     id: state.variant.productId,
@@ -110,14 +111,10 @@ async function reconcile(
   // Et skift rører aldrig eksisterende tildelinger eller ordrer.
   // Uden lagerplacering kan tilstanden ikke afgøres — sig det tydeligt.
   if (plan.preorderEnabled && !plan.locationId) {
-    throw new SyncError(
-      "Varianten ligger ikke på noget lager i Shopify. Tilføj den til et lager, og synkronisér igen.",
-    );
+    throw new SyncError(coded("stored.sync.noLocation"));
   }
   if (plan.preorderEnabled && state.variant.available === null) {
-    throw new SyncError(
-      "Varianten er ikke aktiveret på sit lager i Shopify. Aktivér den på lageret, og synkronisér igen.",
-    );
+    throw new SyncError(coded("stored.sync.notActivated"));
   }
 
   let mode: VariantMode = plan.preorderEnabled
@@ -367,14 +364,10 @@ async function reconcile(
   }
 
   if (!plan.locationId) {
-    throw new SyncError(
-      "Varianten ligger ikke på noget lager i Shopify. Tilføj den til et lager, og synkronisér igen.",
-    );
+    throw new SyncError(coded("stored.sync.noLocation"));
   }
   if (variant.available === null) {
-    throw new SyncError(
-      "Varianten er ikke aktiveret på sit lager i Shopify. Aktivér den på lageret, og synkronisér igen.",
-    );
+    throw new SyncError(coded("stored.sync.notActivated"));
   }
 
   const active = findActiveDelivery(deliveries);
@@ -523,7 +516,7 @@ async function saveCreatedPlans(
     const match = created.find((plan) => plan.option === wanted.option);
     if (!match) {
       throw new SyncError(
-        `Shopify oprettede ikke planen "${wanted.option}". Synkronisér igen.`,
+        coded("stored.sync.planNotCreated", { option: wanted.option }),
       );
     }
     await data.syncState.recordPlanRef(match.id, wanted.deliveryId);

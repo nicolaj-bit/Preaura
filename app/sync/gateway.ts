@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import type { OrderSnapshot } from "../models/preorder.server";
 import type { DesiredPlan, ShopifyPlan } from "./plans";
 
@@ -129,6 +130,8 @@ export interface ShopifyGateway {
   cancelOrder(
     orderId: string,
     reason: "CUSTOMER" | "DECLINED" | "STAFF",
+    /** Note til butikken på ordren (på butiksejerens sprog). */
+    staffNote?: string,
   ): Promise<void>;
   /**
    * Sætter ordrelinjers antal (nedad) med en rettelse af ordren — igen uden
@@ -138,6 +141,8 @@ export interface ShopifyGateway {
   setOrderLineQuantities(
     orderId: string,
     targets: { lineId: string; quantity: number }[],
+    /** Note til butikken på ordren (på butiksejerens sprog). */
+    staffNote?: string,
   ): Promise<void>;
   /** Starter butikkens Flow-workflows, der bruger triggeren. */
   flowTriggerReceive(
@@ -175,7 +180,12 @@ export class ShopifyUserError extends Error {
     action: string,
     public readonly userErrors: { field?: string[] | null; message: string }[],
   ) {
-    super(`${action}: ${userErrors.map((e) => e.message).join("; ")}`);
+    super(
+      coded("stored.shopifyError", {
+        action: `@${action}`,
+        details: userErrors.map((e) => e.message).join("; "),
+      }),
+    );
     this.name = "ShopifyUserError";
   }
 }

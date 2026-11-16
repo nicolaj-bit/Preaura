@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 // Hvilken tilstand en variant skal være i. Ren funktion uden database og
 // Shopify, så reglerne kan testes direkte.
 //
@@ -55,7 +56,7 @@ export function decideMode(input: ModeInput): ModeDecision {
     return {
       mode: "PREORDER",
       changed: true,
-      reason: "Tvunget i forudbestilling af webshopejeren.",
+      reason: coded("stored.mode.forced"),
       stockAvailable: null,
     };
   }
@@ -65,7 +66,7 @@ export function decideMode(input: ModeInput): ModeDecision {
       return {
         mode: "PREORDER",
         changed: true,
-        reason: "Lageret ramte 0, og der er plads i en leverance.",
+        reason: coded("stored.mode.empty"),
         stockAvailable: null,
       };
     }
@@ -84,7 +85,7 @@ export function decideMode(input: ModeInput): ModeDecision {
       return {
         mode: "STOCK",
         changed: true,
-        reason: `Tvang slået fra. ${stock} stk. er sat tilbage på lager.`,
+        reason: coded("stored.mode.unforced", { count: stock }),
         stockAvailable: stock,
       };
     }
@@ -103,8 +104,12 @@ export function decideMode(input: ModeInput): ModeDecision {
           changed: true,
           reason:
             input.owed > 0
-              ? `Der kom ${received} stk. på lager. ${input.owed} går til forudbestillinger, ${forSale} sælges som almindeligt lager.`
-              : `Der kom ${received} stk. på lager.`,
+              ? coded("stored.mode.receivedSplit", {
+                  count: received,
+                  owed: input.owed,
+                  forSale,
+                })
+              : coded("stored.mode.received", { count: received }),
           stockAvailable: forSale,
         };
       }

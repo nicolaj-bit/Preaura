@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
@@ -92,7 +93,7 @@ export async function processOutbox({
           if (!email) {
             await outbox.events.markFailed(
               intent.id,
-              "Tilmeldingen er slettet, før beskeden kunne sendes.",
+              coded("stored.outbox.signupDeleted"),
             );
             continue;
           }
@@ -152,8 +153,7 @@ export async function processOutbox({
           {
             ok: false,
             retry: false,
-            error:
-              "Hændelsens data er slettet (efter 30 dage eller på kundens anmodning) og kan ikke sendes.",
+            error: coded("stored.outbox.dataDeleted"),
           },
           now(),
         );
@@ -165,15 +165,23 @@ export async function processOutbox({
       if (delivery.channel === "FLOW") {
         result = settings.flow
           ? await sendFlow(event, deps)
-          : { ok: false, retry: false, error: "Shopify Flow er slået fra." };
+          : { ok: false, retry: false, error: coded("stored.outbox.flowOff") };
       } else if (delivery.channel === "WEBHOOK") {
         result = settings.webhook
           ? await sendWebhook(event, settings.webhook, deps.fetch)
-          : { ok: false, retry: false, error: "Webhooken er slået fra." };
+          : {
+              ok: false,
+              retry: false,
+              error: coded("stored.outbox.webhookOff"),
+            };
       } else {
         result = settings.klaviyo
           ? await sendKlaviyo(event, settings.klaviyo.apiKey, deps.fetch)
-          : { ok: false, retry: false, error: "Klaviyo er slået fra." };
+          : {
+              ok: false,
+              retry: false,
+              error: coded("stored.outbox.klaviyoOff"),
+            };
       }
       await outbox.deliveries.recordAttempt(delivery.id, result, now());
       if (result.ok) totals.sent += 1;
@@ -240,7 +248,7 @@ async function post(
       retry: true,
       error: timedOut
         ? `Intet svar inden for ${TIMEOUT_MS / 1000} sekunder.`
-        : `Kunne ikke nå modtageren: ${message(error)}`,
+        : coded("stored.outbox.unreachable", { details: message(error) }),
     };
   }
 }
@@ -268,8 +276,7 @@ async function sendKlaviyo(
     return {
       ok: false,
       retry: false,
-      error:
-        "Ordren har ingen e-mail, eller PREAURA har ikke adgang til kundens e-mail i Shopify. Klaviyo kræver en e-mail.",
+      error: coded("stored.outbox.noEmail"),
     };
   }
   return post(
@@ -278,7 +285,7 @@ async function sendKlaviyo(
     { headers: klaviyoHeaders(apiKey), body: toKlaviyoBody(event) },
     (status, text) =>
       status === 401 || status === 403
-        ? "Klaviyo afviste API-nøglen. Tjek, at det er en privat nøgle med adgang til Events."
+        ? coded("stored.outbox.klaviyoKey")
         : `Klaviyo svarede ${status}${text ? `: ${text}` : ""}`,
   );
 }

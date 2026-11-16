@@ -24,6 +24,7 @@ import {
 } from "../events/labels";
 import {
   formatDateTime,
+  localizeStored,
   translate,
   translateCount,
   useT,
@@ -59,7 +60,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     at: format.format(d.deliveredAt ?? d.updatedAt),
     status: d.status,
     attempts: d.attempts,
-    error: d.lastError,
+    error: d.lastError ? localizeStored(locale, d.lastError) : null,
   });
   return {
     settings: {
@@ -80,7 +81,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       type: label(e.type),
       ...reference(e, locale),
       at: format.format(e.createdAt),
-      error: e.lastError,
+      error: e.lastError ? localizeStored(locale, e.lastError) : null,
     })),
     encryptionMissing: !process.env.PREAURA_ENCRYPTION_KEY,
   };
@@ -112,7 +113,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     case "webhookUrl": {
       const result = validateWebhookUrl(String(form.get("url") ?? ""));
-      if (!result.ok) return { ok: false, message: result.error };
+      if (!result.ok) {
+        return { ok: false, message: localizeStored(locale, result.error) };
+      }
       await integrations.setWebhookUrl(result.url);
       return { ok: true, message: t("events.toast.urlSaved") };
     }
@@ -132,7 +135,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { ok: true, message: t("events.toast.secret") };
     case "klaviyoKey": {
       const result = validateKlaviyoKey(String(form.get("key") ?? ""));
-      if (!result.ok) return { ok: false, message: result.error };
+      if (!result.ok) {
+        return { ok: false, message: localizeStored(locale, result.error) };
+      }
       await integrations.setKlaviyoKey(result.key);
       return { ok: true, message: t("events.toast.keySaved") };
     }

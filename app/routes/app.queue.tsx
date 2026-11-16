@@ -21,6 +21,7 @@ import { CHANNEL_LABELS, type Channel } from "../events/labels";
 import {
   formatDate,
   formatDateTime,
+  localizeStored,
   translate,
   translateCount,
   useT,
@@ -141,7 +142,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         id: event.id,
         topic: topicLabel(locale, event.topic),
         orderNumber: ref ? numericId(ref.orderId) : null,
-        error: event.lastError ?? t("queue.unknownError"),
+        error: event.lastError
+          ? localizeStored(locale, event.lastError)
+          : t("queue.unknownError"),
         attempts: event.attempts,
         receivedAt: format.format(event.receivedAt),
       };

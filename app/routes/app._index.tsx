@@ -553,7 +553,7 @@ function SetupGuide({
   firstProduct: string | null;
 }) {
   const guide = setupSteps(state);
-  const { t } = useT();
+  const { t, stored } = useT();
   const action = (id: keyof typeof STEP_TEXT) => {
     switch (id) {
       case "products":
@@ -629,13 +629,13 @@ function SetupGuide({
               text={
                 step.id === "block" && state.block === "unknown" && !step.done
                   ? `${t("guide.block.text")} ${t("guide.block.unknown", {
-                      reason: blockReason ? ` (${blockReason})` : "",
+                      reason: blockReason ? ` (${stored(blockReason)})` : "",
                     })}`
                   : step.id === "cart" &&
                       (state.cart ?? "unknown") === "unknown" &&
                       !step.done
                     ? `${t("guide.cart.text")} ${t("guide.cart.unknown", {
-                        reason: cartReason ? ` (${cartReason})` : "",
+                        reason: cartReason ? ` (${stored(cartReason)})` : "",
                       })}`
                     : t(STEP_TEXT[step.id].text)
               }

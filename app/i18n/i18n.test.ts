@@ -64,3 +64,42 @@ describe("hvilket sprog", () => {
     expect(localeFromHeaders(new Request("https://app.test/app"))).toBeNull();
   });
 });
+
+describe("gemte beskeder", () => {
+  it("gemmes som nøgle og vises på sproget hos den, der ser dem", async () => {
+    const { coded, localizeStored } = await import("./index");
+    const stored = coded("stored.mode.received", { count: 20 });
+    expect(localizeStored("da", stored)).toBe("Der kom 20 stk. på lager.");
+    expect(localizeStored("en", stored)).toBe("20 units arrived in stock.");
+  });
+
+  it("Shopifys egne fejl vises uændret, og handlingen oversættes", async () => {
+    const { coded, localizeStored } = await import("./index");
+    const stored = coded("stored.shopifyError", {
+      action: "@shopifyAction.createPlan",
+      details: "Name Cannot have multiple selling plans with the same name",
+    });
+    expect(localizeStored("en", stored)).toBe(
+      "Creating a selling plan: Name Cannot have multiple selling plans with the same name",
+    );
+    expect(localizeStored("da", stored)).toMatch(
+      /^Oprettelse af selling plan: Name/,
+    );
+  });
+
+  it("ældre beskeder på dansk og ukendte nøgler vises, som de er", async () => {
+    const { localizeStored } = await import("./index");
+    expect(localizeStored("en", "Varianten findes ikke i appen.")).toBe(
+      "Varianten findes ikke i appen.",
+    );
+    expect(localizeStored("en", "i18n:ukendt.nøgle")).toBe("i18n:ukendt.nøgle");
+    expect(localizeStored("en", null)).toBe("");
+  });
+
+  it("en pakket besked oversættes også (fx «Fejl: i18n:…»)", async () => {
+    const { coded, localizeStored } = await import("./index");
+    expect(localizeStored("en", `Error: ${coded("stored.order.gone")}`)).toBe(
+      "Error: The order no longer exists in Shopify.",
+    );
+  });
+});

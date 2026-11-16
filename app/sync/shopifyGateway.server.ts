@@ -1,3 +1,4 @@
+import { coded, translate } from "../i18n";
 import { randomUUID } from "node:crypto";
 import {
   GROUP_NAME,
@@ -51,7 +52,9 @@ async function run<T>(
   };
   if (json.errors?.length) {
     throw new Error(
-      `Shopify afviste forespørgslen: ${json.errors.map((e) => e.message).join("; ")}`,
+      coded("stored.shopifyRejected", {
+        details: json.errors.map((e) => e.message).join("; "),
+      }),
     );
   }
   if (!json.data) throw new Error("Shopify svarede uden data.");
@@ -290,7 +293,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         },
       );
       const payload = data.sellingPlanGroupCreate;
-      check("Oprettelse af selling plan group", payload.userErrors);
+      check("shopifyAction.createGroup", payload.userErrors);
       if (!payload.sellingPlanGroup) {
         throw new Error("Shopify oprettede ikke selling plan-gruppen.");
       }
@@ -374,7 +377,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         { id: resourceId, translations: input },
       );
-      check("Oversættelse", data.translationsRegister.userErrors);
+      check("shopifyAction.translation", data.translationsRegister.userErrors);
     },
 
     async createPlans(groupId, plans: DesiredPlan[]) {
@@ -406,7 +409,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         },
       );
       const payload = data.sellingPlanGroupUpdate;
-      check("Oprettelse af selling plan", payload.userErrors);
+      check("shopifyAction.createPlan", payload.userErrors);
       return (payload.sellingPlanGroup?.sellingPlans.nodes ?? []).map(
         (plan) => ({
           id: plan.id,
@@ -433,7 +436,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         { id: groupId, input: { sellingPlansToDelete: planIds } },
       );
       check(
-        "Udfasning af selling plan",
+        "shopifyAction.deletePlans",
         data.sellingPlanGroupUpdate.userErrors,
       );
     },
@@ -456,7 +459,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         { id: groupId },
       );
       check(
-        "Sletning af selling plan group",
+        "shopifyAction.deleteGroup",
         data.sellingPlanGroupDelete.userErrors,
       );
     },
@@ -478,7 +481,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         { id: groupId, variantIds: [variantId] },
       );
       check(
-        "Tilknytning af variant til selling plan group",
+        "shopifyAction.addVariant",
         data.sellingPlanGroupAddProductVariants.userErrors,
       );
     },
@@ -501,7 +504,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         { id: groupId, variantIds: [variantId] },
       );
       check(
-        "Fjernelse af variant fra selling plan group",
+        "shopifyAction.removeVariant",
         data.sellingPlanGroupRemoveProductVariants.userErrors,
       );
     },
@@ -536,7 +539,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         },
       );
       check(
-        "Opsætning af lagersporing",
+        "shopifyAction.inventoryTracking",
         data.productVariantsBulkUpdate.userErrors,
       );
     },
@@ -714,7 +717,9 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       if (json.errors?.length) {
         if (!json.errors.every((e) => denied(e.message, e.extensions?.code))) {
           throw new Error(
-            `Shopify afviste forespørgslen: ${json.errors.map((e) => e.message).join("; ")}`,
+            coded("stored.shopifyRejected", {
+              details: json.errors.map((e) => e.message).join("; "),
+            }),
           );
         }
         withCustomer = false;
@@ -868,7 +873,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       }
     },
 
-    async cancelOrder(orderId, reason) {
+    async cancelOrder(orderId, reason, staffNote) {
       const data = await run<{
         orderCancel: {
           orderCancelUserErrors: { code: string | null; message: string }[];
@@ -897,8 +902,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         {
           orderId,
           reason,
-          staffNote:
-            "Annulleret af PREAURA. Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+          staffNote: staffNote ?? translate("en", "orderNote.cancelled"),
         },
       );
       const errors = data.orderCancel.orderCancelUserErrors;
@@ -908,7 +912,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       }
     },
 
-    async setOrderLineQuantities(orderId, targets) {
+    async setOrderLineQuantities(orderId, targets, staffNote) {
       const begin = await run<{
         orderEditBegin: {
           calculatedOrder: {
@@ -946,7 +950,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         { id: orderId },
       );
-      check("Rettelse af ordren", begin.orderEditBegin.userErrors);
+      check("shopifyAction.editOrder", begin.orderEditBegin.userErrors);
       const calculated = begin.orderEditBegin.calculatedOrder;
       if (!calculated)
         throw new Error("Shopify startede ikke en rettelse af ordren.");
@@ -983,7 +987,10 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
             }`,
           { id: calculated.id, lineItemId: line.id, quantity: target.quantity },
         );
-        check("Rettelse af antal", set.orderEditSetQuantity.userErrors);
+        check(
+          "shopifyAction.editQuantity",
+          set.orderEditSetQuantity.userErrors,
+        );
         changed = true;
       }
       if (!changed) return;
@@ -1000,11 +1007,10 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         {
           id: calculated.id,
-          staffNote:
-            "Antal nedsat af PREAURA (annullering). Intet er refunderet — refundér i Shopify, hvis kunden har betalt.",
+          staffNote: staffNote ?? translate("en", "orderNote.reduced"),
         },
       );
-      check("Rettelse af ordren", commit.orderEditCommit.userErrors);
+      check("shopifyAction.editOrder", commit.orderEditCommit.userErrors);
     },
 
     async flowTriggerReceive(handle, payload) {
@@ -1023,7 +1029,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         { handle, payload },
       );
-      check("Shopify Flow", data.flowTriggerReceive.userErrors);
+      check("shopifyAction.flow", data.flowTriggerReceive.userErrors);
     },
 
     async setOrderMetafields(orderId, fields) {
@@ -1050,7 +1056,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           })),
         },
       );
-      check("Metafelter på ordren", data.metafieldsSet.userErrors);
+      check("shopifyAction.orderMetafields", data.metafieldsSet.userErrors);
     },
 
     async setVariantPreorderMetafield(variantId, value) {
@@ -1079,7 +1085,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           ],
         },
       );
-      check("Metafelt på varianten", data.metafieldsSet.userErrors);
+      check("shopifyAction.variantMetafield", data.metafieldsSet.userErrors);
     },
 
     async addOrderTags(orderId, tags) {
@@ -1096,7 +1102,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         { id: orderId, tags },
       );
-      check("Tag på ordren", data.tagsAdd.userErrors);
+      check("shopifyAction.addTag", data.tagsAdd.userErrors);
     },
 
     async removeOrderTags(orderId, tags) {
@@ -1113,7 +1119,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         { id: orderId, tags },
       );
-      check("Fjernelse af tag fra ordren", data.tagsRemove.userErrors);
+      check("shopifyAction.removeTag", data.tagsRemove.userErrors);
     },
 
     async setProductRequiresSellingPlan(productId, requiresSellingPlan) {
@@ -1133,10 +1139,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
         // Kun requiresSellingPlan. Intet andet på produktet.
         { product: { id: productId, requiresSellingPlan } },
       );
-      check(
-        "Krav om forudbestilling på produktet",
-        data.productUpdate.userErrors,
-      );
+      check("shopifyAction.requireSellingPlan", data.productUpdate.userErrors);
     },
 
     async setAvailable({ inventoryItemId, locationId, quantity, changeFrom }) {
@@ -1175,7 +1178,10 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           idempotencyKey: randomUUID(),
         },
       );
-      check("Opdatering af lagerantal", data.inventorySetQuantities.userErrors);
+      check(
+        "shopifyAction.updateInventory",
+        data.inventorySetQuantities.userErrors,
+      );
     },
   };
 }

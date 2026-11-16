@@ -1,3 +1,4 @@
+import { coded } from "../i18n";
 import { describe, expect, it } from "vitest";
 import {
   blockStatus,
@@ -88,12 +89,12 @@ describe("når Shopify ikke kan svare", () => {
   it("giver en kort teknisk forklaring", () => {
     expect(describeBlock(undefined)).toEqual({
       status: "unknown",
-      reason: "intet svar fra Shopify",
+      reason: coded("setupReason.noAnswer"),
     });
     expect(
       describeBlock([{ handle: "x", type: "ui_extension", activations: [] }])
         .reason,
-    ).toMatch(/ingen temaudvidelse/);
+    ).toMatch(/setupReason\.noThemeExtension/);
   });
 
   it("butikken kan selv bekræfte — men kun når Shopify ikke ved det", () => {
@@ -139,8 +140,7 @@ describe("kurvens app embed", () => {
     expect(describeBlock(both).status).toBe("active");
     expect(describeBlock(both, "cart").status).toBe("inactive");
     expect(
-      describeBlock(ext([{ handle: "cart", status: "active" }]), "cart")
-        .status,
+      describeBlock(ext([{ handle: "cart", status: "active" }]), "cart").status,
     ).toBe("active");
   });
 

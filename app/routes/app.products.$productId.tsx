@@ -21,7 +21,13 @@ import {
   fetchShopTimeZone,
 } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
-import { formatDateTime, translate, useT, type MessageKey } from "../i18n";
+import {
+  formatDateTime,
+  localizeStored,
+  translate,
+  useT,
+  type MessageKey,
+} from "../i18n";
 import { localeFor } from "../i18n/locale.server";
 import { shopifySync } from "../sync/index.server";
 import { scheduleQueue } from "../orders/scheduler.server";
@@ -107,7 +113,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           mode: plan.mode as "STOCK" | "PREORDER",
           forced: plan.modeForced,
           changedAt: formatSyncTime(plan.modeChangedAt),
-          reason: plan.modeChangeReason,
+          reason: plan.modeChangeReason
+            ? localizeStored(locale, plan.modeChangeReason)
+            : null,
         },
         deliveries: variantDeliveries,
         sync: {
@@ -116,7 +124,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             : null,
           shopifyAvailable: shopifyAvailable[index],
           lastSyncedAt: formatSyncTime(plan.lastSyncedAt),
-          lastSyncError: plan.lastSyncError,
+          lastSyncError: plan.lastSyncError
+            ? localizeStored(locale, plan.lastSyncError)
+            : null,
           lastSyncAttemptAt: formatSyncTime(plan.lastSyncAttemptAt),
         },
       };
@@ -245,7 +255,7 @@ export const action = async ({
       return { ok: false, fieldErrors: error.errors };
     }
     if (error instanceof PreorderActionError) {
-      return { ok: false, message: error.message };
+      return { ok: false, message: localizeStored(locale, error.message) };
     }
     throw error;
   }

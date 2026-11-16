@@ -37,9 +37,6 @@ export const en: Record<MessageKey, string> = {
   "themeBlock.howTo":
     "The button opens the theme editor with the block ready — click Save. Shopify only checks your published theme, so the block must be in that one. If the button doesn’t open the block, your theme probably doesn’t support app blocks (that needs an Online Store 2.0 theme). Write to us and we’ll help.",
   "themeBlock.button": "Add the block to the theme",
-  "themeBlock.reason.noAnswer": "no answer from Shopify",
-  "themeBlock.reason.noExtension":
-    "Shopify Admin doesn’t offer app.extensions()",
 
   // Home page
   "home.heading": "Pre-orders",
@@ -568,4 +565,100 @@ export const en: Record<MessageKey, string> = {
     "Use the webhook. With Zapier: create a Zap with the trigger «Webhooks by Zapier → Catch Hook» and paste Zapier’s address above. Send a pre-order through so Zapier can see the fields, then choose your email system as the next step, for example «Add/Update Subscriber» with customer.email, and a tag or event based on type (for example preorder.ready).",
   "events.others.make":
     "With Make: create a scenario with the «Webhooks → Custom webhook» module, paste Make’s address above, and continue with your email system’s module. The fields are the same.",
+  // Stored messages (errors and reasons, shown later)
+  "stored.shopifyError": "{action}: {details}",
+  "stored.shopifyRejected": "Shopify rejected the request: {details}",
+  "shopifyAction.removeTag": "Removing a tag from the order",
+  "shopifyAction.removeVariant":
+    "Removing a variant from the selling plan group",
+  "shopifyAction.requireSellingPlan": "Requiring pre-order on the product",
+  "shopifyAction.variantMetafield": "Metafield on the variant",
+  "shopifyAction.orderMetafields": "Metafields on the order",
+  "shopifyAction.updateInventory": "Updating the stock level",
+  "shopifyAction.createGroup": "Creating the selling plan group",
+  "shopifyAction.createPlan": "Creating a selling plan",
+  "shopifyAction.inventoryTracking": "Setting up inventory tracking",
+  "shopifyAction.translation": "Translation",
+  "shopifyAction.editQuantity": "Changing the quantity",
+  "shopifyAction.editOrder": "Editing the order",
+  "shopifyAction.flow": "Shopify Flow",
+  "shopifyAction.deleteGroup": "Deleting the selling plan group",
+  "shopifyAction.addTag": "Tag on the order",
+  "shopifyAction.addVariant": "Adding the variant to the selling plan group",
+  "shopifyAction.deletePlans": "Retiring a selling plan",
+  "stored.sync.variantGone": "The variant no longer exists in Shopify.",
+  "stored.sync.noLocation":
+    "The variant isn’t stocked at any location in Shopify. Add it to a location and sync again.",
+  "stored.sync.notActivated":
+    "The variant isn’t activated at its location in Shopify. Activate it at the location and sync again.",
+  "stored.sync.planNotCreated":
+    "Shopify didn’t create the plan «{option}». Sync again.",
+  "stored.order.gone": "The order no longer exists in Shopify.",
+  "stored.order.noOrder": "The event contains no order.",
+  "stored.order.noCustomer": "The event contains no customer.",
+  "stored.order.notWritten":
+    "The order is allocated, but the delivery date and tag couldn’t be written to the order in Shopify: {details}",
+  "stored.mode.forced": "Forced into pre-order by the merchant.",
+  "stored.mode.empty": "Stock reached 0, and a delivery has room.",
+  "stored.mode.unforced":
+    "Forcing turned off. {count} units were put back in stock.",
+  "stored.mode.received": "{count} units arrived in stock.",
+  "stored.mode.receivedSplit":
+    "{count} units arrived in stock. {owed} go to pre-orders, {forSale} are sold as regular stock.",
+  "stored.outbox.signupDeleted":
+    "The sign-up was deleted before the notification could be sent.",
+  "stored.outbox.dataDeleted":
+    "The event’s data has been deleted (after 30 days or at the customer’s request) and can’t be sent.",
+  "stored.outbox.flowOff": "Shopify Flow is turned off.",
+  "stored.outbox.webhookOff": "The webhook is turned off.",
+  "stored.outbox.klaviyoOff": "Klaviyo is turned off.",
+  "stored.outbox.unreachable": "Couldn’t reach the recipient: {details}",
+  "stored.outbox.noEmail":
+    "The order has no email, or PREAURA has no access to the customer’s email in Shopify. Klaviyo needs an email.",
+  "stored.outbox.klaviyoKey":
+    "Klaviyo rejected the API key. Check that it’s a private key with access to Events.",
+  "action.deliveryMissing": "The delivery doesn’t exist.",
+  "action.variantMissing": "The variant isn’t in the app.",
+  "action.cancelledNoEdit": "A cancelled delivery can’t be edited.",
+  "action.hasOrders":
+    "The delivery has allocated orders and can’t be deleted. Cancel it instead — then you can see which orders are affected.",
+  "integration.urlCredentials":
+    "The address must not contain a username or password.",
+  "integration.urlPublic":
+    "The address must be publicly reachable on the internet.",
+  "integration.klaviyoKey":
+    "This doesn’t look like a private Klaviyo key. It starts with pk_ and is found under Settings → API keys in Klaviyo.",
+  // Notes on the order in Shopify
+  "orderNote.cancelled":
+    "Cancelled by PREAURA. Nothing has been refunded — refund in Shopify if the customer has paid.",
+  "orderNote.reduced":
+    "Quantity reduced by PREAURA (cancellation). Nothing has been refunded — refund in Shopify if the customer has paid.",
+  // Customer’s cancellation page (in the store)
+  "cancelPage.heading": "Cancel pre-order",
+  "cancelPage.invalid":
+    "The link is invalid or has expired. Contact the store if you want to cancel your pre-order.",
+  "cancelPage.unavailable":
+    "Cancelling by link isn’t available right now. Contact the store if you want to cancel your pre-order.",
+  "cancelPage.alreadyRequested":
+    "We’ve already received your request to cancel. You’ll hear from the store.",
+  "cancelPage.alreadyCancelled": "The pre-order has already been cancelled.",
+  "cancelPage.windowClosed":
+    "The deadline for cancelling by link has passed, or the item has shipped. Contact the store.",
+  "cancelPage.nothing":
+    "There are no pre-ordered items to cancel on this order.",
+  "cancelPage.chooseSomething": "Choose how many you want to cancel.",
+  "cancelPage.approved":
+    "Your cancellation is approved and is being carried out. If you’ve paid anything, the store will refund it.",
+  "cancelPage.requested":
+    "Thank you. Your request to cancel has been sent to the store, which will get back to you.",
+  "cancelPage.order": "Order {name}",
+  "cancelPage.expected": "Expected: {date}",
+  "cancelPage.quantity": "Quantity to cancel (of {count})",
+  "cancelPage.submit": "Cancel",
+  // Technical explanation in the setup guide
+  "setupReason.noAnswer": "no answer from Shopify",
+  "setupReason.noThemeExtension":
+    "no theme extension in the answer ({count} extensions)",
+  "setupReason.otherName": "the theme extension is called {names}",
+  "setupReason.noApi": "Shopify Admin doesn’t offer app.extensions()",
 };

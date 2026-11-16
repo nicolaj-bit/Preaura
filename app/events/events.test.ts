@@ -1,3 +1,4 @@
+import { localizeStored } from "../i18n";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb } from "../test/testDb";
 import { createFakeShopify } from "../test/fakeShopify";
@@ -442,7 +443,7 @@ describe("Klaviyo og genforsøg", () => {
     await h.run();
     const failed = await outbox().deliveries.failed();
     expect(failed.map((d) => d.channel)).toEqual(["KLAVIYO"]);
-    expect(failed[0].lastError).toContain("e-mail");
+    expect(localizeStored("da", failed[0].lastError)).toContain("e-mail");
     expect(h.shopify.flowTriggers).toHaveLength(1);
     expect(h.sent.webhook).toHaveLength(1);
   });

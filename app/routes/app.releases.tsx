@@ -15,6 +15,7 @@ import { scheduleQueue } from "../orders/scheduler.server";
 import {
   formatDate,
   formatDateTime,
+  localizeStored,
   translate,
   useT,
   type MessageKey,
@@ -53,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         (n, l) => n + (l.from != null ? l.from - l.quantity : 0),
         0,
       ),
-      error: r.lastError,
+      error: r.lastError ? localizeStored(locale, r.lastError) : null,
     })),
     issues: issues.map((i) => ({
       id: i.id,
@@ -69,7 +70,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           date: formatDate(locale, d.date),
         }),
       ),
-      error: i.lastError,
+      error: i.lastError ? localizeStored(locale, i.lastError) : null,
     })),
   };
 };
