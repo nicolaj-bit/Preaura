@@ -235,8 +235,8 @@ export default function Dpa() {
               <strong>Kategorier af oplysninger</strong>
             </Cell>
             <Cell>
-              Almindelige personoplysninger: ordrenummer og -id, antal,
-              bestillingstidspunkt og lovet leveringsdato. Kun ved udsendelse af
+              Almindelige personoplysninger: ordrenummer og -id, antal, pris
+              pr. stk., bestillingstidspunkt og lovet leveringsdato. Kun ved udsendelse af
               hændelser desuden kundens navn og e-mail. Ved tilmelding til
               ventelisten: kundens e-mail, produkt, variant og tidspunkt. Ingen
               følsomme oplysninger, ingen betalingsoplysninger, ingen adresser

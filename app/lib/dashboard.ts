@@ -1,48 +1,115 @@
-// Nøgletal til forsiden. Ren funktion, så tallene kan testes.
+// Nøgletal til forsidens oversigt. Ren funktion, så tallene kan testes.
 
 export type RecentAllocation = {
   orderId: string;
   quantity: number;
   orderCreatedAt: Date | null;
+  /** Pris pr. stk. (Prisma Decimal, tekst eller tal). Tom for ældre rækker. */
+  unitPrice?: { toString(): string } | string | number | null;
+  currency?: string | null;
 };
 
+/** Perioderne, oversigten kan vise. */
+export const PERIODS = [7, 30, 90] as const;
+export type Period = (typeof PERIODS)[number];
+export const DEFAULT_PERIOD: Period = 30;
+
+export function parsePeriod(value: string | null | undefined): Period {
+  const days = Number(value);
+  return (PERIODS as readonly number[]).includes(days)
+    ? (days as Period)
+    : DEFAULT_PERIOD;
+}
+
 export type DashboardStats = {
-  /** Ordrer med forudbestilling de seneste 30 dage. */
-  orders30: number;
-  /** Ændring i procent mod de 30 dage før. Null, når der intet er at sammenligne med. */
+  /** Ordrer med forudbestilling i perioden. */
+  orders: number;
+  /** Ændring i procent mod perioden før. Null, når der intet er at sammenligne med. */
   ordersTrendPct: number | null;
-  /** Forudbestilte stk. de seneste 30 dage. */
-  units30: number;
+  /** Forudbestilte stk. i perioden. */
+  units: number;
+  /**
+   * Forudbestilt for i perioden, i butikkens valuta. Null, når ingen af
+   * periodens tildelinger har en pris.
+   */
+  amount: { value: number; currency: string } | null;
+  amountTrendPct: number | null;
+  /** Gennemsnitlig værdi pr. ordre med pris. */
+  averageOrder: { value: number; currency: string } | null;
+  /** Nogle af periodens tildelinger er fra før prisen blev gemt. */
+  amountPartial: boolean;
 };
 
 const DAY = 24 * 60 * 60 * 1000;
 
+function trend(current: number, previous: number) {
+  return previous === 0
+    ? null
+    : Math.round(((current - previous) / previous) * 100);
+}
+
+/** Afrundet til øre, så kommatal ikke ophobes. */
+const round = (n: number) => Math.round(n * 100) / 100;
+
 export function dashboardStats(
   allocations: RecentAllocation[],
   now: Date,
+  days: number = DEFAULT_PERIOD,
 ): DashboardStats {
-  const since30 = now.getTime() - 30 * DAY;
-  const since60 = now.getTime() - 60 * DAY;
+  const end = now.getTime();
+  const start = end - days * DAY;
+  const previousStart = end - 2 * days * DAY;
+
+  // Valutaen er butikkens. Skulle butikken have skiftet valuta, tælles kun
+  // den, der er brugt senest — beløb i to valutaer kan ikke lægges sammen.
+  const latestCurrency = allocations
+    .filter((a) => a.currency && a.unitPrice != null && a.orderCreatedAt)
+    .sort(
+      (a, b) =>
+        (b.orderCreatedAt as Date).getTime() -
+        (a.orderCreatedAt as Date).getTime(),
+    )[0]?.currency;
+
   const current = new Set<string>();
   const previous = new Set<string>();
-  let units30 = 0;
+  const pricedOrders = new Set<string>();
+  let units = 0;
+  let amount = 0;
+  let previousAmount = 0;
+  let partial = false;
+
   for (const a of allocations) {
     const t = a.orderCreatedAt?.getTime();
     if (t == null) continue;
-    if (t >= since30 && t <= now.getTime()) {
+    const priced =
+      a.unitPrice != null && latestCurrency != null && a.currency === latestCurrency;
+    const value = priced ? Number(a.unitPrice!.toString()) * a.quantity : 0;
+    if (t >= start && t <= end) {
       current.add(a.orderId);
-      units30 += a.quantity;
-    } else if (t >= since60 && t < since30) {
+      units += a.quantity;
+      if (priced) {
+        amount += value;
+        pricedOrders.add(a.orderId);
+      } else {
+        partial = true;
+      }
+    } else if (t >= previousStart && t < start) {
       previous.add(a.orderId);
+      if (priced) previousAmount += value;
     }
   }
+
+  const hasAmount = latestCurrency != null && pricedOrders.size > 0;
   return {
-    orders30: current.size,
-    ordersTrendPct:
-      previous.size === 0
-        ? null
-        : Math.round(((current.size - previous.size) / previous.size) * 100),
-    units30,
+    orders: current.size,
+    ordersTrendPct: trend(current.size, previous.size),
+    units,
+    amount: hasAmount ? { value: round(amount), currency: latestCurrency } : null,
+    amountTrendPct: hasAmount ? trend(amount, previousAmount) : null,
+    averageOrder: hasAmount
+      ? { value: round(amount / pricedOrders.size), currency: latestCurrency }
+      : null,
+    amountPartial: hasAmount && partial,
   };
 }
 

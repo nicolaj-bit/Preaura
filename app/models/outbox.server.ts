@@ -43,6 +43,16 @@ export function outboxFor(shop: string, client: PrismaClient = db) {
 
   return {
     integrations: {
+      /** Kun om kanalerne er slået til — til indstillingssidens overblik. */
+      async status() {
+        const row = await settingsRow();
+        return {
+          flow: row.flowEnabled,
+          webhook: row.webhookEnabled,
+          klaviyo: row.klaviyoEnabled,
+        };
+      },
+
       /** Det, admin må se. Nøgle og adresse kun som de sidste fire tegn. */
       async view(): Promise<IntegrationView> {
         const row = await settingsRow();

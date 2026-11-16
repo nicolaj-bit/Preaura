@@ -18,8 +18,9 @@ efter hver sikkerhedshændelse.
   hentes fra Shopify, gemmes krypteret og slettes efter højst 30 dage.
 - **E-mail på ventelisten:** gemmes krypteret; slettes 7 dage efter, kunden
   har fået besked, og senest efter 180 dage.
-- **Ordrens id og nummer, antal og lovet dato** i tildelingerne — ingen
-  navne, adresser eller betalingsoplysninger.
+- **Ordrens id og nummer, antal, pris pr. stk. og lovet dato** i
+  tildelingerne — ingen navne, adresser eller betalingsoplysninger. Prisen
+  bruges kun til oversigtens beløb på forsiden.
 
 Alt om en butik slettes 48 timer efter afinstallation (shop/redact).
 

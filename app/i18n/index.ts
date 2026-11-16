@@ -60,6 +60,23 @@ export function formatDate(locale: Locale, date: string, timeZone = "UTC") {
   }).format(value);
 }
 
+/**
+ * Et beløb i butikkens valuta, skrevet som på sproget: «1.234,50 kr.» på
+ * dansk, «DKK 1,234.50» på engelsk. Beløbet omregnes aldrig.
+ */
+export function formatMoney(locale: Locale, value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(locale === "da" ? "da-DK" : "en-US", {
+      style: "currency",
+      currency,
+      currencyDisplay: locale === "da" ? "symbol" : "code",
+    }).format(value);
+  } catch {
+    // Ukendt valutakode: vis tallet med koden efter.
+    return `${value.toFixed(2)} ${currency}`;
+  }
+}
+
 /** Tidspunkt med dato og klokkeslæt, fx «16. nov. 2026 14.05». */
 export function formatDateTime(
   locale: Locale,
@@ -137,6 +154,8 @@ export function useT() {
       translateCount(locale, key, count, vars),
     date: (date: string, timeZone?: string) =>
       formatDate(locale, date, timeZone),
+    money: (value: number, currency: string) =>
+      formatMoney(locale, value, currency),
     /** En gemt besked (eller en teknisk forklaring) på sproget. */
     stored: (text: string | null | undefined) => localizeStored(locale, text),
   };

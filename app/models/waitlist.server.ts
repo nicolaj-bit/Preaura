@@ -83,6 +83,11 @@ export function waitlistFor(shop: string, client: PrismaClient = db) {
     },
 
     /** Varianter med åbne tilmeldinger. */
+    /** Tilmeldinger, der endnu ikke har fået besked. Kun et tal. */
+    async countWaiting() {
+      return client.waitlistEntry.count({ where: { shop, notifiedAt: null } });
+    },
+
     async openVariantIds() {
       const rows = await client.waitlistEntry.findMany({
         where: { shop, notifiedAt: null },
