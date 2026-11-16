@@ -11,6 +11,10 @@ import {
 } from "./variantMetafield";
 import {
   desiredPlans,
+  groupTexts,
+  planLocales,
+  DEFAULT_PLAN_LOCALES,
+  type PlanLocales,
   groupMerchantCode,
   planMatches,
   type DesiredPlan,
@@ -235,7 +239,8 @@ async function reconcile(
   }
 
   const settings = await data.settings.get();
-  const desired = desiredPlans(deliveries, settings);
+  const locales = await readPlanLocales(gateway);
+  const desired = desiredPlans(deliveries, settings, locales);
   const storedPlanIds = new Map(
     deliveries.map((delivery) => [delivery.id, delivery.sellingPlanId]),
   );
@@ -280,13 +285,19 @@ async function reconcile(
       }
     }
   } else if (!group) {
+    const texts = groupTexts(locales);
     const created = await gateway.createGroup({
       variantId,
       merchantCode: groupMerchantCode(variantId),
       plans: desired,
+      group: { name: texts.name, option: texts.option },
     });
     await data.syncState.setGroupId(variantId, created.groupId);
     await saveCreatedPlans(data, desired, created.plans);
+    await translateCreated(gateway, desired, created.plans, {
+      id: created.groupId,
+      translations: texts.translations,
+    });
     // Planer for leverancer uden plan nu (fx annullerede) nulstilles.
     for (const delivery of deliveries) {
       const wanted = desired.some((plan) => plan.deliveryId === delivery.id);
@@ -341,6 +352,7 @@ async function reconcile(
     if (toCreate.length > 0) {
       const created = await gateway.createPlans(groupId, toCreate);
       await saveCreatedPlans(data, toCreate, created);
+      await translateCreated(gateway, toCreate, created, null);
     }
     if (!group.appliesToVariant) {
       await gateway.addVariant(groupId, variantId);
@@ -443,6 +455,62 @@ async function reconcileProduct(
   } else if (allPreorder && product.requiresSellingPlan && !setByApp) {
     // Allerede sat (fx af webshopejeren). Appen overtager den nu.
     await data.syncState.markRequiresSellingPlan(product.id, true);
+  }
+}
+
+/**
+ * Butikkens sprog. Kan de ikke læses (fx før appen har fået adgangen),
+ * oprettes planerne på dansk som før, og intet oversættes.
+ */
+async function readPlanLocales(gateway: ShopifyGateway): Promise<PlanLocales> {
+  try {
+    return planLocales(await gateway.shopLocales());
+  } catch (error) {
+    console.warn("PREAURA: kunne ikke læse butikkens sprog", error);
+    return DEFAULT_PLAN_LOCALES;
+  }
+}
+
+/**
+ * Lægger oversættelser på nye planer (og en ny gruppe). En oversættelse er
+ * pynt: fejler den, er planen stadig gyldig på hovedsproget, og
+ * synkroniseringen fortsætter.
+ */
+async function translateCreated(
+  gateway: ShopifyGateway,
+  desired: DesiredPlan[],
+  created: { id: string; option: string }[],
+  group: {
+    id: string;
+    translations: { locale: string; name: string; option: string }[];
+  } | null,
+) {
+  try {
+    if (group && group.translations.length > 0) {
+      await gateway.translate(
+        group.id,
+        group.translations.flatMap((t) => [
+          { locale: t.locale, key: "name", value: t.name },
+          { locale: t.locale, key: "option1", value: t.option },
+        ]),
+      );
+    }
+    for (const wanted of desired) {
+      const plan = created.find((p) => p.option === wanted.option);
+      const translations = wanted.translations ?? [];
+      if (!plan || translations.length === 0) continue;
+      await gateway.translate(
+        plan.id,
+        translations.flatMap((t) => [
+          { locale: t.locale, key: "name", value: t.name },
+          ...(t.option
+            ? [{ locale: t.locale, key: "option1", value: t.option }]
+            : []),
+        ]),
+      );
+    }
+  } catch (error) {
+    console.warn("PREAURA: kunne ikke oversætte selling plans", error);
   }
 }
 

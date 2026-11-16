@@ -27,7 +27,9 @@ redirect_urls = [ "https://preaura.onrender.com/auth/callback" ]
 # til forudbestilling) — write_products alene er ikke nok. write_app_proxy
 # kræves af ventelisten på produktsiden (se [app_proxy] nederst).
 # write_order_edits kræves for at nedsætte antal ved delvis annullering.
-scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits"
+# read_locales og write_translations: planerne oprettes på butikkens
+# hovedsprog og oversættes til de øvrige sprog (app/sync/plans.ts).
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits,read_locales,write_translations"
 
 [webhooks]
 api_version = "2026-10"

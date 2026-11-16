@@ -856,3 +856,105 @@ describe("lagermode og forudbestillingsmode", () => {
     expect(shopify.variants.get(VARIANT)?.available).toBe(43);
   });
 });
+
+describe("sprog på planerne", () => {
+  it("engelsk butik: planer og gruppe på engelsk, dansk som oversættelse", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.setLocales([
+      { locale: "en", primary: true, published: true },
+      { locale: "da", primary: false, published: true },
+      { locale: "de", primary: false, published: true },
+    ]);
+
+    expect(await sync()).toMatchObject({ ok: true });
+
+    const group = onlyGroup(shopify);
+    expect(shopify.groupTexts.get(group.id)).toEqual({
+      name: "Pre-order",
+      option: "Delivery",
+    });
+    expect(group.plans[0].options).toEqual([
+      "Expected to ship: December 1, 2026",
+    ]);
+
+    // Dansk lægges på som oversættelse; tysk har appen ingen tekst til.
+    expect(shopify.translations.get(group.id)).toEqual({
+      da: { name: "Forudbestilling", option1: "Leverance" },
+    });
+    expect(shopify.translations.get(group.plans[0].id)).toEqual({
+      da: {
+        name: "Forudbestilling",
+        option1: "Forventet afsendelse: 1. december 2026",
+      },
+    });
+  });
+
+  it("dansk butik uden andre sprog: dansk som før og intet at oversætte", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+
+    await sync();
+
+    const group = onlyGroup(shopify);
+    expect(group.plans[0].options).toEqual([
+      "Forventet afsendelse: 1. december 2026",
+    ]);
+    expect(shopify.writes.some((w) => w.method === "translate")).toBe(false);
+  });
+
+  it("et sprog, der ikke er udgivet, oversættes ikke", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.setLocales([
+      { locale: "da", primary: true, published: true },
+      { locale: "en", primary: false, published: false },
+    ]);
+
+    await sync();
+
+    expect(shopify.writes.some((w) => w.method === "translate")).toBe(false);
+  });
+
+  it("butikkens egen tekst bruges på hovedsproget; kun navnet oversættes", async () => {
+    await setupVariant();
+    await data().settings.update({
+      dateMode: "SHIPPING",
+      buttonLabel: "Forudbestil",
+      shippingDateText: "Sendes omkring {dato}",
+      deliveryDateText: "Forventet levering: {dato}",
+      preorderNote: "",
+    });
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.setLocales([
+      { locale: "da", primary: true, published: true },
+      { locale: "en", primary: false, published: true },
+    ]);
+
+    await sync();
+
+    const plan = onlyGroup(shopify).plans[0];
+    expect(plan.options).toEqual(["Sendes omkring 1. december 2026"]);
+    expect(shopify.translations.get(plan.id)).toEqual({
+      en: { name: "Pre-order" },
+    });
+  });
+
+  it("fejler oversættelsen, er planen stadig oprettet, og synkroniseringen lykkes", async () => {
+    await setupVariant();
+    await addDelivery("2026-12-01", 10);
+    const { shopify, sync } = setup();
+    shopify.setLocales([
+      { locale: "da", primary: true, published: true },
+      { locale: "en", primary: false, published: true },
+    ]);
+    shopify.failNext("translate", "Access denied for translationsRegister");
+
+    expect(await sync()).toMatchObject({ ok: true });
+    expect(onlyGroup(shopify).plans).toHaveLength(1);
+  });
+});

@@ -17,6 +17,15 @@ export type DesiredPlan = {
   option: string;
   /** Leverancens dato som tidspunkt, se fulfillmentTime(). */
   fulfillmentExactTime: string;
+  /** Navn og valg på butikkens øvrige sprog (Shopifys oversættelser). */
+  translations?: PlanTranslation[];
+};
+
+/** Én oversættelse: locale er butikkens sprogkode, fx "en" eller "da". */
+export type PlanTranslation = {
+  locale: string;
+  name: string;
+  option?: string;
 };
 
 /** En selling plan, som Shopify returnerer den. */
@@ -37,10 +46,90 @@ export type ShopifyPlan = {
   pricingPolicyCount: number;
 };
 
-export const GROUP_NAME = "Forudbestilling";
+/**
+ * Planernes tekster på de sprog, appen kan. Planerne oprettes på butikkens
+ * hovedsprog, og de andre sprog lægges på som Shopify-oversættelser, så
+ * kunden ser sit eget sprog i kurv, checkout og ordrebekræftelse. Andre sprog
+ * end disse får hovedsprogets tekst (Shopifys standard).
+ *
+ * Navnene bruges også af kurvens app embed til at genkende PREAURAs planer
+ * (theme-extension-src/preaura-cart.js) — en test holder dem ens.
+ */
+export const PLAN_LANGUAGES = {
+  da: {
+    planName: "Forudbestilling",
+    groupName: "Forudbestilling",
+    groupOption: "Leverance",
+    shipping: "Forventet afsendelse: {date}",
+    delivery: "Forventet levering: {date}",
+    nth: "leverance {n}",
+    dateLocale: "da-DK",
+  },
+  en: {
+    planName: "Pre-order",
+    groupName: "Pre-order",
+    groupOption: "Delivery",
+    shipping: "Expected to ship: {date}",
+    delivery: "Expected delivery: {date}",
+    nth: "delivery {n}",
+    dateLocale: "en-US",
+  },
+} as const;
+
+export type PlanLanguage = keyof typeof PLAN_LANGUAGES;
+
+/** Butikkens sprogkode → appens sprog. Ukendt: dansk, som før. */
+export function planLanguage(locale: string | null | undefined): PlanLanguage {
+  if (!locale) return "da";
+  const base = locale.toLowerCase().split("-")[0];
+  return base in PLAN_LANGUAGES ? (base as PlanLanguage) : "en";
+}
+
+/** Hovedsprog og de øvrige udgivne sprog, appen har tekster til. */
+export type PlanLocales = {
+  primary: PlanLanguage;
+  /** Butikkens sprogkode og appens sprog for hvert øvrigt sprog. */
+  others: { locale: string; language: PlanLanguage }[];
+};
+
+export const DEFAULT_PLAN_LOCALES: PlanLocales = { primary: "da", others: [] };
+
+/** Ud fra Shopifys shopLocales. */
+export function planLocales(
+  locales: { locale: string; primary: boolean; published: boolean }[],
+): PlanLocales {
+  const primaryLocale = locales.find((l) => l.primary)?.locale;
+  if (!primaryLocale) return DEFAULT_PLAN_LOCALES;
+  const primary = planLanguage(primaryLocale);
+  const others = locales
+    .filter((l) => !l.primary && l.published)
+    .filter((l) => {
+      const base = l.locale.toLowerCase().split("-")[0];
+      return base in PLAN_LANGUAGES && base !== primary;
+    })
+    .map((l) => ({ locale: l.locale, language: planLanguage(l.locale) }));
+  return { primary, others };
+}
+
+// Bagudkompatible navne (dansk).
+export const GROUP_NAME = PLAN_LANGUAGES.da.groupName;
 /** Hver plans navn. Datoen står i linjeegenskaben, ikke her. */
-export const PLAN_NAME = "Forudbestilling";
-export const GROUP_OPTION = "Leverance";
+export const PLAN_NAME = PLAN_LANGUAGES.da.planName;
+export const GROUP_OPTION = PLAN_LANGUAGES.da.groupOption;
+
+/** Gruppens navn og valg på hovedsproget og oversættelserne. */
+export function groupTexts(locales: PlanLocales) {
+  const t = PLAN_LANGUAGES[locales.primary];
+  return {
+    name: t.groupName,
+    option: t.groupOption,
+    translations: locales.others.map(({ locale, language }) => ({
+      locale,
+      name: PLAN_LANGUAGES[language].groupName,
+      option: PLAN_LANGUAGES[language].groupOption,
+    })),
+  };
+}
 
 export function groupMerchantCode(variantId: string) {
   return `preaura-variant-${variantId.split("/").pop()}`;
@@ -55,10 +144,27 @@ export function fulfillmentTime(date: string) {
   return `${date}T12:00:00Z`;
 }
 
-const dateFormat = new Intl.DateTimeFormat("da-DK", {
-  dateStyle: "long",
-  timeZone: "UTC",
-});
+function formatPlanDate(date: string, language: PlanLanguage) {
+  return new Intl.DateTimeFormat(PLAN_LANGUAGES[language].dateLocale, {
+    dateStyle: "long",
+    timeZone: "UTC",
+  }).format(new Date(fulfillmentTime(date)));
+}
+
+/**
+ * Butikkens tekst i appens indstillinger. Står den til en af standardteksterne
+ * (fx databasens «Forventet afsendelse: {dato}»), bruges sprogets egen tekst,
+ * så en engelsk butik ikke får dansk. En egen tekst bruges på hovedsproget.
+ */
+const STANDARD_TEMPLATES = new Set<string>([
+  "Forventet afsendelse: {dato}",
+  "Forventet levering: {dato}",
+  ...Object.values(PLAN_LANGUAGES).flatMap((t) => [t.shipping, t.delivery]),
+]);
+
+function fillDate(template: string, date: string) {
+  return template.replaceAll("{dato}", date).replaceAll("{date}", date);
+}
 
 export type PlanTexts = {
   dateMode: string;
@@ -73,32 +179,56 @@ export type PlanTexts = {
 export function desiredPlans(
   deliveries: { id: string; position: number; date: string; status: string }[],
   texts: PlanTexts,
+  locales: PlanLocales = DEFAULT_PLAN_LOCALES,
 ): DesiredPlan[] {
-  const template =
-    texts.dateMode === "DELIVERY"
-      ? texts.deliveryDateText
-      : texts.shippingDateText;
+  const delivery = texts.dateMode === "DELIVERY";
+  const own = delivery ? texts.deliveryDateText : texts.shippingDateText;
+  const standard = STANDARD_TEMPLATES.has(own);
+  const template = (language: PlanLanguage) =>
+    standard
+      ? PLAN_LANGUAGES[language][delivery ? "delivery" : "shipping"]
+      : own;
   const open = deliveries
-    .filter((delivery) => delivery.status === "OPEN")
+    .filter((d) => d.status === "OPEN")
     .sort((a, b) => a.position - b.position);
 
-  const seen = new Set<string>();
-  return open.map((delivery) => {
-    const formatted = dateFormat.format(
-      new Date(fulfillmentTime(delivery.date)),
-    );
-    const label = template.replaceAll("{dato}", formatted);
-    // To leverancer på samme dato skal stadig kunne skelnes i gruppen.
-    let option = label;
-    if (seen.has(option)) option = `${label} (leverance ${delivery.position})`;
-    seen.add(option);
-    return {
-      deliveryId: delivery.id,
-      name: PLAN_NAME,
-      option,
-      fulfillmentExactTime: fulfillmentTime(delivery.date),
-    };
-  });
+  // To leverancer på samme dato skal stadig kunne skelnes i gruppen.
+  const labels = (language: PlanLanguage, withOwn: boolean) => {
+    const seen = new Set<string>();
+    return open.map((d) => {
+      const label = fillDate(
+        withOwn
+          ? template(language)
+          : PLAN_LANGUAGES[language][delivery ? "delivery" : "shipping"],
+        formatPlanDate(d.date, language),
+      );
+      let option = label;
+      if (seen.has(option)) {
+        option = `${label} (${PLAN_LANGUAGES[language].nth.replace("{n}", String(d.position))})`;
+      }
+      seen.add(option);
+      return option;
+    });
+  };
+
+  const primary = labels(locales.primary, true);
+  // Har butikken sin egen tekst, oversættes kun navnet: appen kan ikke
+  // oversætte butikkens egen formulering.
+  const other = locales.others.map((o) => ({
+    ...o,
+    options: standard ? labels(o.language, false) : null,
+  }));
+  return open.map((d, i) => ({
+    deliveryId: d.id,
+    name: PLAN_LANGUAGES[locales.primary].planName,
+    option: primary[i],
+    fulfillmentExactTime: fulfillmentTime(d.date),
+    translations: other.map((o) => ({
+      locale: o.locale,
+      name: PLAN_LANGUAGES[o.language].planName,
+      ...(o.options ? { option: o.options[i] } : {}),
+    })),
+  }));
 }
 
 /** Input til Shopify for en ny plan. Alle reglerne for en plan står her. */

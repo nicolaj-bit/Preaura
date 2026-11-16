@@ -252,7 +252,7 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
       };
     },
 
-    async createGroup({ variantId, merchantCode, plans }) {
+    async createGroup({ variantId, merchantCode, plans, group }) {
       const data = await run<{
         sellingPlanGroupCreate: {
           sellingPlanGroup: {
@@ -281,9 +281,9 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           }`,
         {
           input: {
-            name: GROUP_NAME,
+            name: group?.name ?? GROUP_NAME,
             merchantCode,
-            options: [GROUP_OPTION],
+            options: [group?.option ?? GROUP_OPTION],
             sellingPlansToCreate: plans.map(sellingPlanInput),
           },
           resources: { productVariantIds: [variantId] },
@@ -301,6 +301,80 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
           option: plan.options[0] ?? "",
         })),
       };
+    },
+
+    async shopLocales() {
+      const data = await run<{
+        shopLocales: { locale: string; primary: boolean; published: boolean }[];
+      }>(
+        graphql,
+        `#graphql
+          query PreauraShopLocales {
+            shopLocales {
+              locale
+              primary
+              published
+            }
+          }`,
+        {},
+      );
+      return data.shopLocales;
+    },
+
+    async translate(resourceId, translations) {
+      if (translations.length === 0) return;
+      // Shopify kræver tekstens digest for hvert felt, der oversættes.
+      const read = await run<{
+        translatableResourcesByIds: {
+          nodes: {
+            resourceId: string;
+            translatableContent: { key: string; digest: string | null }[];
+          }[];
+        };
+      }>(
+        graphql,
+        `#graphql
+          query PreauraTranslatable($ids: [ID!]!) {
+            translatableResourcesByIds(first: 1, resourceIds: $ids) {
+              nodes {
+                resourceId
+                translatableContent {
+                  key
+                  digest
+                }
+              }
+            }
+          }`,
+        { ids: [resourceId] },
+      );
+      const content =
+        read.translatableResourcesByIds.nodes[0]?.translatableContent ?? [];
+      const digests = new Map(content.map((c) => [c.key, c.digest]));
+      const input = translations
+        .filter((t) => t.value && digests.get(t.key))
+        .map((t) => ({
+          locale: t.locale,
+          key: t.key,
+          value: t.value,
+          translatableContentDigest: digests.get(t.key)!,
+        }));
+      if (input.length === 0) return;
+      const data = await run<{
+        translationsRegister: { userErrors: UserErrors };
+      }>(
+        graphql,
+        `#graphql
+          mutation PreauraTranslate($id: ID!, $translations: [TranslationInput!]!) {
+            translationsRegister(resourceId: $id, translations: $translations) {
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        { id: resourceId, translations: input },
+      );
+      check("Oversættelse", data.translationsRegister.userErrors);
     },
 
     async createPlans(groupId, plans: DesiredPlan[]) {
