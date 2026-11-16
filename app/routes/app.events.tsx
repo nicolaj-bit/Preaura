@@ -16,12 +16,21 @@ import {
   validateWebhookUrl,
 } from "../lib/integrationInput";
 import { numericId } from "../lib/ids";
-import { EVENT_LABELS, isEventType } from "../events/build";
+import { isEventType } from "../events/build";
 import {
   CHANNEL_LABELS,
   SIGNATURE_HEADER,
   type Channel,
 } from "../events/labels";
+import {
+  formatDateTime,
+  translate,
+  translateCount,
+  useT,
+  type Locale,
+  type MessageKey,
+} from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 
 // Hændelser: modtagere (Flow, webhook, Klaviyo), fejlede leveringer og
 // logbogen. Nøgler og adresser vises aldrig — kun de sidste fire tegn.
@@ -36,18 +45,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     outbox.events.unbuilt(50),
     fetchShopTimeZone(admin.graphql),
   ]);
-  const format = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  });
+  const locale = await localeFor(request, session.shop);
+  const format = {
+    format: (date: Date) => formatDateTime(locale, date, timeZone),
+  };
   const label = (type: string) =>
-    isEventType(type) ? EVENT_LABELS[type] : type;
+    isEventType(type) ? translate(locale, `event.${type}` as MessageKey) : type;
   const row = (d: (typeof log)[number]) => ({
     id: d.id,
     type: label(d.event.type),
     channel: CHANNEL_LABELS[d.channel as Channel] ?? d.channel,
-    ...reference(d.event),
+    ...reference(d.event, locale),
     at: format.format(d.deliveredAt ?? d.updatedAt),
     status: d.status,
     attempts: d.attempts,
@@ -70,7 +78,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     waiting: waiting.map((e) => ({
       id: e.id,
       type: label(e.type),
-      ...reference(e),
+      ...reference(e, locale),
       at: format.format(e.createdAt),
       error: e.lastError,
     })),
@@ -81,6 +89,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const form = await request.formData();
+  const locale = await localeFor(request, session.shop);
+  const t = (key: MessageKey) => translate(locale, key);
   const integrations = outboxFor(session.shop).integrations;
   const deliveries = outboxFor(session.shop).deliveries;
   const on = form.get("enabled") === "true";
@@ -88,69 +98,84 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   switch (form.get("intent")) {
     case "responsibility":
       await integrations.acceptResponsibility(on);
-      return { ok: true, message: on ? "Bekræftet" : "Bekræftelse fjernet" };
+      return {
+        ok: true,
+        message: on
+          ? t("events.toast.confirmed")
+          : t("events.toast.unconfirmed"),
+      };
     case "flow":
       await integrations.setFlow(on);
-      return { ok: true, message: on ? "Flow slået til" : "Flow slået fra" };
+      return {
+        ok: true,
+        message: on ? t("events.toast.flowOn") : t("events.toast.flowOff"),
+      };
     case "webhookUrl": {
       const result = validateWebhookUrl(String(form.get("url") ?? ""));
       if (!result.ok) return { ok: false, message: result.error };
       await integrations.setWebhookUrl(result.url);
-      return { ok: true, message: "Adressen er gemt" };
+      return { ok: true, message: t("events.toast.urlSaved") };
     }
     case "webhookRemove":
       await integrations.setWebhookUrl(null);
-      return { ok: true, message: "Adressen er fjernet" };
+      return { ok: true, message: t("events.toast.urlRemoved") };
     case "webhookEnabled":
       await integrations.setWebhookEnabled(on);
       return {
         ok: true,
-        message: on ? "Webhook slået til" : "Webhook slået fra",
+        message: on
+          ? t("events.toast.webhookOn")
+          : t("events.toast.webhookOff"),
       };
     case "webhookSecret":
       await integrations.regenerateWebhookSecret();
-      return { ok: true, message: "Ny signaturnøgle lavet" };
+      return { ok: true, message: t("events.toast.secret") };
     case "klaviyoKey": {
       const result = validateKlaviyoKey(String(form.get("key") ?? ""));
       if (!result.ok) return { ok: false, message: result.error };
       await integrations.setKlaviyoKey(result.key);
-      return { ok: true, message: "Nøglen er gemt" };
+      return { ok: true, message: t("events.toast.keySaved") };
     }
     case "klaviyoRemove":
       await integrations.setKlaviyoKey(null);
-      return { ok: true, message: "Nøglen er fjernet" };
+      return { ok: true, message: t("events.toast.keyRemoved") };
     case "klaviyoEnabled":
       await integrations.setKlaviyoEnabled(on);
       return {
         ok: true,
-        message: on ? "Klaviyo slået til" : "Klaviyo slået fra",
+        message: on
+          ? t("events.toast.klaviyoOn")
+          : t("events.toast.klaviyoOff"),
       };
     case "retry": {
       const id = form.get("deliveryId");
       const count = await deliveries.retry(id ? String(id) : undefined);
       scheduleQueue(session.shop, 0);
-      return { ok: true, message: `${count} levering(er) sendes igen` };
+      return {
+        ok: true,
+        message: translateCount(locale, "events.toast.retried", count),
+      };
     }
     default:
-      return { ok: false, message: "Ukendt handling." };
+      return { ok: false, message: t("common.unknownAction") };
   }
 };
 
-const STATUS: Record<
-  string,
-  { tone: "success" | "critical" | "info"; text: string }
-> = {
-  DONE: { tone: "success", text: "Sendt" },
-  FAILED: { tone: "critical", text: "Fejlet" },
-  PENDING: { tone: "info", text: "Venter" },
+const STATUS_TONES: Record<string, "success" | "critical" | "info"> = {
+  DONE: "success",
+  FAILED: "critical",
+  PENDING: "info",
 };
 
 /** Ordren, hændelsen handler om — eller produktet for ventelisten. */
-function reference(event: {
-  orderId: string | null;
-  orderName: string;
-  productId?: string | null;
-}) {
+function reference(
+  event: {
+    orderId: string | null;
+    orderName: string;
+    productId?: string | null;
+  },
+  locale: Locale,
+) {
   if (event.orderId) {
     return {
       reference: event.orderName || numericId(event.orderId),
@@ -158,7 +183,7 @@ function reference(event: {
     };
   }
   return {
-    reference: "Venteliste",
+    reference: translate(locale, "events.waitlistRef"),
     href: event.productId
       ? `shopify://admin/products/${numericId(event.productId)}`
       : "/app/waitlist",
@@ -170,6 +195,7 @@ export default function EventsPage() {
     useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const { t } = useT();
   const [url, setUrl] = useState("");
   const [key, setKey] = useState("");
   const accepted = settings.responsibilityAcceptedAt != null;
@@ -195,39 +221,24 @@ export default function EventsPage() {
     fetcher.submit(values, { method: "POST" });
 
   return (
-    <s-page heading="Hændelser">
+    <s-page heading={t("events.heading")}>
       <s-section>
-        <s-stack gap="base">
-          <s-paragraph>
-            PREAURA sender fire hændelser, når der sker noget med en
-            forudbestilling: <strong>oprettet</strong>,{" "}
-            <strong>forsinket</strong>, <strong>klar til afsendelse</strong> og{" "}
-            <strong>annulleret</strong>. Hver hændelse indeholder butik, kundens
-            navn og e-mail, ordrenummer, produkt og variant, antal, leverancens
-            dato, den tidligere dato, hvis den er ændret, og et entydigt id.
-            Indholdet er det samme hos alle modtagere — det er jer, der bygger
-            mailen.
-          </s-paragraph>
-        </s-stack>
+        <s-paragraph>{t("events.intro")}</s-paragraph>
       </s-section>
 
-      <s-section heading="Ansvar for kundeoplysninger">
+      <s-section heading={t("events.responsibility.heading")}>
         <s-stack gap="base">
           <s-banner tone="warning">
-            <s-paragraph>
-              Webhook og Klaviyo sender kundens navn og e-mail videre til en
-              tredjepart. Butikken er selv ansvarlig for at have et lovligt
-              grundlag for det (fx samtykke eller kundens ordre) og for sin egen
-              aftale med modtageren. PREAURA sender kun på butikkens instruks og
-              er databehandler — ikke afsender.
-            </s-paragraph>
+            <s-paragraph>{t("events.responsibility.warning")}</s-paragraph>
           </s-banner>
           <s-checkbox
-            label="Butikken har grundlag for at sende kundeoplysninger til de modtagere, den slår til nedenfor"
+            label={t("events.responsibility.label")}
             details={
               accepted
-                ? `Bekræftet ${settings.responsibilityAcceptedAt}. Fjernes bekræftelsen, slås webhook og Klaviyo fra.`
-                : "Kræves for at slå webhook og Klaviyo til. Shopify Flow kræver det ikke — det bliver i Shopify."
+                ? t("events.responsibility.accepted", {
+                    date: settings.responsibilityAcceptedAt ?? "",
+                  })
+                : t("events.responsibility.required")
             }
             checked={accepted}
             onChange={() =>
@@ -240,8 +251,8 @@ export default function EventsPage() {
       <s-section heading="Shopify Flow">
         <s-stack gap="base">
           <s-switch
-            label="Send hændelser til Shopify Flow"
-            details="Fire triggere i Flow: «Forudbestilling oprettet», «… forsinket», «… klar til afsendelse» og «… annulleret». Byg en workflow i Flow-appen, fx en mail eller et tag, når ordren er klar."
+            label={t("events.flow.label")}
+            details={t("events.flow.details")}
             checked={settings.flowEnabled}
             onChange={() =>
               submit({ intent: "flow", enabled: String(!settings.flowEnabled) })
@@ -252,23 +263,26 @@ export default function EventsPage() {
 
       <s-section heading="Webhook">
         <s-stack gap="base">
-          <s-paragraph>
-            Appen sender hændelsen som JSON med POST til jeres adresse. Brug den
-            til fx Zapier, Make, Drip, Omnisend, Mailchimp eller Brevo.
-          </s-paragraph>
+          <s-paragraph>{t("events.webhook.intro")}</s-paragraph>
           {settings.webhookUrlLast4 ? (
             <s-stack direction="inline" gap="base" alignItems="center">
-              <s-text>Adresse gemt: ••••{settings.webhookUrlLast4}</s-text>
+              <s-text>
+                {t("events.webhook.saved", { last4: settings.webhookUrlLast4 })}
+              </s-text>
               <s-button
                 tone="critical"
                 onClick={() => submit({ intent: "webhookRemove" })}
               >
-                Fjern
+                {t("events.remove")}
               </s-button>
             </s-stack>
           ) : null}
           <s-url-field
-            label={settings.webhookUrlLast4 ? "Ny adresse" : "Adresse"}
+            label={
+              settings.webhookUrlLast4
+                ? t("events.webhook.newUrl")
+                : t("events.webhook.url")
+            }
             placeholder="https://hooks.zapier.com/…"
             value={url}
             onChange={(e) => setUrl(e.currentTarget.value)}
@@ -277,10 +291,10 @@ export default function EventsPage() {
             disabled={!url}
             onClick={() => submit({ intent: "webhookUrl", url })}
           >
-            Gem adresse
+            {t("events.webhook.save")}
           </s-button>
           <s-switch
-            label="Send hændelser til webhooken"
+            label={t("events.webhook.label")}
             disabled={!accepted || !settings.webhookUrlLast4}
             checked={settings.webhookEnabled}
             onChange={() =>
@@ -292,20 +306,15 @@ export default function EventsPage() {
           />
           {settings.webhookSecret ? (
             <s-stack gap="small-200">
-              <s-text type="strong">Signaturnøgle</s-text>
+              <s-text type="strong">{t("events.webhook.secret")}</s-text>
               <s-text>
                 <code>{settings.webhookSecret}</code>
               </s-text>
               <s-paragraph>
-                Hvert kald har headeren <code>{SIGNATURE_HEADER}</code>:
-                HMAC-SHA256 af den rå tekst i kaldet med denne nøgle,
-                base64-kodet. Beregn den selv, og sammenlign — så ved I, at
-                kaldet kommer fra PREAURA. Headeren{" "}
-                <code>X-Preaura-Event-Id</code> er hændelsens id; brug den til
-                at se bort fra gentagelser.
+                {t("events.webhook.signature", { header: SIGNATURE_HEADER })}
               </s-paragraph>
               <s-button onClick={() => submit({ intent: "webhookSecret" })}>
-                Lav ny signaturnøgle
+                {t("events.webhook.newSecret")}
               </s-button>
             </s-stack>
           ) : null}
@@ -314,29 +323,25 @@ export default function EventsPage() {
 
       <s-section heading="Klaviyo">
         <s-stack gap="base">
-          <s-paragraph>
-            Hændelserne sendes til Klaviyo som metrics, fx «PREAURA:
-            Forudbestilling klar til afsendelse», på kundens profil. Klaviyo
-            opretter selv metricen første gang, og den kan bruges som udløser i
-            et flow. Brug en privat API-nøgle med adgang til Events (Settings →
-            API keys i Klaviyo).
-          </s-paragraph>
+          <s-paragraph>{t("events.klaviyo.intro")}</s-paragraph>
           {settings.klaviyoKeyLast4 ? (
             <s-stack direction="inline" gap="base" alignItems="center">
-              <s-text>Nøgle gemt: ••••{settings.klaviyoKeyLast4}</s-text>
+              <s-text>
+                {t("events.klaviyo.saved", { last4: settings.klaviyoKeyLast4 })}
+              </s-text>
               <s-button
                 tone="critical"
                 onClick={() => submit({ intent: "klaviyoRemove" })}
               >
-                Fjern
+                {t("events.remove")}
               </s-button>
             </s-stack>
           ) : null}
           <s-password-field
             label={
               settings.klaviyoKeyLast4
-                ? "Ny privat API-nøgle"
-                : "Privat API-nøgle"
+                ? t("events.klaviyo.newKey")
+                : t("events.klaviyo.key")
             }
             placeholder="pk_…"
             value={key}
@@ -346,10 +351,10 @@ export default function EventsPage() {
             disabled={!key}
             onClick={() => submit({ intent: "klaviyoKey", key })}
           >
-            Gem nøgle
+            {t("events.klaviyo.save")}
           </s-button>
           <s-switch
-            label="Send hændelser til Klaviyo"
+            label={t("events.klaviyo.label")}
             disabled={!accepted || !settings.klaviyoKeyLast4}
             checked={settings.klaviyoEnabled}
             onChange={() =>
@@ -363,28 +368,25 @@ export default function EventsPage() {
       </s-section>
 
       {encryptionMissing && (
-        <s-banner tone="critical" heading="Krypteringsnøglen mangler">
-          <s-paragraph>
-            Serveren mangler miljøvariablen PREAURA_ENCRYPTION_KEY. Uden den kan
-            hændelser ikke bygges, og nøgler og adresser kan ikke gemmes. På
-            Render: preaura → Environment, eller Manual sync på blueprintet.
-          </s-paragraph>
+        <s-banner tone="critical" heading={t("events.encryption.heading")}>
+          <s-paragraph>{t("events.encryption.text")}</s-paragraph>
         </s-banner>
       )}
 
       {waiting.length > 0 && (
-        <s-section heading="Venter på at blive sendt">
+        <s-section heading={t("events.waiting.heading")}>
           <s-stack gap="base">
-            <s-paragraph>
-              Disse hændelser er ikke sendt endnu. Normalt sker det inden for et
-              minut. Står der en fejl, prøver appen igen hvert minut.
-            </s-paragraph>
+            <s-paragraph>{t("events.waiting.intro")}</s-paragraph>
             <s-table>
               <s-table-header-row>
-                <s-table-header listSlot="primary">Hændelse</s-table-header>
-                <s-table-header>Ordre / produkt</s-table-header>
-                <s-table-header>Oprettet</s-table-header>
-                <s-table-header listSlot="secondary">Fejl</s-table-header>
+                <s-table-header listSlot="primary">
+                  {t("events.col.event")}
+                </s-table-header>
+                <s-table-header>{t("events.col.reference")}</s-table-header>
+                <s-table-header>{t("events.col.created")}</s-table-header>
+                <s-table-header listSlot="secondary">
+                  {t("events.col.error")}
+                </s-table-header>
               </s-table-header-row>
               <s-table-body>
                 {waiting.map((row) => (
@@ -409,21 +411,17 @@ export default function EventsPage() {
         </s-section>
       )}
 
-      <s-section heading="Fejlede leveringer">
+      <s-section heading={t("events.failed.heading")}>
         {failed.length === 0 ? (
-          <s-paragraph>Ingen fejl.</s-paragraph>
+          <s-paragraph>{t("events.failed.none")}</s-paragraph>
         ) : (
           <s-stack gap="base">
-            <s-paragraph>
-              Disse hændelser kunne ikke leveres, heller ikke efter 10 forsøg
-              med voksende ventetid (op til omkring 8 timer). Ret årsagen, og
-              prøv igen. Hændelsens data slettes efter 30 dage.
-            </s-paragraph>
+            <s-paragraph>{t("events.failed.intro")}</s-paragraph>
             <s-button
               variant="primary"
               onClick={() => submit({ intent: "retry" })}
             >
-              Prøv alle igen
+              {t("events.retryAll")}
             </s-button>
             <EventTable
               rows={failed}
@@ -434,10 +432,10 @@ export default function EventsPage() {
                       submit({ intent: "retry", deliveryId: row.id })
                     }
                   >
-                    Prøv igen
+                    {t("events.retry")}
                   </s-button>
                 ) : (
-                  <s-text color="subdued">Data slettet</s-text>
+                  <s-text color="subdued">{t("events.dataDeleted")}</s-text>
                 )
               }
             />
@@ -445,31 +443,18 @@ export default function EventsPage() {
         )}
       </s-section>
 
-      <s-section heading="Logbog">
+      <s-section heading={t("events.log.heading")}>
         {log.length === 0 ? (
-          <s-paragraph>
-            Ingen hændelser endnu. De kommer, når en kunde forudbestiller.
-          </s-paragraph>
+          <s-paragraph>{t("events.log.none")}</s-paragraph>
         ) : (
           <EventTable rows={log} />
         )}
       </s-section>
 
-      <s-section heading="Drip, Omnisend, Mailchimp, Brevo og andre">
+      <s-section heading={t("events.others.heading")}>
         <s-stack gap="base">
-          <s-paragraph>
-            Brug webhooken. Med Zapier: opret en Zap med udløseren «Webhooks by
-            Zapier → Catch Hook», og indsæt Zapiers adresse ovenfor. Send en
-            forudbestilling igennem, så Zapier kan se felterne, og vælg derefter
-            jeres mailsystem som næste trin, fx «Add/Update Subscriber» med{" "}
-            <code>customer.email</code>, og en tag eller hændelse ud fra{" "}
-            <code>type</code> (fx <code>preorder.ready</code>).
-          </s-paragraph>
-          <s-paragraph>
-            Med Make: opret et scenarie med modulet «Webhooks → Custom webhook»,
-            indsæt Makes adresse ovenfor, og fortsæt med jeres mailsystems
-            modul. Felterne er de samme.
-          </s-paragraph>
+          <s-paragraph>{t("events.others.zapier")}</s-paragraph>
+          <s-paragraph>{t("events.others.make")}</s-paragraph>
         </s-stack>
       </s-section>
     </s-page>
@@ -495,23 +480,31 @@ function EventTable<T extends Row>({
   rows: T[];
   action?: (row: T) => React.ReactNode;
 }) {
+  const { t } = useT();
   return (
     <s-table>
       <s-table-header-row>
-        <s-table-header listSlot="primary">Hændelse</s-table-header>
-        <s-table-header>Modtager</s-table-header>
-        <s-table-header>Ordre / produkt</s-table-header>
-        <s-table-header>Tidspunkt</s-table-header>
-        <s-table-header listSlot="secondary">Status</s-table-header>
-        <s-table-header>Besked</s-table-header>
-        {action ? <s-table-header>Handling</s-table-header> : null}
+        <s-table-header listSlot="primary">
+          {t("events.col.event")}
+        </s-table-header>
+        <s-table-header>{t("events.col.recipient")}</s-table-header>
+        <s-table-header>{t("events.col.reference")}</s-table-header>
+        <s-table-header>{t("events.col.time")}</s-table-header>
+        <s-table-header listSlot="secondary">
+          {t("events.col.status")}
+        </s-table-header>
+        <s-table-header>{t("events.col.message")}</s-table-header>
+        {action ? (
+          <s-table-header>{t("events.col.action")}</s-table-header>
+        ) : null}
       </s-table-header-row>
       <s-table-body>
         {rows.map((row) => {
-          const status = STATUS[row.status] ?? {
-            tone: "info" as const,
-            text: row.status,
-          };
+          const tone = STATUS_TONES[row.status] ?? "info";
+          const text =
+            row.status in STATUS_TONES
+              ? t(`events.status.${row.status}` as MessageKey)
+              : row.status;
           return (
             <s-table-row key={row.id}>
               <s-table-cell>{row.type}</s-table-cell>
@@ -521,9 +514,11 @@ function EventTable<T extends Row>({
               </s-table-cell>
               <s-table-cell>{row.at}</s-table-cell>
               <s-table-cell>
-                <s-badge tone={status.tone}>
-                  {status.text}
-                  {row.attempts > 1 ? ` (${row.attempts} forsøg)` : ""}
+                <s-badge tone={tone}>
+                  {text}
+                  {row.attempts > 1
+                    ? t("events.attempts", { count: row.attempts })
+                    : ""}
                 </s-badge>
               </s-table-cell>
               <s-table-cell>

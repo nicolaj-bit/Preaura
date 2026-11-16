@@ -16,33 +16,51 @@ import { scheduleQueue } from "../orders/scheduler.server";
 import { orderRef } from "../orders/processQueue.server";
 import { fetchShopTimeZone } from "../lib/shopifyProducts.server";
 import { numericId } from "../lib/ids";
-import { EVENT_LABELS, isEventType } from "../events/build";
+import { isEventType } from "../events/build";
 import { CHANNEL_LABELS, type Channel } from "../events/labels";
+import {
+  formatDate,
+  formatDateTime,
+  translate,
+  translateCount,
+  useT,
+  type Locale,
+  type MessageKey,
+} from "../i18n";
+import { localeFor } from "../i18n/locale.server";
 
 // Ordrebehandling: hændelser, der ikke kunne behandles, og ordrelinjer uden
 // plads i nogen leverance. Intet må forsvinde i en log. Og kunders
 // anmodninger om at se deres data (GDPR).
 
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Tildelt",
-  UNRESOLVED: "Uafklaret",
-  CANCELLED: "Annulleret",
-};
+const STATUSES = ["ACTIVE", "UNRESOLVED", "CANCELLED"];
+const TOPICS = [
+  "CUSTOMERS_DATA_REQUEST",
+  "CUSTOMERS_REDACT",
+  "SHOP_REDACT",
+  "ORDERS_CREATE",
+  "ORDERS_UPDATED",
+  "ORDERS_CANCELLED",
+  "REFUNDS_CREATE",
+  "ORDER_TRANSACTIONS_CREATE",
+];
 
-const TOPIC_LABELS: Record<string, string> = {
-  CUSTOMERS_DATA_REQUEST: "Dataanmodning",
-  CUSTOMERS_REDACT: "Sletning af kunde",
-  SHOP_REDACT: "Sletning af butik",
-  ORDERS_CREATE: "Ny ordre",
-  ORDERS_UPDATED: "Ordre ændret",
-  ORDERS_CANCELLED: "Ordre annulleret",
-  REFUNDS_CREATE: "Refundering",
-};
+const statusLabel = (locale: Locale, status: string) =>
+  STATUSES.includes(status)
+    ? translate(locale, `queue.status.${status}` as MessageKey)
+    : status;
+const topicLabel = (locale: Locale, topic: string) =>
+  TOPICS.includes(topic)
+    ? translate(locale, `queue.topic.${topic}` as MessageKey)
+    : topic;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const queue = queueFor(session.shop);
   const data = forShop(session.shop);
+  const locale = await localeFor(request, session.shop);
+  const t = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [
     counts,
@@ -61,16 +79,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     fetchShopTimeZone(admin.graphql),
     complianceFor(session.shop).dataRequests(),
   ]);
-  const format = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  });
-
-  const dateOnly = new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  });
+  const format = {
+    format: (date: Date) => formatDateTime(locale, date, timeZone),
+  };
 
   return {
     pending: counts.PENDING ?? 0,
@@ -82,22 +93,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderCount: request.orderIds.length,
       // Kundens tilmeldinger til ventelisten (uden e-mailen selv).
       waitlist: request.waitlist.map((entry) =>
-        [
-          `Venteliste: variant ${numericId(entry.variantId)} (produkt ${numericId(entry.productId)})`,
-          `tilmeldt ${format.format(new Date(entry.signedUpAt))}`,
-          entry.notifiedAt
-            ? `fik besked ${format.format(new Date(entry.notifiedAt))}`
-            : "venter på besked",
-        ].join(", "),
+        t("queue.waitlistLine", {
+          variant: numericId(entry.variantId),
+          product: numericId(entry.productId),
+          signedUp: format.format(new Date(entry.signedUpAt)),
+          notified: entry.notifiedAt
+            ? t("queue.waitlistNotified", {
+                date: format.format(new Date(entry.notifiedAt)),
+              })
+            : t("queue.waitlistWaiting"),
+        }),
       ),
       orders: request.data.map((order) => ({
-        name: order.orderName || `Ordre ${numericId(order.orderId)}`,
+        name:
+          order.orderName ||
+          t("product.order", { number: numericId(order.orderId) }),
         lines: order.lines.map((line) =>
           [
-            `${line.quantity} stk.`,
-            STATUS_LABELS[line.status] ?? line.status,
+            t("queue.lineUnits", { count: line.quantity }),
+            statusLabel(locale, line.status),
             line.promisedDate
-              ? `lovet ${dateOnly.format(new Date(`${line.promisedDate}T12:00:00Z`))}`
+              ? t("queue.linePromised", {
+                  date: formatDate(locale, line.promisedDate),
+                })
               : null,
           ]
             .filter(Boolean)
@@ -105,11 +123,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         ),
         events: (order.sentEvents ?? []).map(
           (event) =>
-            `${isEventType(event.type) ? EVENT_LABELS[event.type] : event.type} sendt til ${
-              event.recipients
-                .map((r) => CHANNEL_LABELS[r as Channel] ?? r)
-                .join(", ") || "ingen modtagere"
-            }${event.containsContact ? " (navn og e-mail gemt krypteret)" : ""}`,
+            t("queue.eventSent", {
+              event: isEventType(event.type)
+                ? t(`event.${event.type}` as MessageKey)
+                : event.type,
+              recipients:
+                event.recipients
+                  .map((r) => CHANNEL_LABELS[r as Channel] ?? r)
+                  .join(", ") || t("queue.noRecipients"),
+            }) + (event.containsContact ? t("queue.contactEncrypted") : ""),
         ),
       })),
     })),
@@ -117,9 +139,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const ref = orderRef(event);
       return {
         id: event.id,
-        topic: TOPIC_LABELS[event.topic] ?? event.topic,
+        topic: topicLabel(locale, event.topic),
         orderNumber: ref ? numericId(ref.orderId) : null,
-        error: event.lastError ?? "Ukendt fejl.",
+        error: event.lastError ?? t("queue.unknownError"),
         attempts: event.attempts,
         receivedAt: format.format(event.receivedAt),
       };
@@ -130,7 +152,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderNumber: numericId(row.orderId),
       orderName: row.orderName,
       quantity: row.quantity,
-      status: row.status,
+      status: statusLabel(locale, row.status),
       orderedAt: row.orderCreatedAt ? format.format(row.orderCreatedAt) : "–",
     })),
     unresolved: unresolved.map((row) => ({
@@ -148,27 +170,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const form = await request.formData();
   const queue = queueFor(session.shop);
+  const locale = await localeFor(request, session.shop);
+  const t = (key: MessageKey) => translate(locale, key);
 
   switch (form.get("intent")) {
     case "retry": {
       const id = form.get("eventId");
       const count = await queue.retry(id ? String(id) : undefined);
       scheduleQueue(session.shop, 0);
-      return { ok: true, message: `${count} hændelse(r) sat i kø igen` };
+      return {
+        ok: true,
+        message: translateCount(locale, "queue.retried", count),
+      };
     }
     case "answer": {
       const count = await complianceFor(session.shop).markAnswered(
         String(form.get("requestId")),
       );
       return count === 1
-        ? { ok: true, message: "Markeret som besvaret" }
-        : { ok: false, message: "Anmodningen findes ikke." };
+        ? { ok: true, message: t("queue.answered") }
+        : { ok: false, message: t("queue.requestMissing") };
     }
     case "reprocess": {
       // Behandl en ordre igen, fx når der er kommet en ny leverance med plads.
       const orderId = String(form.get("orderId"));
       if (!orderId.startsWith("gid://shopify/Order/")) {
-        return { ok: false, message: "Ukendt ordre." };
+        return { ok: false, message: t("queue.unknownOrder") };
       }
       await enqueueWebhook({
         webhookId: `manual-${orderId}-${Date.now()}`,
@@ -177,10 +204,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         payload: { admin_graphql_api_id: orderId },
       });
       scheduleQueue(session.shop, 0);
-      return { ok: true, message: "Ordren behandles igen" };
+      return { ok: true, message: t("queue.reprocessing") };
     }
     default:
-      return { ok: false, message: "Ukendt handling." };
+      return { ok: false, message: t("common.unknownAction") };
   }
 };
 
@@ -195,6 +222,7 @@ export default function QueuePage() {
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const { t, tn } = useT();
   const busy = fetcher.state !== "idle";
 
   useEffect(() => {
@@ -207,7 +235,7 @@ export default function QueuePage() {
     fetcher.submit(values, { method: "POST" });
 
   return (
-    <s-page heading="Ordrebehandling">
+    <s-page heading={t("queue.heading")}>
       {failed.length > 0 && (
         <s-button
           slot="primary-action"
@@ -215,29 +243,18 @@ export default function QueuePage() {
           onClick={() => submit({ intent: "retry" })}
           {...(busy ? { loading: true } : {})}
         >
-          Prøv alle igen
+          {t("queue.retryAll")}
         </s-button>
       )}
 
       {pending > 0 && (
-        <s-banner tone="info">
-          {pending} hændelse(r) venter på at blive behandlet. Det sker normalt
-          inden for et minut.
-        </s-banner>
+        <s-banner tone="info">{tn("queue.pending", pending)}</s-banner>
       )}
 
       {dataRequests.length > 0 && (
-        <s-section heading="Kunders dataanmodninger">
+        <s-section heading={t("queue.data.heading")}>
           <s-stack gap="base">
-            <s-paragraph>
-              En kunde har bedt butikken om at se de oplysninger, der gemmes om
-              kunden. Her er alt, hvad PREAURA gemmer om kundens ordrer. Navn og
-              e-mail gemmes kun i hændelser, der sendes på butikkens instruks
-              (Flow, webhook, Klaviyo), krypteret og højst 30 dage. Send det til
-              kunden sammen med butikkens egne oplysninger, og markér
-              anmodningen som besvaret. Besvarede anmodninger slettes efter 30
-              dage.
-            </s-paragraph>
+            <s-paragraph>{t("queue.data.intro")}</s-paragraph>
             {dataRequests.map((request) => (
               <s-box
                 key={request.id}
@@ -250,24 +267,24 @@ export default function QueuePage() {
                     <s-link
                       href={`shopify://admin/customers/${request.customerId}`}
                     >
-                      Kunde {request.customerId}
+                      {t("queue.data.customer", { id: request.customerId })}
                     </s-link>
                     {request.answeredAt ? (
                       <s-badge tone="success">
-                        Besvaret {request.answeredAt}
+                        {t("queue.data.answered", { date: request.answeredAt })}
                       </s-badge>
                     ) : (
-                      <s-badge tone="warning">Venter på svar</s-badge>
+                      <s-badge tone="warning">
+                        {t("queue.data.waiting")}
+                      </s-badge>
                     )}
                   </s-stack>
-                  <s-text color="subdued">Modtaget {request.receivedAt}</s-text>
+                  <s-text color="subdued">
+                    {t("queue.data.received", { date: request.receivedAt })}
+                  </s-text>
                   {request.orders.length === 0 ? (
                     <s-paragraph>
-                      PREAURA gemmer ingen oplysninger om{" "}
-                      {request.orderCount === 1
-                        ? "kundens ordre"
-                        : `kundens ${request.orderCount} ordrer`}
-                      .
+                      {tn("queue.data.nothing", request.orderCount)}
                     </s-paragraph>
                   ) : (
                     <s-unordered-list>
@@ -275,7 +292,9 @@ export default function QueuePage() {
                         <s-list-item key={order.name}>
                           {order.name}: {order.lines.join("; ")}
                           {order.events.length > 0
-                            ? `. Hændelser: ${order.events.join("; ")}`
+                            ? t("queue.data.events", {
+                                events: order.events.join("; "),
+                              })
                             : ""}
                         </s-list-item>
                       ))}
@@ -294,7 +313,7 @@ export default function QueuePage() {
                         submit({ intent: "answer", requestId: request.id })
                       }
                     >
-                      Markér som besvaret
+                      {t("queue.data.markAnswered")}
                     </s-button>
                   )}
                 </s-stack>
@@ -304,26 +323,22 @@ export default function QueuePage() {
         </s-section>
       )}
 
-      <s-section heading="Uafklarede ordrer">
+      <s-section heading={t("queue.unresolved.heading")}>
         {unresolved.length === 0 ? (
-          <s-paragraph>
-            Alle forudbestillinger har plads i en leverance.
-          </s-paragraph>
+          <s-paragraph>{t("queue.unresolved.none")}</s-paragraph>
         ) : (
           <s-stack gap="base">
-            <s-paragraph>
-              Disse ordrelinjer er betalt, men der var ikke plads i nogen
-              leverance. Opret en leverance med plads, og behandl ordren igen.
-              Ordrerne har tagget «Forudbestilling uafklaret» i Shopify.
-            </s-paragraph>
+            <s-paragraph>{t("queue.unresolved.intro")}</s-paragraph>
             <s-table>
               <s-table-header-row>
-                <s-table-header listSlot="primary">Ordre</s-table-header>
-                <s-table-header format="numeric">
-                  Antal uden plads
+                <s-table-header listSlot="primary">
+                  {t("queue.col.order")}
                 </s-table-header>
-                <s-table-header>Bestilt</s-table-header>
-                <s-table-header>Handling</s-table-header>
+                <s-table-header format="numeric">
+                  {t("queue.col.unplaced")}
+                </s-table-header>
+                <s-table-header>{t("queue.col.ordered")}</s-table-header>
+                <s-table-header>{t("queue.col.action")}</s-table-header>
               </s-table-header-row>
               <s-table-body>
                 {unresolved.map((row) => (
@@ -332,7 +347,8 @@ export default function QueuePage() {
                       <s-link
                         href={`shopify://admin/orders/${row.orderNumber}`}
                       >
-                        {row.orderName || `Ordre ${row.orderNumber}`}
+                        {row.orderName ||
+                          t("product.order", { number: row.orderNumber })}
                       </s-link>
                     </s-table-cell>
                     <s-table-cell>{row.quantity}</s-table-cell>
@@ -343,7 +359,7 @@ export default function QueuePage() {
                           submit({ intent: "reprocess", orderId: row.orderId })
                         }
                       >
-                        Behandl igen
+                        {t("queue.reprocess")}
                       </s-button>
                     </s-table-cell>
                   </s-table-row>
@@ -354,28 +370,26 @@ export default function QueuePage() {
         )}
       </s-section>
 
-      <s-section heading="Solgt uden forudbestillingsplan">
+      <s-section heading={t("queue.withoutPlan.heading")}>
         {withoutPlan.length === 0 ? (
-          <s-paragraph>
-            Alle forudbestillinger er købt som forudbestilling.
-          </s-paragraph>
+          <s-paragraph>{t("queue.withoutPlan.none")}</s-paragraph>
         ) : (
           <s-stack gap="base">
             <s-paragraph>
-              {withoutPlan30 === 1 ? "1 ordre" : `${withoutPlan30} ordrer`} de
-              seneste 30 dage købte en vare på forudbestilling uden at vælge
-              forudbestilling — fx en kladdeordre, et salg i POS, en ordre fra
-              en anden app, eller fordi PREAURA-blokken mangler på produktsiden.
-              Appen har talt dem med i den aktive leverance, så varen ikke
-              sælges for meget. Sker det tit, er der som regel noget galt i
-              opsætningen.
+              {tn("queue.withoutPlan.intro", withoutPlan30)}
             </s-paragraph>
             <s-table>
               <s-table-header-row>
-                <s-table-header listSlot="primary">Ordre</s-table-header>
-                <s-table-header format="numeric">Antal</s-table-header>
-                <s-table-header listSlot="secondary">Status</s-table-header>
-                <s-table-header>Bestilt</s-table-header>
+                <s-table-header listSlot="primary">
+                  {t("queue.col.order")}
+                </s-table-header>
+                <s-table-header format="numeric">
+                  {t("queue.col.quantity")}
+                </s-table-header>
+                <s-table-header listSlot="secondary">
+                  {t("queue.col.status")}
+                </s-table-header>
+                <s-table-header>{t("queue.col.ordered")}</s-table-header>
               </s-table-header-row>
               <s-table-body>
                 {withoutPlan.map((row) => (
@@ -384,17 +398,12 @@ export default function QueuePage() {
                       <s-link
                         href={`shopify://admin/orders/${row.orderNumber}`}
                       >
-                        {row.orderName || `Ordre ${row.orderNumber}`}
+                        {row.orderName ||
+                          t("product.order", { number: row.orderNumber })}
                       </s-link>
                     </s-table-cell>
                     <s-table-cell>{row.quantity}</s-table-cell>
-                    <s-table-cell>
-                      {row.status === "ACTIVE"
-                        ? "Tildelt"
-                        : row.status === "UNRESOLVED"
-                          ? "Uafklaret"
-                          : "Annulleret"}
-                    </s-table-cell>
+                    <s-table-cell>{row.status}</s-table-cell>
                     <s-table-cell>{row.orderedAt}</s-table-cell>
                   </s-table-row>
                 ))}
@@ -404,17 +413,21 @@ export default function QueuePage() {
         )}
       </s-section>
 
-      <s-section heading="Hændelser, der fejlede">
+      <s-section heading={t("queue.failed.heading")}>
         {failed.length === 0 ? (
-          <s-paragraph>Ingen fejl.</s-paragraph>
+          <s-paragraph>{t("queue.failed.none")}</s-paragraph>
         ) : (
           <s-table>
             <s-table-header-row>
-              <s-table-header listSlot="primary">Hændelse</s-table-header>
-              <s-table-header>Ordre</s-table-header>
-              <s-table-header listSlot="secondary">Fejl</s-table-header>
-              <s-table-header>Modtaget</s-table-header>
-              <s-table-header>Handling</s-table-header>
+              <s-table-header listSlot="primary">
+                {t("queue.col.event")}
+              </s-table-header>
+              <s-table-header>{t("queue.col.order")}</s-table-header>
+              <s-table-header listSlot="secondary">
+                {t("queue.col.error")}
+              </s-table-header>
+              <s-table-header>{t("queue.col.received")}</s-table-header>
+              <s-table-header>{t("queue.col.action")}</s-table-header>
             </s-table-header-row>
             <s-table-body>
               {failed.map((event) => (
@@ -441,7 +454,7 @@ export default function QueuePage() {
                         submit({ intent: "retry", eventId: event.id })
                       }
                     >
-                      Prøv igen
+                      {t("queue.retry")}
                     </s-button>
                   </s-table-cell>
                 </s-table-row>

@@ -162,6 +162,11 @@ const STANDARD_TEMPLATES = new Set<string>([
   ...Object.values(PLAN_LANGUAGES).flatMap((t) => [t.shipping, t.delivery]),
 ]);
 
+/** Er teksten en af standardteksterne (på et af sprogene)? */
+export function isStandardDateText(text: string) {
+  return STANDARD_TEMPLATES.has(text);
+}
+
 function fillDate(template: string, date: string) {
   return template.replaceAll("{dato}", date).replaceAll("{date}", date);
 }
