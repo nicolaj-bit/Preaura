@@ -104,8 +104,8 @@ export default function Privacy() {
         </li>
         <li>
           Om en ordre gemmes kun det, der skal til for at holde styr på
-          pladserne i leverancerne: ordrens id og nummer, antal, tidspunkt og
-          den lovede dato.
+          pladserne i leverancerne: ordrens id og nummer, antal, pris pr. stk.,
+          tidspunkt og den lovede dato.
         </li>
         <li>
           Data ligger krypteret på servere i EU (Frankfurt) og slettes, når
@@ -149,8 +149,8 @@ export default function Privacy() {
         </thead>
         <tbody>
           <Row
-            what="Tildelinger: ordrens id og nummer (fx #1042), ordrelinjens id, variant, antal, bestillingstidspunkt, leverance og lovet dato"
-            why="Fordele forudbestillinger på leverancer i den rækkefølge, kunderne bestilte, og undgå oversalg"
+            what="Tildelinger: ordrens id og nummer (fx #1042), ordrelinjens id, variant, antal, pris pr. stk. og valuta, bestillingstidspunkt, leverance og lovet dato"
+            why="Fordele forudbestillinger på leverancer i den rækkefølge, kunderne bestilte, undgå oversalg og vise butikken et overblik over forudbestillingerne"
             how="Så længe appen er installeret. Bevares også ved en kundes anmodning om sletning, fordi de ikke indeholder personoplysninger og er butikkens regnskab over pladserne"
           />
           <Row

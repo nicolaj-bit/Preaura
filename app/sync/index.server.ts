@@ -14,8 +14,10 @@ export function shopifySync(graphql: AdminGraphql, shop: string) {
   const gateway = createShopifyGateway(graphql);
   /** Noter på ordren skrives på butiksejerens sprog. */
   const note = async (key: "orderNote.cancelled" | "orderNote.reduced") => {
-    const saved = (await forShop(shop).settings.get()).adminLocale;
-    return translate(resolveLocale(saved) ?? "en", key);
+    const saved = await forShop(shop).settings.get();
+    const locale =
+      resolveLocale(saved.adminLocaleChosen) ?? resolveLocale(saved.adminLocale);
+    return translate(locale ?? "en", key);
   };
   return {
     /** Bringer Shopify i overensstemmelse med appen for én variant. */

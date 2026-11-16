@@ -563,6 +563,9 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
               variantTitle: string | null;
               variant: { id: string } | null;
               sellingPlan: { sellingPlanId: string | null } | null;
+              discountedUnitPriceAfterAllDiscountsSet: {
+                shopMoney: { amount: string; currencyCode: string };
+              } | null;
             }[];
           };
           promisedDate: { value: string } | null;
@@ -598,6 +601,12 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
                   sellingPlan {
                     sellingPlanId
                   }
+                  discountedUnitPriceAfterAllDiscountsSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
                 }
               }
               promisedDate: metafield(namespace: "preaura", key: "promised_date") {
@@ -629,6 +638,12 @@ export function createShopifyGateway(graphql: AdminGraphql): ShopifyGateway {
             unfulfilled: line.unfulfilledQuantity,
             title: line.title,
             variantTitle: line.variantTitle,
+            unitPrice:
+              line.discountedUnitPriceAfterAllDiscountsSet?.shopMoney.amount ??
+              null,
+            currency:
+              line.discountedUnitPriceAfterAllDiscountsSet?.shopMoney
+                .currencyCode ?? null,
           })),
           payment: {
             paid: order.fullyPaid,

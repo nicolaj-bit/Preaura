@@ -77,6 +77,9 @@ export type OrderSnapshot = {
     /** Produkt og variant, til kundens annulleringsside. */
     title?: string;
     variantTitle?: string | null;
+    /** Pris pr. stk. efter rabatter (decimaltal som tekst) og valuta. */
+    unitPrice?: string | null;
+    currency?: string | null;
   }[];
   /**
    * Betaling. paid: ordren er betalt fuldt ud. failedAt: seneste afviste
@@ -148,6 +151,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
 
       /** Sproget i butiksejerens Shopify Admin (app/i18n/locale.server.ts). */
+      /** Sproget, butiksejeren selv har valgt. null: følg Shopify. */
+      async setChosenLocale(locale: string | null) {
+        return client.shopSetting.upsert({
+          where: { shop },
+          create: { shop, adminLocaleChosen: locale },
+          update: { adminLocaleChosen: locale },
+        });
+      },
+
       async setAdminLocale(locale: string) {
         await client.shopSetting.upsert({
           where: { shop },
@@ -176,10 +188,23 @@ export function forShop(shop: string, client: PrismaClient = db) {
     },
 
     dashboard: {
-      /** Det, forsiden viser: varianter, ordrer de seneste 60 dage og ventende stk. */
-      async overview(now = new Date()) {
-        const since60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-        const [plans, recent, waiting, ready] = await Promise.all([
+      /**
+       * Det, forsiden viser: varianter, ordrer i perioden og perioden før,
+       * ventende stk. og det, der kræver handling.
+       */
+      async overview(now = new Date(), days = 30) {
+        const DAY = 24 * 60 * 60 * 1000;
+        const since = new Date(now.getTime() - 2 * days * DAY);
+        const periodStart = new Date(now.getTime() - days * DAY);
+        const [
+          plans,
+          recent,
+          waiting,
+          ready,
+          paymentIssues,
+          cancellations,
+          waitlist,
+        ] = await Promise.all([
           client.variantPlan.findMany({
             where: { shop },
             select: {
@@ -193,9 +218,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
             where: {
               shop,
               status: { in: ["ACTIVE", "UNRESOLVED"] },
-              orderCreatedAt: { gte: since60 },
+              orderCreatedAt: { gte: since },
             },
-            select: { orderId: true, quantity: true, orderCreatedAt: true },
+            select: {
+              orderId: true,
+              quantity: true,
+              orderCreatedAt: true,
+              unitPrice: true,
+              currency: true,
+            },
           }),
           client.allocation.aggregate({
             where: {
@@ -210,12 +241,22 @@ export function forShop(shop: string, client: PrismaClient = db) {
             where: { shop, status: "ACTIVE", readyAt: { not: null } },
             _sum: { quantity: true },
           }),
+          client.paymentIssue.count({
+            where: { shop, status: { in: ["OPEN", "RELEASING"] } },
+          }),
+          client.cancellationRequest.count({
+            where: { shop, requestedAt: { gte: periodStart } },
+          }),
+          client.waitlistEntry.count({ where: { shop, notifiedAt: null } }),
         ]);
         return {
           plans,
           recent,
           waitingUnits: waiting._sum.quantity ?? 0,
           readyUnits: ready._sum.quantity ?? 0,
+          openPaymentIssues: paymentIssues,
+          cancellations,
+          waitlistWaiting: waitlist,
         };
       },
     },
@@ -688,6 +729,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
             const lineChanged = await applyLine(tx, order, line.id, {
               ...target,
               desired: order.cancelled ? 0 : line.quantity,
+              price: priceOf(line),
             });
             changed ||= lineChanged;
           }
@@ -772,6 +814,15 @@ export function forShop(shop: string, client: PrismaClient = db) {
       },
     },
   };
+
+  /** Linjens pris pr. stk., hvis Shopify har oplyst en brugbar. */
+  function priceOf(line: OrderSnapshot["lines"][number]) {
+    const amount = Number(line.unitPrice);
+    if (line.unitPrice == null || !line.currency || !Number.isFinite(amount)) {
+      return null;
+    }
+    return { unitPrice: line.unitPrice, currency: line.currency };
+  }
 
   async function deliveryForPlan(tx: Tx, sellingPlanId: string) {
     const ref = await tx.sellingPlanRef.findUnique({
@@ -870,12 +921,14 @@ export function forShop(shop: string, client: PrismaClient = db) {
       startDeliveryId,
       soldWithoutPlan,
       desired,
+      price,
     }: {
       variantId: string;
       /** Null: ingen åben leverance — alt bliver uafklaret. */
       startDeliveryId: string | null;
       soldWithoutPlan: boolean;
       desired: number;
+      price: { unitPrice: string; currency: string } | null;
     },
   ) {
     const rows = await tx.allocation.findMany({
@@ -910,7 +963,17 @@ export function forShop(shop: string, client: PrismaClient = db) {
         remaining: remainingQuantity(d.quantity, d.allocations),
       })),
     });
-    if (sameAllocation(target, current)) return false;
+    if (sameAllocation(target, current)) {
+      // Rækker fra før prisen blev gemt, får den, næste gang ordren
+      // behandles. Antal og leverance røres ikke.
+      if (price && rows.some((row) => row.unitPrice == null)) {
+        await tx.allocation.updateMany({
+          where: { shop, orderLineId, unitPrice: null },
+          data: price,
+        });
+      }
+      return false;
+    }
 
     const activeBefore = rows.filter((r) => r.status === "ACTIVE");
     const activeAfter = target.filter((b) => b.deliveryId != null);
@@ -979,6 +1042,7 @@ export function forShop(shop: string, client: PrismaClient = db) {
           promisedDate: bucket.promisedDate,
           soldWithoutPlan,
           readyAt,
+          ...(price ?? {}),
         },
       });
     }

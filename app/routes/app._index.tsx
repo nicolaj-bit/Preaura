@@ -12,7 +12,13 @@ import { forShop } from "../models/preorder.server";
 import { fetchProducts, numericId } from "../lib/shopifyProducts.server";
 import { queueFor } from "../models/queue.server";
 import { complianceFor } from "../models/compliance.server";
-import { dashboardStats, progressPct } from "../lib/dashboard";
+import {
+  PERIODS,
+  dashboardStats,
+  parsePeriod,
+  progressPct,
+} from "../lib/dashboard";
+import { LanguageMenu } from "../components/LanguageMenu";
 import {
   CART_EMBED_HANDLE,
   cartEmbedUrl,
@@ -31,6 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const data = forShop(session.shop);
   const locale = await localeFor(request, session.shop);
+  const period = parsePeriod(new URL(request.url).searchParams.get("period"));
 
   const [summaries, settings] = await Promise.all([
     data.variantPlans.listProducts(),
@@ -50,7 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
       ),
       complianceFor(session.shop).countUnansweredDataRequests(),
-      data.dashboard.overview(),
+      data.dashboard.overview(new Date(), period),
     ]);
 
   // Leverancer på forsiden: åbne leverancer på varianter med forudbestilling,
@@ -95,11 +102,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const next = deliveries.find(
     (d) => d.state === "ACTIVE" || d.state === "UPCOMING",
   );
-  const stats = dashboardStats(overview.recent, new Date());
+  const stats = dashboardStats(overview.recent, new Date(), period);
 
   return {
+    period,
     stats: {
       ...stats,
+      openPaymentIssues: overview.openPaymentIssues,
+      cancellations: overview.cancellations,
+      waitlistWaiting: overview.waitlistWaiting,
       waitingUnits: overview.waitingUnits,
       readyUnits: overview.readyUnits,
       nextDelivery: next
@@ -198,6 +209,7 @@ export default function Index() {
     withoutPlan7,
     dataRequests,
     stats,
+    period,
     deliveries,
     setup,
     supportEmail,
@@ -205,7 +217,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const guide = useFetcher<typeof action>();
   const shopify = useAppBridge();
-  const { t, tn } = useT();
+  const { t, tn, money } = useT();
   const blockInfo = useBlockInfo();
   const block = blockInfo.status;
   const confirmBlock = () =>
@@ -256,6 +268,8 @@ export default function Index() {
       >
         {t("home.selectProducts")}
       </s-button>
+
+      <LanguageMenu />
 
       <ThemeBlockBanner
         status={block}
@@ -339,34 +353,109 @@ export default function Index() {
       )}
 
       {setup.hasProducts && (
-        <s-grid
-          gridTemplateColumns="repeat(auto-fit, minmax(180px, 1fr))"
-          gap="base"
-        >
-          <StatCard
-            label={t("home.stats.orders30")}
-            value={String(stats.orders30)}
-            trend={stats.ordersTrendPct}
-          />
-          <StatCard
-            label={t("home.stats.units30")}
-            value={String(stats.units30)}
-          />
-          <StatCard
-            label={t("home.stats.waiting")}
-            value={t("common.units", { count: stats.waitingUnits })}
-            note={
-              stats.readyUnits > 0
-                ? t("home.stats.ready", { count: stats.readyUnits })
-                : undefined
-            }
-          />
-          <StatCard
-            label={t("home.stats.next")}
-            value={stats.nextDelivery?.date ?? t("common.none")}
-            note={stats.nextDelivery?.product}
-          />
-        </s-grid>
+        <s-section heading={t("home.overview.heading")}>
+          <s-stack gap="base">
+            <s-stack
+              direction="inline"
+              gap="small-200"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <s-text color="subdued">{t("home.overview.intro")}</s-text>
+              <s-stack direction="inline" gap="small-300">
+                {PERIODS.map((days) => (
+                  <s-button
+                    key={days}
+                    href={`/app?period=${days}`}
+                    variant={days === period ? "primary" : "secondary"}
+                  >
+                    {t("home.period.days", { count: days })}
+                  </s-button>
+                ))}
+              </s-stack>
+            </s-stack>
+            <s-grid
+              gridTemplateColumns="repeat(auto-fit, minmax(180px, 1fr))"
+              gap="base"
+            >
+              <StatCard
+                icon="money"
+                label={t("home.stats.amount")}
+                value={
+                  stats.amount
+                    ? money(stats.amount.value, stats.amount.currency)
+                    : "–"
+                }
+                trend={stats.amountTrendPct}
+                note={
+                  stats.amount == null
+                    ? t("home.stats.amountNone")
+                    : stats.amountPartial
+                      ? t("home.stats.amountPartial")
+                      : undefined
+                }
+              />
+              <StatCard
+                icon="order"
+                label={t("home.stats.orders")}
+                value={String(stats.orders)}
+                trend={stats.ordersTrendPct}
+              />
+              <StatCard
+                icon="receipt"
+                label={t("home.stats.average")}
+                value={
+                  stats.averageOrder
+                    ? money(
+                        stats.averageOrder.value,
+                        stats.averageOrder.currency,
+                      )
+                    : "–"
+                }
+              />
+              <StatCard
+                icon="product"
+                label={t("home.stats.units")}
+                value={t("common.units", { count: stats.units })}
+              />
+              <StatCard
+                icon="delivery"
+                label={t("home.stats.waiting")}
+                value={t("common.units", { count: stats.waitingUnits })}
+                note={
+                  stats.readyUnits > 0
+                    ? t("home.stats.ready", { count: stats.readyUnits })
+                    : undefined
+                }
+              />
+              <StatCard
+                icon="calendar"
+                label={t("home.stats.next")}
+                value={stats.nextDelivery?.date ?? t("common.none")}
+                note={stats.nextDelivery?.product}
+              />
+              <StatCard
+                icon="credit-card-cancel"
+                label={t("home.stats.paymentIssues")}
+                value={String(stats.openPaymentIssues)}
+                tone={stats.openPaymentIssues > 0 ? "warning" : undefined}
+                href={stats.openPaymentIssues > 0 ? "/app/releases" : undefined}
+              />
+              <StatCard
+                icon="x-circle"
+                label={t("home.stats.cancellations")}
+                value={String(stats.cancellations)}
+                href={stats.cancellations > 0 ? "/app/releases" : undefined}
+              />
+              <StatCard
+                icon="person-list"
+                label={t("home.stats.waitlist")}
+                value={String(stats.waitlistWaiting)}
+                href={stats.waitlistWaiting > 0 ? "/app/waitlist" : undefined}
+              />
+            </s-grid>
+          </s-stack>
+        </s-section>
       )}
 
       {setup.hasProducts && deliveries.length === 0 && (
@@ -687,20 +776,35 @@ function SetupStep({
 }
 
 function StatCard({
+  icon,
   label,
   value,
   trend,
   note,
+  tone,
+  href,
 }: {
+  icon: IconType;
   label: string;
   value: string;
   trend?: number | null;
   note?: string;
+  tone?: "warning";
+  href?: string;
 }) {
+  const { t } = useT();
   return (
-    <s-section>
+    <s-box
+      padding="base"
+      border="base"
+      borderRadius="base"
+      background={tone === "warning" ? "subdued" : "base"}
+    >
       <s-stack gap="small-200">
-        <s-text color="subdued">{label}</s-text>
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <s-icon type={icon} tone={tone ?? "neutral"} size="small" />
+          <s-text color="subdued">{label}</s-text>
+        </s-stack>
         <s-stack direction="inline" gap="small-200" alignItems="center">
           <s-heading>{value}</s-heading>
           {trend != null && trend !== 0 && (
@@ -710,10 +814,13 @@ function StatCard({
           )}
         </s-stack>
         {note && <s-text color="subdued">{note}</s-text>}
+        {href && <s-link href={href}>{t("home.stats.see")}</s-link>}
       </s-stack>
-    </s-section>
+    </s-box>
   );
 }
+
+type IconType = HTMLElementTagNameMap["s-icon"]["type"];
 
 /** Fremdriftslinje: hvor stor en del af leverancen der er solgt. */
 function ProgressBar({ pct }: { pct: number }) {

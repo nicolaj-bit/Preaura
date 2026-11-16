@@ -109,6 +109,9 @@ model ShopSetting {
   // Sproget i butiksejerens Shopify Admin («da» eller «en»), husket fra
   // ?locale=, så appen kan vises på samme sprog (app/i18n).
   adminLocale           String?
+  // Sproget, butiksejeren selv har valgt i appen («da» eller «en»). Går
+  // forud for Shopify Admins sprog. Tom: følg Shopify.
+  adminLocaleChosen     String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -225,6 +228,11 @@ model Allocation {
   // Datoen, kunden blev lovet, da tildelingen blev lavet. Den følger IKKE
   // leverancen, hvis leverancens dato senere ændres.
   promisedDate    String?
+  // Prisen pr. stk. efter rabatter, i butikkens valuta, som Shopify oplyste
+  // den, da tildelingen blev lavet. Kun til oversigtens beløb — ingen
+  // persondata. Tom for tildelinger fra før prisen blev gemt.
+  unitPrice       Decimal?  @db.Decimal(18, 4)
+  currency        String?
   // Varerne til tildelingen er kommet hjem: klar til afsendelse.
   readyAt         DateTime?
   allocatedAt     DateTime  @default(now())

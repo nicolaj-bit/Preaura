@@ -6,7 +6,8 @@ import { localeFromHeaders } from "./headers";
 // når appen åbnes i Shopify Admin (sproget i butiksejerens Admin). Senere
 // anmodninger i appen har den ikke, så sproget huskes pr. butik.
 //
-// Rækkefølge: adressens locale → det huskede → browserens sprog → engelsk.
+// Rækkefølge: sproget, butiksejeren selv har valgt i appen → adressens
+// locale → det huskede → browserens sprog → engelsk.
 
 export async function localeFor(
   request: Request,
@@ -16,9 +17,12 @@ export async function localeFor(
   const fromUrl = resolveLocale(
     new URL(request.url).searchParams.get("locale"),
   );
-  const saved = (await settings.get()).adminLocale;
+  const stored = await settings.get();
+  const saved = stored.adminLocale;
+  const chosen = resolveLocale(stored.adminLocaleChosen);
+  if (fromUrl && saved !== fromUrl) await settings.setAdminLocale(fromUrl);
+  if (chosen) return chosen;
   if (fromUrl) {
-    if (saved !== fromUrl) await settings.setAdminLocale(fromUrl);
     return fromUrl;
   }
   return resolveLocale(saved) ?? localeFromHeaders(request) ?? DEFAULT_LOCALE;
