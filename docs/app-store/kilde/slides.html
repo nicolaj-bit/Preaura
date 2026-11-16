@@ -64,7 +64,30 @@ body.dark .ring{border-width:3px}
 .preaura-cart-totals{display:flex;flex-direction:column;gap:.45em}
 .preaura-cart-totals>div{display:flex;justify-content:space-between;gap:1em;font-size:19px}
 .preaura-cart-totals>div:last-child{font-weight:600;font-size:22px}
-</style></head><body><div id="root"></div>
+</style></head><body><script>if(new URLSearchParams(location.search).get("anim"))document.write(`
+<style id="anim">
+@keyframes fadeUp{from{opacity:0;translate:0 40px}to{opacity:1;translate:0 0}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{opacity:0;translate:0 60px;scale:.96}100%{opacity:1;translate:0 0;scale:1}}
+@keyframes ringIn{from{opacity:0;transform:var(--r) scale(.85)}to{opacity:1;transform:var(--r) scale(1)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(176,138,118,0)}50%{box-shadow:0 0 0 14px rgba(176,138,118,.25)}}
+.eyebrow{animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) .2s both}
+h1{animation:fadeUp .9s cubic-bezier(.2,.7,.2,1) .4s both}
+.sub{animation:fadeUp .9s cubic-bezier(.2,.7,.2,1) .7s both}
+.brand{animation:fadeIn 1s ease 1s both}
+.glow{animation:fadeIn 1.6s ease both}
+.ring{animation:fadeIn 1.4s ease .3s both}
+.card,.panel{animation:pop 1s cubic-bezier(.2,.7,.2,1) .6s both}
+.card+.card{animation-delay:1.3s}
+.preaura__timeline li{animation:fadeUp .6s ease both}
+.preaura__timeline li:nth-child(1){animation-delay:1.8s}.preaura__timeline li:nth-child(2){animation-delay:2.1s}.preaura__timeline li:nth-child(3){animation-delay:2.4s}
+.highlight{animation:pulse 1.6s ease 2s 2 both}
+s-grid>s-box{animation:fadeUp .6s ease both}
+s-grid>s-box:nth-child(1){animation-delay:1.3s}s-grid>s-box:nth-child(2){animation-delay:1.4s}s-grid>s-box:nth-child(3){animation-delay:1.5s}s-grid>s-box:nth-child(4){animation-delay:1.6s}
+s-grid>s-box:nth-child(5){animation-delay:1.7s}s-grid>s-box:nth-child(6){animation-delay:1.8s}s-grid>s-box:nth-child(7){animation-delay:1.9s}s-grid>s-box:nth-child(8){animation-delay:2s}
+s-table-row{animation:fadeUp .6s ease both}
+s-table-row:nth-child(1){animation-delay:2.2s}s-table-row:nth-child(2){animation-delay:2.4s}s-table-row:nth-child(3){animation-delay:2.6s}
+</style>`)</script><div id="root"></div>
 <script>
 const q=new URLSearchParams(location.search), L=q.get('lang')||'da', S=q.get('s')||'1';
 const T={

@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@400;500&display=swap" rel="stylesheet">
+<style>*{margin:0;box-sizing:border-box}
+body{width:1600px;height:900px;overflow:hidden;position:relative;color:#F4EEE8;font-family:Jost,sans-serif;
+ background:radial-gradient(1100px 800px at 50% 45%,#4A3E37 0%,#2A2420 50%,#1B1614 100%);display:grid;place-items:center}
+.wrap{text-align:center;position:relative;z-index:2}
+.logo{font-family:Marcellus,serif;font-size:150px;letter-spacing:.06em;animation:fadeUp 1.2s cubic-bezier(.2,.7,.2,1) .5s both}
+.logo b{color:#B08A76;font-weight:400}
+.tag{margin-top:22px;font-size:24px;letter-spacing:.42em;text-transform:uppercase;color:#C9A898;animation:fadeUp 1s ease 1.3s both}
+.line{margin-top:70px;font-family:Marcellus,serif;font-size:40px;animation:fadeUp 1s ease 1.8s both}
+.ring{position:absolute;left:50%;top:50%;width:1100px;height:300px;margin:-150px 0 0 -550px;border-radius:50%;border:3px solid transparent;
+ background:linear-gradient(90deg,rgba(184,152,138,.1),#E9D6C8,#B08A76,rgba(142,107,91,.25)) border-box;
+ -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+ transform:rotate(-10deg);animation:ringIn 1.8s cubic-bezier(.2,.7,.2,1) both}
+.glow{position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 50%,rgba(176,138,118,.35),transparent 70%);animation:fadeIn 2s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes ringIn{from{opacity:0;transform:rotate(-30deg) scale(.6)}to{opacity:1;transform:rotate(-10deg) scale(1)}}
+</style></head><body><div class="glow"></div><div class="ring"></div>
+<div class="wrap"><div class="logo">PREAURA<b>.</b></div><div class="tag" id="tag"></div><div class="line" id="line"></div></div>
+<script>const q=new URLSearchParams(location.search),L=q.get('lang')||'en',K=q.get('k')||'intro';
+const T={en:{intro:['Pre-orders per delivery',''],outro:['Pre-orders per delivery','Nothing due today. Paid when it ships.']},
+         da:{intro:['Forudbestilling pr. leverance',''],outro:['Forudbestilling pr. leverance','Intet at betale i dag. Betales ved afsendelse.']}}[L][K];
+tag.textContent=T[0];line.textContent=T[1];document.fonts.ready.then(()=>document.body.dataset.ready=1)</script></body></html>
