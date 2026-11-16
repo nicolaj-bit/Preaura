@@ -36,6 +36,7 @@ function page(
     locale = "da",
     themeSellingPlan = false,
     installmentForm = false,
+    buttonHtml = "<span>Læg i kurv</span>",
   } = {},
 ) {
   document.body.innerHTML = `
@@ -50,7 +51,7 @@ function page(
       <form action="/cart/add" method="post" data-theme-form>
         <input type="hidden" name="id" value="${selected}">
         ${themeSellingPlan ? '<input type="radio" name="selling_plan" value="" checked>' : ""}
-        <button type="submit" name="add"><span>Læg i kurv</span></button>
+        <button type="submit" name="add">${buttonHtml}</button>
       </form>
       <div data-preaura-root hidden>
         <p data-preaura-message></p>
@@ -228,6 +229,43 @@ describe("app-blokken på produktsiden", () => {
     p.setVariant("2");
     vi.advanceTimersByTime(300);
     expect(p.button()).toBe("Læg i kurv");
+  });
+
+  it("skifter kun teksten i Horizon-knappen, hvor teksten står uden <span>", () => {
+    // Horizons knap: ikon og flueben-animation i spans, teksten direkte i
+    // knappen. Før skrev vi i første <span>, så begge tekster blev vist.
+    const p = page(
+      { "1": active("2026-12-01"), "2": { active: false } },
+      {
+        settings: { changeButtonText: true },
+        buttonHtml: `<span aria-hidden="true" class="svg-wrapper add-to-cart-icon"><svg><title>kurv</title></svg></span>
+          Add to cart
+          <span class="add-to-cart__added"><span class="svg-wrapper"><svg></svg></span></span>`,
+      },
+    );
+    const button = p.form.querySelector("button")!;
+    const text = () => button.textContent!.replace(/\s+/g, " ").trim();
+    expect(text()).toBe("kurv Forudbestil");
+    expect(button.querySelector(".add-to-cart__added")!.textContent).toBe("");
+    expect(button.querySelector("svg title")!.textContent).toBe("kurv");
+    p.setVariant("2");
+    vi.advanceTimersByTime(300);
+    expect(text()).toBe("kurv Add to cart");
+  });
+
+  it("skifter alle kopier af teksten, men ikke andre tilstande", () => {
+    const p = page(
+      { "1": active("2026-12-01") },
+      {
+        settings: { changeButtonText: true },
+        buttonHtml:
+          '<span class="label">Læg i kurv</span><span class="label-copy">Læg i kurv</span><span class="added">Tilføjet</span>',
+      },
+    );
+    const button = p.form.querySelector("button")!;
+    expect(button.querySelector(".label")!.textContent).toBe("Forudbestil");
+    expect(button.querySelector(".label-copy")!.textContent).toBe("Forudbestil");
+    expect(button.querySelector(".added")!.textContent).toBe("Tilføjet");
   });
 
   it("lægger felterne ind igen, hvis temaet genskaber formularens indhold", () => {
