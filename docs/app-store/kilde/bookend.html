@@ -21,4 +21,4 @@ body{width:1600px;height:900px;overflow:hidden;position:relative;color:#F4EEE8;f
 <script>const q=new URLSearchParams(location.search),L=q.get('lang')||'en',K=q.get('k')||'intro';
 const T={en:{intro:['Pre-orders per delivery',''],outro:['Pre-orders per delivery','Nothing due today. Paid when it ships.']},
          da:{intro:['Forudbestilling pr. leverance',''],outro:['Forudbestilling pr. leverance','Intet at betale i dag. Betales ved afsendelse.']}}[L][K];
-tag.textContent=T[0];line.textContent=T[1];document.fonts.ready.then(()=>document.body.dataset.ready=1)</script></body></html>
+if(K==='outro'){tag.remove();line.remove();}else{tag.textContent=T[0];line.textContent=T[1];}document.fonts.ready.then(()=>document.body.dataset.ready=1)</script></body></html>
