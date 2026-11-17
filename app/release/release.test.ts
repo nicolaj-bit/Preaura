@@ -222,10 +222,23 @@ describe("én frigivelse — kundens annullering", () => {
   it("alt annulleres: hele ordren annulleres i Shopify — uden refundering — og alle 5 frigives", async () => {
     const h = await setup({ quantity: 5 });
     currentShopify = h.shopify;
-    await customerCancels(5);
+    const first = await customerCancels(5);
+    const again = await customerCancels(5); // Linket åbnet to gange.
+    expect(again?.id).toBe(first?.id);
     await h.run();
     expect((await h.shopifyOrder()).cancelled).toBe(true);
     expect(await h.remaining()).toBe(10);
+    // Shopify sender annulleringen (og en opdatering) bagefter; intet
+    // frigives to gange.
+    await h.webhook("ORDERS_CANCELLED");
+    await h.webhook("ORDERS_CANCELLED");
+    await h.run();
+    await h.run();
+    expect(await h.remaining()).toBe(10);
+    expect(h.writes("cancelOrder")).toBe(1);
+    expect(
+      await client.allocation.findMany({ select: { status: true, quantity: true } }),
+    ).toEqual([{ status: "CANCELLED", quantity: 5 }]);
     const [call] = h.shopify.writes.filter((w) => w.method === "cancelOrder");
     expect(call.args).toEqual([ORDER, "CUSTOMER"]);
     const events = await client.outboxEvent.findMany({
@@ -300,6 +313,60 @@ describe("én frigivelse — afvist betaling", () => {
     expect(h.writes("cancelOrder")).toBe(1);
     const [call] = h.shopify.writes.filter((w) => w.method === "cancelOrder");
     expect(call.args).toEqual([ORDER, "DECLINED"]);
+  });
+
+  it("automatisk ved fristens udløb giver samme resultat som manuel frigivelse før fristen", async () => {
+    // Samme ordre to gange: én gang frigivet automatisk, da fristen udløb,
+    // én gang frigivet manuelt af butikken før fristen.
+    async function scenario(mode: "auto" | "manual") {
+      await testDb.reset();
+      const h = await setup({ quantity: 5 });
+      await decline(h);
+      await h.run();
+      const issue = await client.paymentIssue.findFirstOrThrow();
+
+      // Før fristen: intet frigives, uanset hvor mange gange køen kører.
+      await h.run();
+      expect(await h.remaining()).toBe(5);
+      expect(h.writes("cancelOrder")).toBe(0);
+
+      if (mode === "auto") {
+        // Tiden går: fristen er udløbet.
+        await client.paymentIssue.update({
+          where: { id: issue.id },
+          data: { releaseAt: new Date(Date.now() - 1000) },
+        });
+      } else {
+        expect(issue.releaseAt.getTime()).toBeGreaterThan(Date.now());
+        await release().payments.releaseNow(issue.id);
+      }
+      await h.run();
+      await h.run();
+      const after = await client.paymentIssue.findFirstOrThrow();
+      const allocations = await client.allocation.findMany({
+        select: { status: true, quantity: true },
+        orderBy: { allocatedAt: "asc" },
+      });
+      return {
+        issue: after.status,
+        cancelled: (await h.shopifyOrder()).cancelled,
+        cancelCalls: h.shopify.writes
+          .filter((w) => w.method === "cancelOrder")
+          .map((w) => w.args),
+        remaining: await h.remaining(),
+        allocations,
+      };
+    }
+    const auto = await scenario("auto");
+    const manual = await scenario("manual");
+    expect(auto).toEqual({
+      issue: "RELEASED",
+      cancelled: true,
+      cancelCalls: [[ORDER, "DECLINED"]],
+      remaining: 10,
+      allocations: [{ status: "CANCELLED", quantity: 5 }],
+    });
+    expect(manual).toEqual(auto);
   });
 
   it("kunden betaler inden fristen: sagen lukkes, intet frigives", async () => {

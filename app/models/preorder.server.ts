@@ -716,6 +716,11 @@ export function forShop(shop: string, client: PrismaClient = db) {
        */
       async apply(order: OrderSnapshot) {
         return client.$transaction(async (tx) => {
+          // Én afstemning ad gangen pr. butik, også hvis køens lås er udløbet
+          // midt i en behandling. Uden den kan to samtidige afstemninger
+          // begge læse «1 tilbage» og give den sidste enhed til to kunder.
+          // Låsen holdes til transaktionen slutter. Se deliveryControl.test.ts.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`preaura:apply:${shop}`}))`;
           const variantIds = new Set<string>();
           let changed = false;
           const handledLines = new Set<string>();
