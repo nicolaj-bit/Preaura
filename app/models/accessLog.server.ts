@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import db from "../db.server";
+import { logError } from "../lib/log.server";
 
 // Adgangslog over persondata (krav til beskyttede kundedata, level 2).
 //
@@ -50,9 +51,9 @@ export function accessLogFor(shop: string, client: Client = db) {
           })),
         });
       } catch (error) {
-        console.error(
-          `PREAURA: adgangsloggen kunne ikke skrives (${shop}):`,
-          entries.map((e) => `${e.action} ${e.subject}`).join(", "),
+        logError(
+          "Adgangsloggen kunne ikke skrives",
+          { shop, ids: { actions: entries.map((e) => e.action).join(",") } },
           error,
         );
       }

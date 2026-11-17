@@ -30,12 +30,12 @@ Alt om en butik slettes 48 timer efter afinstallation (shop/redact).
 | --- | --- |
 | Kryptering under transport | Al trafik er HTTPS. |
 | Kryptering i hvile | Databasen hos Render er krypteret. Navn, e-mail, API-nøgler og webhook-adresser krypteres desuden af appen selv (AES-256-GCM) med `PREAURA_ENCRYPTION_KEY`, som kun findes som miljøvariabel på Render. |
-| Krypterede backups | Renders backups af databasen (se tjekliste nedenfor). |
+| Krypterede backups | Renders løbende sikkerhedskopier, AES-256, højst 7 dage. Gendannelse pr. butik: `docs/backup.md`. |
 | Adskilt test og produktion | To apps, to servere, to databaser, egne nøgler. Data kopieres aldrig mellem dem (`AGENTS.md`). |
 | Undgå datatab | Ingen data slettes ved udløbet abonnement. Hændelser prøves igen med voksende ventetid og står i admin, hvis de fejler. Køen gemmer kun ordrens id. |
 | Begrænset adgang for medarbejdere | Kun den ansvarlige har adgang til Render, databasen, GitHub og Partner Dashboard. Ingen adgang deles. |
 | Stærke adgangskoder | Lange, unikke adgangskoder i en adgangskodemanager og totrinsbekræftelse på alle konti (se tjekliste). |
-| Log over adgang til persondata | Tabellen `AccessLog` (se afsnit 3). |
+| Log over adgang til persondata | Tabellen `AccessLog` (se afsnit 3). Fejllogningen indeholder ingen persondata (`app/lib/log.server.ts`). |
 | Plan for sikkerhedshændelser | Afsnit 4. |
 
 ### Tjekliste — kontrolleres ved hver gennemgang

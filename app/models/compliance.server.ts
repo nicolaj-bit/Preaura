@@ -3,6 +3,7 @@ import db from "../db.server";
 import { purgeWaitlist, waitlistFor } from "./waitlist.server";
 import { purgeReleaseHistory } from "./release.server";
 import { accessLogFor, purgeAccessLog } from "./accessLog.server";
+import { logInfo } from "../lib/log.server";
 
 // Databeskyttelse: kunders dataanmodninger og sletning.
 //
@@ -271,7 +272,7 @@ export function complianceFor(shop: string, client: PrismaClient = db) {
     async redactShop() {
       const where = { where: { shop } };
       // Loggen slettes med resten; selve sletningen står i serverens log.
-      console.info(`PREAURA: shop/redact — alt om ${shop} slettes.`);
+      logInfo("shop/redact: alt om butikken slettes", { shop });
       await accessLogFor(shop, client).deleteAll();
       // Tildelinger før leverancer (fremmednøglen forbyder det omvendte).
       await client.$transaction([

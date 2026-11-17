@@ -20,6 +20,7 @@ import {
   planMatches,
   type DesiredPlan,
 } from "./plans";
+import { logError, logInfo, logWarn } from "../lib/log.server";
 
 // DEN ENESTE VEJ, APPEN SKRIVER TIL SHOPIFY.
 //
@@ -69,6 +70,11 @@ export async function syncVariant({
         ? error.message
         : "Ukendt fejl under synkronisering.";
     await data.syncState.recordFailure(variantId, message);
+    logError(
+      "Synkronisering med Shopify fejlede",
+      { shop, ids: { variantId } },
+      error,
+    );
     return { ok: false, error: message };
   }
 }
@@ -163,9 +169,9 @@ async function reconcile(
         ? plan.receivedWhileForced
         : received;
     if (received > 0) {
-      console.info(
-        `${variantId}: lageret i Shopify er ${available}, appen satte det til ${plan.syncedAvailable}. ${owed} stk. venter på varer.`,
-      );
+      logInfo("Varer modtaget i Shopify", {
+        ids: { variantId, available, synced: plan.syncedAvailable, owed },
+      });
     }
     if (
       decision.changed &&
@@ -459,7 +465,7 @@ async function readPlanLocales(gateway: ShopifyGateway): Promise<PlanLocales> {
   try {
     return planLocales(await gateway.shopLocales());
   } catch (error) {
-    console.warn("PREAURA: kunne ikke læse butikkens sprog", error);
+    logWarn("Butikkens sprog kunne ikke læses", {}, error);
     return DEFAULT_PLAN_LOCALES;
   }
 }
@@ -503,7 +509,7 @@ async function translateCreated(
       );
     }
   } catch (error) {
-    console.warn("PREAURA: kunne ikke oversætte selling plans", error);
+    logWarn("Selling plans kunne ikke oversættes", {}, error);
   }
 }
 

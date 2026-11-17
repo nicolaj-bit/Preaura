@@ -17,6 +17,7 @@ import {
 } from "../billing/subscriptionRequired";
 import { localeFor } from "../i18n/locale.server";
 import { LocaleContext, translate, useT } from "../i18n";
+import { logWarn } from "../lib/log.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -41,10 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     // Abonnementet kunne ikke tjekkes. Butikken sendes IKKE til
     // prisvalgssiden; i stedet vises årsagen (uden hemmeligheder).
-    console.error(
-      `Abonnementet for ${session.shop} kunne ikke tjekkes:`,
-      error,
-    );
+    logWarn("Abonnementet kunne ikke tjekkes", { shop: session.shop }, error);
     return {
       apiKey,
       locale,

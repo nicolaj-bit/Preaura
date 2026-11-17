@@ -83,25 +83,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
   const id = String(form.id ?? "");
+  // Findes sagen ikke i butikken (eller er den allerede afgjort), ændres
+  // intet, og der vises ingen «godkendt».
+  const missing = () => {
+    return {
+      ok: false as const,
+      errors: {},
+      message: t("releases.toast.missing"),
+    };
+  };
   switch (form.intent) {
     case "approve":
-      await release.cancellations.approve(id);
+      if ((await release.cancellations.approve(id)) === 0) return missing();
       scheduleQueue(session.shop, 0);
       return { ok: true as const, message: t("releases.toast.approved") };
     case "reject":
-      await release.cancellations.reject(id);
+      if ((await release.cancellations.reject(id)) === 0) return missing();
       return { ok: true as const, message: t("releases.toast.rejected") };
     case "retry":
-      await release.cancellations.retry(id);
+      if ((await release.cancellations.retry(id)) === 0) return missing();
       scheduleQueue(session.shop, 0);
       return { ok: true as const, message: t("releases.toast.retry") };
     case "release":
-      await release.payments.releaseNow(id);
+      if ((await release.payments.releaseNow(id)) === 0) return missing();
       scheduleQueue(session.shop, 0);
       return { ok: true as const, message: t("releases.toast.releasing") };
     case "extend": {
       const settings = await release.settings();
-      await release.payments.extend(id, settings.paymentGraceDays);
+      if ((await release.payments.extend(id, settings.paymentGraceDays)) === 0)
+        return missing();
       return {
         ok: true as const,
         message: t("releases.toast.extended", {
@@ -159,7 +169,11 @@ export default function Releases() {
     fetcher.data && !fetcher.data.ok ? fetcher.data.errors : {};
 
   useEffect(() => {
-    if (fetcher.data?.ok) shopify.toast.show(fetcher.data.message);
+    if (fetcher.data && "message" in fetcher.data && fetcher.data.message) {
+      shopify.toast.show(fetcher.data.message, {
+        isError: !fetcher.data.ok,
+      });
+    }
   }, [fetcher.data, shopify]);
 
   const send = (intent: string, id?: string) =>

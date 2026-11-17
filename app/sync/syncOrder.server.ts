@@ -11,6 +11,7 @@ import {
   desiredOrderTags,
   metafieldMatches,
 } from "./orderFields";
+import { logWarn } from "../lib/log.server";
 
 // Den anden halvdel af synkroniseringen: bringer én ordres metafelter og
 // tags i overensstemmelse med dens tildelinger. Samme regler som
@@ -105,9 +106,6 @@ async function ensureCancelUrlDefinition(
     });
     definedShops.add(shop);
   } catch (error) {
-    console.error(
-      `Definitionen af preaura.cancel_url for ${shop} fejlede:`,
-      error,
-    );
+    logWarn("Definitionen af preaura.cancel_url fejlede", { shop }, error);
   }
 }

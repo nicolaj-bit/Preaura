@@ -7,6 +7,7 @@ import { createFakeShopify } from "../test/fakeShopify";
 import { syncVariant } from "../sync/syncVariant.server";
 import { syncOrder } from "../sync/syncOrder.server";
 import { processShopQueue } from "./processQueue.server";
+import { setAlertFetch } from "../lib/log.server";
 
 // Hele vejen: webhook i kø → behandling → tildelinger → lager og ordrefelter
 // i (en simuleret) Shopify. Databasen er en rigtig PostgreSQL med appens
@@ -461,6 +462,28 @@ describe("fejl og samtidighed", () => {
     await queueFor(SHOP, client).retry();
     expect(await h.run()).toMatchObject({ done: 1 });
     expect(await h.remaining()).toEqual([9]);
+  });
+
+  it("en ordre, der fejler, sender en alarm til et menneske med butik og ordre, uden persondata", async () => {
+    const sent: string[] = [];
+    process.env.PREAURA_ALERT_URL = "https://ntfy.sh/preaura-test";
+    setAlertFetch((async (_url: string, init: RequestInit) => {
+      sent.push(String(init.body));
+      return new Response("ok");
+    }) as unknown as typeof fetch);
+    try {
+      const h = await setup([{ date: "2026-12-01", quantity: 10 }]);
+      await h.order(1, [{ quantity: 1, deliveryId: h.ids[0] }]);
+      h.shopify.failNext("setOrderMetafields", "Access denied for anna@example.com");
+      expect(await h.run()).toMatchObject({ failed: 1 });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toContain(SHOP);
+      expect(sent[0]).toContain("gid://shopify/Order/1");
+      expect(sent[0]).not.toContain("anna@example.com");
+    } finally {
+      delete process.env.PREAURA_ALERT_URL;
+    }
   });
 
   it("to behandlere kan ikke køre samtidig på samme butik", async () => {

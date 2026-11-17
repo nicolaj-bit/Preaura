@@ -7,6 +7,7 @@ import { EVENT_STATUS, queueFor } from "../models/queue.server";
 import { complianceFor, orderGid } from "../models/compliance.server";
 import { releaseFor, type LineTarget } from "../models/release.server";
 import { processReleases } from "../release/process.server";
+import { logError } from "../lib/log.server";
 
 // Behandling af ordre-hændelser i køen → tildelinger.
 //
@@ -197,6 +198,11 @@ export async function processShopQueue({
             error instanceof Error ? error.message : "Ukendt fejl.";
           await queue.markFailed(group.ids, message);
           totals.failed += group.ids.length;
+          logError(
+            "Ordren kunne ikke behandles",
+            { shop, ids: { orderId } },
+            error,
+          );
         }
       }
 
@@ -236,6 +242,11 @@ export async function processShopQueue({
             error instanceof Error ? error.message : "Ukendt fejl.";
           await queue.markFailed(ids, message);
           totals.failed += ids.length;
+          logError(
+            "Lagerændringen kunne ikke behandles",
+            { shop, ids: { variantId } },
+            error,
+          );
         }
       }
     }
@@ -323,6 +334,11 @@ async function processCompliance(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl.";
       await queue.markFailed([event.id], message);
+      logError(
+        "Compliance-hændelsen kunne ikke behandles",
+        { shop, ids: { eventId: event.id, topic: event.topic } },
+        error,
+      );
       result.failed += 1;
     }
   }
