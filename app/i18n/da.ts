@@ -441,6 +441,7 @@ export const da = {
   "releases.toast.retry": "Prøves igen",
   "releases.toast.releasing": "Enhederne frigives nu",
   "releases.toast.extended": "Fristen er forlænget med {count} dage",
+  "releases.toast.missing": "Sagen findes ikke, eller den er allerede afgjort.",
   "releases.toast.saved": "Indstillinger gemt",
   "releases.deliveryLine": "{count} stk. i leverance {position} ({date})",
   "releases.request.PENDING": "Venter på dig",

@@ -2,6 +2,7 @@ import {
   fetchActiveSubscription,
   type ActiveSubscription,
 } from "./partnerApi.server";
+import { logWarn } from "../lib/log.server";
 
 // Har butikken adgang til PREAURA lige nu?
 //
@@ -90,7 +91,7 @@ export async function resolveAccess(
     // abonnement, beholder sin adgang — den sendes aldrig til prisvalgssiden,
     // fordi et kald fejlede.
     if (cached) {
-      console.error(`Abonnementet for ${shop} kunne ikke tjekkes:`, error);
+      logWarn("Abonnementet kunne ikke tjekkes", { shop }, error);
       return cached.access;
     }
     throw error;

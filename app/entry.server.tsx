@@ -6,6 +6,7 @@ import { type EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { startQueueSweeper } from "./orders/scheduler.server";
+import { logWarn } from "./lib/log.server";
 
 // Samler ordre-hændelser op, der venter i køen (fx efter en genstart).
 startQueueSweeper();
@@ -44,7 +45,7 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
-          console.error(error);
+          logWarn("Siden kunne ikke vises", {}, error);
         },
       },
     );

@@ -442,6 +442,7 @@ export const en: Record<MessageKey, string> = {
   "releases.toast.retry": "Trying again",
   "releases.toast.releasing": "The units are being released",
   "releases.toast.extended": "The deadline is extended by {count} days",
+  "releases.toast.missing": "The case doesn’t exist, or it has already been decided.",
   "releases.toast.saved": "Settings saved",
   "releases.deliveryLine": "{count} units in delivery {position} ({date})",
   "releases.request.PENDING": "Waiting for you",

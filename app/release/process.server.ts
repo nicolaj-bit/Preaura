@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import db from "../db.server";
 import type { OrderSnapshot } from "../models/preorder.server";
 import { releaseFor, type LineTarget } from "../models/release.server";
+import { logError } from "../lib/log.server";
 
 // Frigivelse af reserverede enheder — ÉN mekanisme med flere udløsere:
 //
@@ -108,6 +109,11 @@ export async function processReleases({
     } catch (error) {
       await release.cancellations.recordFailure(request.id, message(error));
       totals.failed += 1;
+      logError(
+        "Annulleringen kunne ikke udføres",
+        { shop, ids: { orderId: request.orderId, requestId: request.id } },
+        error,
+      );
     }
   }
 
@@ -131,6 +137,11 @@ export async function processReleases({
     } catch (error) {
       await release.payments.recordFailure(issue.id, message(error));
       totals.failed += 1;
+      logError(
+        "Frigivelsen efter afvist betaling fejlede",
+        { shop, ids: { orderId: issue.orderId, issueId: issue.id } },
+        error,
+      );
     }
   }
   return totals;

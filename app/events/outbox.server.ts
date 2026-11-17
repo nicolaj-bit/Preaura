@@ -25,6 +25,7 @@ import {
   webhookHeaders,
   type Channel,
 } from "./channels";
+import { scrub } from "../lib/log.server";
 
 // Afsenderen. To trin:
 //
@@ -241,7 +242,11 @@ async function post(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (response.ok) return { ok: true, status: response.status };
-    const text = (await response.text().catch(() => "")).slice(0, 300);
+    // Modtagerens svar gemmes som fejl og vises i admin. Klaviyo gentager
+    // ofte den e-mail, der var noget galt med; den fjernes.
+    const text = scrub(
+      (await response.text().catch(() => "")).slice(0, 300),
+    );
     return {
       ok: false,
       retry: !permanent(response.status),

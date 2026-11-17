@@ -41,6 +41,11 @@ services:
     startCommand: npm run start
     healthCheckPath: /healthz
     envVars:
+      # Hvor appen sender en besked, når noget går i stykker (ntfy, Slack
+      # eller Discord). Hemmelig, fordi alle med adressen kan læse beskederne.
+      # Se docs/backup.md, «Alarmer».
+      - key: PREAURA_ALERT_URL
+        sync: false
       # Nyeste Node.js 22. Nogle pakker kræver mindst 22.20 (se engines i
       # package.json); en fast, ældre version får buildet til at fejle.
       - key: NODE_VERSION
@@ -91,6 +96,11 @@ services:
     startCommand: npm run start
     healthCheckPath: /healthz
     envVars:
+      # Hvor appen sender en besked, når noget går i stykker (ntfy, Slack
+      # eller Discord). Hemmelig, fordi alle med adressen kan læse beskederne.
+      # Se docs/backup.md, «Alarmer».
+      - key: PREAURA_ALERT_URL
+        sync: false
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV

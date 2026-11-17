@@ -9,6 +9,7 @@ import { shopsWithWaitlist } from "../models/waitlist.server";
 import { shopsWithReleaseWork } from "../models/release.server";
 import { processWaitlist } from "../waitlist/process.server";
 import { accessFor } from "../billing/access.server";
+import { logError } from "../lib/log.server";
 
 // Starter behandlingen af en butiks kø.
 //
@@ -71,7 +72,7 @@ export async function runQueue(shop: string) {
   try {
     result = await processShopQueue({ shop, deps });
   } catch (error) {
-    console.error(`Køen for ${shop} kunne ikke behandles:`, error);
+    logError("Køen kunne ikke behandles", { shop }, error);
     result = { ran: false as const };
   }
   // Ventelisten — efter køen, så lageret er opdateret, og før udbakken, så
@@ -95,7 +96,7 @@ export async function runQueue(shop: string) {
         },
       });
     } catch (error) {
-      console.error(`Ventelisten for ${shop} fejlede:`, error);
+      logError("Ventelisten fejlede", { shop }, error);
     }
   }
   // Udgående hændelser (Flow, webhook, Klaviyo) — efter køen, så hændelser
@@ -112,7 +113,7 @@ export async function runQueue(shop: string) {
         },
       });
     } catch (error) {
-      console.error(`Udgående hændelser for ${shop} fejlede:`, error);
+      logError("Udgående hændelser fejlede", { shop }, error);
     }
   }
   return result;
@@ -133,7 +134,7 @@ export function startQueueSweeper() {
       try {
         await purgeOldData();
       } catch (error) {
-        console.error("Sletning af gamle data fejlede:", error);
+        logError("Sletning af gamle data fejlede", {}, error);
       }
     }
     try {
@@ -145,7 +146,7 @@ export function startQueueSweeper() {
       ]);
       for (const shop of shops) scheduleQueue(shop, 0);
     } catch (error) {
-      console.error("Fejning af køen fejlede:", error);
+      logError("Fejning af køen fejlede", {}, error);
     }
   }, SWEEP_MS);
 }
