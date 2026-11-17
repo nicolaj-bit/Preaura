@@ -19,6 +19,7 @@
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:leverancer": "vitest run app/orders/deliveryControl.test.ts app/orders/processQueue.server.test.ts app/release/release.test.ts app/lib/allocation.test.ts app/lib/deliveries.test.ts app/lib/variantMode.test.ts app/sync/syncVariant.server.test.ts",
     "build:block": "esbuild theme-extension-src/preaura-preorder.js --minify --target=es2018 \"--banner:js=/* PREAURA. Genereret fra theme-extension-src/preaura-preorder.js med npm run build:block - ret ikke her. */\" --outfile=extensions/preaura-preorder/assets/preaura-preorder.js && esbuild theme-extension-src/preaura-preorder-extras.js --minify --target=es2018 \"--banner:js=/* PREAURA. Genereret fra theme-extension-src/preaura-preorder-extras.js med npm run build:block - ret ikke her. */\" --outfile=extensions/preaura-preorder/assets/preaura-preorder-extras.js && esbuild theme-extension-src/preaura-cart.js --minify --target=es2018 \"--banner:js=/* PREAURA. Genereret fra theme-extension-src/preaura-cart.js med npm run build:block - ret ikke her. */\" --outfile=extensions/preaura-preorder/assets/preaura-cart.js",
     "pretest": "npm run build:block",
     "deploy:test": "shopify app deploy --config shopify.app.test.toml",
