@@ -579,17 +579,7 @@ modtagerne i `app/events/channels.ts` omformaterer kun.
 
 ## Før indsendelse til App Store
 
-Shopifys spørgsmål om databeskyttelse (Partner Dashboard → API access →
-Protected customer data access) er besvaret ærligt for udviklingsfasen.
-Disse svar står til «Nej» og skal være «Ja», før appen sendes til
-godkendelse:
-
-- **Fortæller shopejere, hvilke persondata vi behandler:** kræver en
-  privatlivspolitik for PREAURA, som der linkes til fra App Store-siden.
-- **Aftaler om databeskyttelse med shopejere:** kræver en
-  databehandleraftale (DPA) som del af appens vilkår.
-- **Opbevaringsperioder:** på plads (se «Databeskyttelse (GDPR)»). Svaret
-  kan sættes til «Ja».
-- **Kryptering ved lagring og overførsel:** overførsel er HTTPS, og
-  databasen på Render er krypteret (se «Drift på Render»). Svaret kan sættes
-  til «Ja».
+Ansøgningen om beskyttede kundedata (navn og e-mail, niveau 2) står med
+svar og begrundelser i `docs/protected-customer-data.md`. Privatlivspolitik,
+databehandleraftale, opbevaringsperioder, kryptering, adgangslog og plan for
+sikkerhedshændelser er på plads, så alle svar er «Ja».
