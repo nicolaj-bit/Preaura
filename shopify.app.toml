@@ -29,7 +29,10 @@ redirect_urls = [ "https://preaura.onrender.com/auth/callback" ]
 # write_order_edits kræves for at nedsætte antal ved delvis annullering.
 # read_locales og write_translations: planerne oprettes på butikkens
 # hovedsprog og oversættes til de øvrige sprog (app/sync/plans.ts).
-scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits,read_locales,write_translations"
+# read_all_orders: uden den kan appen kun læse og rette ordrer fra de
+# seneste 60 dage, og en forudbestilling sendes ofte senere. Godkendt af
+# Shopify (Dev Dashboard → Access requests) for PREAURA.
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,read_all_orders,write_orders,write_purchase_options,write_app_proxy,write_order_edits,read_locales,write_translations"
 
 [webhooks]
 api_version = "2026-10"
