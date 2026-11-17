@@ -9,13 +9,18 @@ const scenes = [
 ];
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1.2 });
-  const dir = `video-${lang}`; fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir);
+  const dir = `video-${lang}`;
+  // ONLY=7: optag kun de nævnte scener igen og genbrug de andre.
+  const only = process.env.ONLY ? process.env.ONLY.split(',').map(Number) : null;
+  if (!only) fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
   const clips = [];
   for (let i = 0; i < scenes.length; i++) {
     const [file, q, dur] = scenes[i];
+    if (only && !only.includes(i) && fs.existsSync(`${dir}/s${i}.mp4`)) { clips.push([`${dir}/s${i}.mp4`, dur]); continue; }
     await p.goto('file://' + path.resolve(file) + `?lang=${lang}&anim=1&${q}`);
     await p.waitForSelector('body[data-ready]', { timeout: 30000 }); await p.waitForTimeout(400);
-    const fdir = `${dir}/s${i}`; fs.mkdirSync(fdir);
+    const fdir = `${dir}/s${i}`; fs.rmSync(fdir, { recursive: true, force: true }); fs.mkdirSync(fdir);
     const n = Math.round(dur * FPS);
     for (let f = 0; f < n; f++) {
       await p.evaluate((t) => { for (const a of document.getAnimations({ subtree: true })) { a.pause(); a.currentTime = t; } }, f * 1000 / FPS);
